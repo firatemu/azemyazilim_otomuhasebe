@@ -291,6 +291,53 @@ Tablolarda form elemanları için:
 5. **Dialog background**: Dialog'larda mutlaka background renklerini ayarlayın
 6. **Tablo renkleri**: Tablolarda tüm text renkleri CSS variable kullanmalı
 
+## 📊 Global Table Styles
+
+Tüm Material-UI tablolar için otomatik uygulanan global stiller:
+
+```css
+/* Tablo Container */
+.MuiTableContainer-root {
+  background-color: var(--card);
+}
+
+/* Tablo Başlıkları */
+.MuiTableHead-root .MuiTableCell-root {
+  background-color: var(--muted);
+  font-weight: 700;
+}
+
+/* Tablo Satırları */
+.MuiTableBody-root .MuiTableRow-root {
+  background-color: var(--background);
+  border-bottom: 1px solid var(--border);
+}
+
+/* Hover Durumu */
+.MuiTableBody-root .MuiTableRow-root:hover {
+  background-color: var(--muted) !important;
+}
+```
+
+**Kullanım:**
+```tsx
+// Hiçbir ek stil gerekmez, otomatik uygulanır
+<TableContainer component={Paper}>
+  <Table>
+    <TableHead>
+      <TableRow>
+        <TableCell>Başlık</TableCell>
+      </TableRow>
+    </TableHead>
+    <TableBody>
+      <TableRow>
+        <TableCell sx={{ color: 'var(--foreground)' }}>Veri</TableCell>
+      </TableRow>
+    </TableBody>
+  </Table>
+</TableContainer>
+```
+
 ## 🔧 Troubleshooting
 
 **Sorun:** Dark mode'da helper text görünmüyor
@@ -305,11 +352,16 @@ Tablolarda form elemanları için:
 **Sorun:** Dialog arka planı yanlış renkte
 **Çözüm:** `PaperProps` ve `DialogContent` sx prop'larını ayarlayın
 
+**Sorun:** Tablo arka planı farklı renkte
+**Çözüm:** Global table CSS'leri otomatik uygulanır, ekstra stil gerekmez
+
 ---
 
 **Son Güncelleme:** 2026-01-21
-**Versiyon:** 1.1.0
+**Versiyon:** 1.2.0
 **Changelog:**
+- v1.2.0: Global table CSS stilleri eklendi (otomatik uygulanır)
+- v1.2.0: Tablo arka plan ve hover durumları CSS'e taşındı
 - v1.1.0: Helper text ve placeholder stilleri eklendi
 - v1.1.0: Dialog ve tablo kullanım örnekleri eklendi
 - v1.1.0: Best practices ve troubleshooting bölümleri eklendi
