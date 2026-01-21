@@ -1350,12 +1350,29 @@ export default function MalzemeListesiPage() {
         </Box>
       </Box>
 
-      <Paper sx={{ p: 2.5, mb: 3 }}>
+      <Paper sx={{ p: 2.5, mb: 3, bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)' }}>
         <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
           <TextField
             fullWidth
             size="small"
             placeholder="Stok kodu, adı, barkod veya OEM kodu ile ara..."
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'var(--input)',
+                '& fieldset': {
+                  borderColor: 'var(--border)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+              },
+              '& .MuiInputBase-input': {
+                color: 'var(--foreground)',
+              },
+            }}
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyPress={(e) => {
@@ -1409,7 +1426,26 @@ export default function MalzemeListesiPage() {
             </FormControl>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small" disabled={!selectedKategori}>
+            <FormControl fullWidth size="small" disabled={!selectedKategori} sx={{
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'var(--input)',
+                '& fieldset': {
+                  borderColor: 'var(--border)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: 'var(--muted-foreground)',
+              },
+              '& .MuiSelect-select': {
+                color: 'var(--foreground)',
+              },
+            }}>
               <InputLabel>Alt Kategori</InputLabel>
               <Select
                 label="Alt Kategori"
@@ -1428,7 +1464,26 @@ export default function MalzemeListesiPage() {
             </FormControl>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small">
+            <FormControl fullWidth size="small" sx={{
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'var(--input)',
+                '& fieldset': {
+                  borderColor: 'var(--border)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: 'var(--muted-foreground)',
+              },
+              '& .MuiSelect-select': {
+                color: 'var(--foreground)',
+              },
+            }}>
               <InputLabel>Marka</InputLabel>
               <Select
                 label="Marka"
@@ -1447,7 +1502,26 @@ export default function MalzemeListesiPage() {
             </FormControl>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small">
+            <FormControl fullWidth size="small" sx={{
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'var(--input)',
+                '& fieldset': {
+                  borderColor: 'var(--border)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+              },
+              '& .MuiInputLabel-root': {
+                color: 'var(--muted-foreground)',
+              },
+              '& .MuiSelect-select': {
+                color: 'var(--foreground)',
+              },
+            }}>
               <InputLabel>Stok Durumu</InputLabel>
               <Select
                 label="Stok Durumu"
@@ -1463,22 +1537,22 @@ export default function MalzemeListesiPage() {
         </Grid>
       </Paper>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} sx={{ bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)' }}>
         <Table>
-          <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+          <TableHead sx={{ bgcolor: 'var(--muted)' }}>
             <TableRow>
-              <TableCell><strong>Stok Kodu</strong></TableCell>
-              <TableCell><strong>Stok Adı</strong></TableCell>
-              <TableCell><strong>Marka</strong></TableCell>
-              <TableCell><strong>Raf Adresi</strong></TableCell>
-              <TableCell><strong>Ölçü</strong></TableCell>
-              <TableCell><strong>OEM</strong></TableCell>
-              <TableCell><strong>Araç Bilgileri</strong></TableCell>
-              <TableCell align="center"><strong>Miktar</strong></TableCell>
-              <TableCell><strong>Birim</strong></TableCell>
-              <TableCell align="right"><strong>Alış Fiyatı</strong></TableCell>
-              <TableCell align="right"><strong>Satış Fiyatı</strong></TableCell>
-              <TableCell align="center"><strong>İşlemler</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Stok Kodu</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Stok Adı</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Marka</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Raf Adresi</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Ölçü</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>OEM</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Araç Bilgileri</strong></TableCell>
+              <TableCell align="center" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Miktar</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Birim</strong></TableCell>
+              <TableCell align="right" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Alış Fiyatı</strong></TableCell>
+              <TableCell align="right" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Satış Fiyatı</strong></TableCell>
+              <TableCell align="center" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>İşlemler</strong></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
