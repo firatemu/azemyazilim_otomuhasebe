@@ -107,8 +107,22 @@
   
   /* Material-UI overrides for dark mode */
   .dark .MuiPaper-root {
+    background-color: var(--card) !important;
+    color: var(--card-foreground) !important;
+  }
+  
+  /* Paper component overrides for both light and dark mode */
+  .MuiPaper-root {
     background-color: var(--card);
     color: var(--card-foreground);
+  }
+  
+  .MuiPaper-elevation {
+    box-shadow: var(--shadow-sm);
+  }
+  
+  .MuiPaper-outlined {
+    border-color: var(--border) !important;
   }
   
   /* Table overrides for both light and dark mode */
@@ -116,24 +130,36 @@
     background-color: var(--card);
   }
   
+  .MuiTable-root {
+    background-color: var(--card);
+  }
+  
   .MuiTableCell-root {
-    color: var(--foreground);
-    border-color: var(--border);
+    color: var(--foreground) !important;
+    border-color: var(--border) !important;
+  }
+  
+  .MuiTableHead-root {
+    background-color: var(--muted);
   }
   
   .MuiTableHead-root .MuiTableCell-root {
-    background-color: var(--muted);
+    background-color: var(--muted) !important;
     font-weight: 700;
     color: var(--foreground) !important;
   }
   
   .MuiTableBody-root .MuiTableRow-root {
-    background-color: var(--background);
-    border-bottom: 1px solid var(--border);
+    background-color: var(--background) !important;
+    border-bottom: 1px solid var(--border) !important;
   }
   
   .MuiTableBody-root .MuiTableRow-root:hover {
     background-color: var(--muted) !important;
+  }
+  
+  .MuiTableRow-root {
+    border-color: var(--border) !important;
   }
   
   .dark .MuiMenuItem-root {
@@ -252,6 +278,24 @@
     border-color: var(--destructive);
   }
   
+  /* Autocomplete overrides for both light and dark mode */
+  .MuiAutocomplete-paper {
+    background-color: var(--card) !important;
+    border: 1px solid var(--border) !important;
+  }
+  
+  .MuiAutocomplete-option {
+    color: var(--foreground) !important;
+  }
+  
+  .MuiAutocomplete-option:hover {
+    background-color: var(--muted) !important;
+  }
+  
+  .MuiAutocomplete-option[aria-selected="true"] {
+    background-color: var(--muted) !important;
+  }
+  
   .dark .MuiAutocomplete-paper {
     background-color: var(--card);
     border: 1px solid var(--border);
@@ -263,6 +307,24 @@
   
   .dark .MuiAutocomplete-option:hover {
     background-color: var(--muted);
+  }
+  
+  /* Menu overrides for both light and dark mode */
+  .MuiMenu-paper {
+    background-color: var(--card) !important;
+    border: 1px solid var(--border) !important;
+  }
+  
+  .MuiMenuItem-root {
+    color: var(--foreground) !important;
+  }
+  
+  .MuiMenuItem-root:hover {
+    background-color: var(--muted) !important;
+  }
+  
+  .MuiMenuItem-root.Mui-selected {
+    background-color: var(--muted) !important;
   }
   
   .dark .MuiMenu-paper {
@@ -288,6 +350,85 @@
   
   .dark .MuiLinearProgress-bar {
     background-color: var(--primary);
+  }
+  
+  /* General InputBase overrides for both light and dark mode */
+  .MuiInputBase-root {
+    color: var(--foreground) !important;
+  }
+  
+  .MuiInputBase-input {
+    color: var(--foreground) !important;
+  }
+  
+  .MuiInputBase-input::placeholder {
+    color: var(--muted-foreground) !important;
+    opacity: 0.7;
+  }
+  
+  /* General Select overrides */
+  .MuiSelect-select {
+    color: var(--foreground) !important;
+  }
+  
+  .MuiSelect-icon {
+    color: var(--muted-foreground) !important;
+  }
+  
+  /* General TextField overrides */
+  .MuiTextField-root {
+    color: var(--foreground);
+  }
+  
+  /* General Chip overrides for both light and dark mode */
+  .MuiChip-root {
+    color: var(--foreground);
+  }
+  
+  .MuiChip-outlined {
+    border-color: var(--border) !important;
+  }
+  
+  /* General IconButton overrides */
+  .MuiIconButton-root {
+    color: var(--muted-foreground);
+  }
+  
+  .MuiIconButton-root:hover {
+    background-color: var(--muted) !important;
+    color: var(--foreground) !important;
+  }
+  
+  /* General Typography overrides */
+  .MuiTypography-root {
+    color: var(--foreground);
+  }
+  
+  .MuiTypography-colorTextSecondary {
+    color: var(--muted-foreground) !important;
+  }
+  
+  .MuiTypography-colorTextPrimary {
+    color: var(--foreground) !important;
+  }
+  
+  /* General Divider overrides */
+  .MuiDivider-root {
+    border-color: var(--border) !important;
+  }
+  
+  /* General List overrides */
+  .MuiList-root {
+    background-color: var(--card);
+    color: var(--foreground);
+  }
+  
+  .MuiListItem-root {
+    color: var(--foreground);
+  }
+  
+  .MuiListItem-root:hover {
+    background-color: var(--muted) !important;
   }
   
   /* Reusable MUI Component Styles */
