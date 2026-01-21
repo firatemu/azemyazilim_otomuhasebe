@@ -414,26 +414,13 @@ export default function CariPage() {
           <TextField
             fullWidth
             size="small"
+            className="form-control-textfield"
             placeholder="Cari kodu, ünvan veya yetkili bilgisi ile ara..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && fetchCariler()}
             InputProps={{
               startAdornment: <Search sx={{ mr: 1, color: 'var(--muted-foreground)' }} />,
-            }}
-            sx={{
-              '& .MuiOutlinedInput-root': {
-                bgcolor: 'var(--input)',
-                '& fieldset': {
-                  borderColor: 'var(--border)',
-                },
-                '&:hover fieldset': {
-                  borderColor: 'var(--muted-foreground)',
-                },
-                '&.Mui-focused fieldset': {
-                  borderColor: 'var(--ring)',
-                },
-              },
             }}
           />
           <Button
@@ -514,33 +501,46 @@ export default function CariPage() {
             ) : cariler.filter((cari: any) => showInactive ? cari.aktif === false : cari.aktif !== false).length === 0 ? (
               <TableRow>
                 <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
-                  <Typography variant="body1" color="text.secondary">
+                  <Typography variant="body1" sx={{ color: 'var(--muted-foreground)' }}>
                     {showInactive ? 'Kullanım dışı cari bulunamadı' : 'Kullanım içi cari bulunamadı'}
                   </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+                  <Typography variant="body2" sx={{ color: 'var(--muted-foreground)', mt: 1 }}>
                     {showInactive ? 'Tüm cariler kullanım içi durumda' : 'Yeni cari eklemek için yukarıdaki butonu kullanın'}
                   </Typography>
                 </TableCell>
               </TableRow>
             ) : (
               cariler.filter((cari: any) => showInactive ? cari.aktif === false : cari.aktif !== false).map((cari: any) => (
-                <TableRow key={cari.id} hover>
+                <TableRow 
+                  key={cari.id} 
+                  hover
+                  sx={{
+                    '&:hover': {
+                      bgcolor: 'var(--muted)',
+                    },
+                    borderBottom: '1px solid var(--border)',
+                  }}
+                >
                   <TableCell>
                     <Chip
                       label={cari.tip === 'MUSTERI' ? 'Müşteri' : 'Tedarikçi'}
                       size="small"
                       sx={{
-                        bgcolor: cari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
-                        color: 'white',
+                        bgcolor: cari.tip === 'MUSTERI' 
+                          ? 'color-mix(in srgb, var(--chart-1) 15%, transparent)' 
+                          : 'color-mix(in srgb, var(--primary) 15%, transparent)',
+                        color: cari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
+                        borderColor: cari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
                         fontWeight: 600,
                         fontSize: '0.75rem',
                       }}
+                      variant="outlined"
                     />
                   </TableCell>
-                  <TableCell>{cari.cariKodu}</TableCell>
-                  <TableCell>{cari.unvan}</TableCell>
-                  <TableCell>{cari.yetkili || '-'}</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 600 }}>
+                  <TableCell sx={{ color: 'var(--primary)' }}>{cari.cariKodu}</TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>{cari.unvan}</TableCell>
+                  <TableCell sx={{ color: 'var(--muted-foreground)' }}>{cari.yetkili || '-'}</TableCell>
+                  <TableCell align="right" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>
                     ₺{parseFloat(cari.bakiye || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                   </TableCell>
                   <TableCell align="center">
