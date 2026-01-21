@@ -482,17 +482,18 @@ export default function CariPage() {
           borderRadius: 'var(--radius)',
           border: '1px solid var(--border)',
           boxShadow: 'var(--shadow-sm)',
+          bgcolor: 'var(--card)',
         }}
       >
         <Table>
-          <TableHead sx={{ bgcolor: 'var(--muted)' }}>
-            <TableRow>
-              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Tip</TableCell>
-              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Cari Kodu</TableCell>
-              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Ünvan</TableCell>
-              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Yetkili</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Bakiye</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>İşlemler</TableCell>
+          <TableHead>
+            <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+              <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Tip</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Cari Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Ünvan</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Yetkili</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Bakiye</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -515,8 +516,9 @@ export default function CariPage() {
                   key={cari.id} 
                   hover
                   sx={{
+                    bgcolor: 'var(--background)',
                     '&:hover': {
-                      bgcolor: 'var(--muted)',
+                      bgcolor: 'var(--muted) !important',
                     },
                     borderBottom: '1px solid var(--border)',
                   }}
