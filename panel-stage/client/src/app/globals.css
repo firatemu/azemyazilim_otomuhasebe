@@ -111,13 +111,28 @@
     color: var(--card-foreground);
   }
   
-  .dark .MuiTableCell-root {
+  /* Table overrides for both light and dark mode */
+  .MuiTableContainer-root {
+    background-color: var(--card);
+  }
+  
+  .MuiTableCell-root {
     color: var(--foreground);
     border-color: var(--border);
   }
   
-  .dark .MuiTableHead-root .MuiTableCell-root {
+  .MuiTableHead-root .MuiTableCell-root {
     background-color: var(--muted);
+    font-weight: 700;
+  }
+  
+  .MuiTableBody-root .MuiTableRow-root {
+    background-color: var(--background);
+    border-bottom: 1px solid var(--border);
+  }
+  
+  .MuiTableBody-root .MuiTableRow-root:hover {
+    background-color: var(--muted) !important;
   }
   
   .dark .MuiMenuItem-root {
