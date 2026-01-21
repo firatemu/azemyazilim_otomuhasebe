@@ -111,23 +111,6 @@
     color: var(--card-foreground);
   }
   
-  .dark .MuiInputBase-root {
-    background-color: var(--input);
-    color: var(--foreground);
-  }
-  
-  .dark .MuiOutlinedInput-notchedOutline {
-    border-color: var(--border);
-  }
-  
-  .dark .MuiInputBase-input {
-    color: var(--foreground);
-  }
-  
-  .dark .MuiInputLabel-root {
-    color: var(--muted-foreground);
-  }
-  
   .dark .MuiTableCell-root {
     color: var(--foreground);
     border-color: var(--border);
@@ -137,19 +120,7 @@
     background-color: var(--muted);
   }
   
-  .dark .MuiSelect-select {
-    color: var(--foreground);
-  }
-  
   .dark .MuiMenuItem-root {
-    color: var(--foreground);
-  }
-  
-  .dark .MuiFormLabel-root {
-    color: var(--muted-foreground);
-  }
-  
-  .dark .MuiTypography-root {
     color: var(--foreground);
   }
   
@@ -161,70 +132,78 @@
   
   /* Form Control - Select Dropdown */
   .form-control-select .MuiOutlinedInput-root {
-    background-color: var(--input);
+    background-color: var(--input) !important;
     font-family: var(--font-sans);
   }
   
   .form-control-select .MuiOutlinedInput-root fieldset {
-    border-color: var(--border);
+    border-color: var(--border) !important;
   }
   
   .form-control-select .MuiOutlinedInput-root:hover fieldset {
-    border-color: var(--ring);
+    border-color: var(--ring) !important;
   }
   
   .form-control-select .MuiOutlinedInput-root.Mui-focused fieldset {
-    border-color: var(--ring);
+    border-color: var(--ring) !important;
   }
   
   .form-control-select .MuiOutlinedInput-root.Mui-disabled fieldset {
-    border-color: var(--border);
+    border-color: var(--border) !important;
   }
   
   .form-control-select .MuiInputLabel-root {
-    color: var(--muted-foreground);
+    color: var(--muted-foreground) !important;
     font-family: var(--font-sans);
   }
   
   .form-control-select .MuiInputLabel-root.Mui-disabled {
-    color: var(--muted-foreground);
+    color: var(--muted-foreground) !important;
   }
   
   .form-control-select .MuiSelect-select {
-    color: var(--foreground);
+    color: var(--foreground) !important;
     font-family: var(--font-sans);
   }
   
   .form-control-select .MuiSelect-select.Mui-disabled {
-    color: var(--foreground);
-    -webkit-text-fill-color: var(--foreground);
+    color: var(--foreground) !important;
+    -webkit-text-fill-color: var(--foreground) !important;
     opacity: 0.6;
+  }
+  
+  .form-control-select .MuiInputBase-root {
+    color: var(--foreground) !important;
+  }
+  
+  .form-control-select .MuiInputBase-input {
+    color: var(--foreground) !important;
   }
   
   /* Form Control - TextField */
   .form-control-textfield .MuiOutlinedInput-root {
-    background-color: var(--input);
+    background-color: var(--input) !important;
   }
   
   .form-control-textfield .MuiOutlinedInput-root fieldset {
-    border-color: var(--border);
+    border-color: var(--border) !important;
   }
   
   .form-control-textfield .MuiOutlinedInput-root:hover fieldset {
-    border-color: var(--ring);
+    border-color: var(--ring) !important;
   }
   
   .form-control-textfield .MuiOutlinedInput-root.Mui-focused fieldset {
-    border-color: var(--ring);
+    border-color: var(--ring) !important;
   }
   
   .form-control-textfield .MuiInputBase-input {
-    color: var(--foreground);
+    color: var(--foreground) !important;
     font-family: var(--font-sans);
   }
   
   .form-control-textfield .MuiInputLabel-root {
-    color: var(--muted-foreground);
+    color: var(--muted-foreground) !important;
     font-family: var(--font-sans);
   }
 }
