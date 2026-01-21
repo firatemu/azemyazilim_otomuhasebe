@@ -1306,7 +1306,7 @@ export default function MalzemeListesiPage() {
   return (
     <MainLayout>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" fontWeight="bold">
+        <Typography variant="h4" fontWeight="bold" sx={{ color: 'var(--foreground)' }}>
           Malzeme Listesi
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
