@@ -191,7 +191,11 @@ const MalzemeFormDialog = memo(({
       maxWidth="lg"
       fullWidth
       PaperProps={{
-        sx: { minHeight: '70vh' }
+        sx: { 
+          minHeight: '70vh',
+          bgcolor: 'var(--card)',
+          backgroundImage: 'none'
+        }
       }}
     >
       <DialogTitle
@@ -205,7 +209,7 @@ const MalzemeFormDialog = memo(({
       >
         {editingMalzeme ? '✏️ Malzeme Düzenle' : '➕ Yeni Malzeme Ekle'}
       </DialogTitle>
-      <DialogContent sx={{ mt: 3, background: 'var(--muted)', borderTop: '1px solid var(--border)', px: 3 }}>
+      <DialogContent sx={{ mt: 3, bgcolor: 'var(--background)', borderTop: '1px solid var(--border)', px: 3 }}>
         <Box sx={{ py: 1 }}>
           {/* Genel Bilgiler Bölümü */}
           <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>

@@ -179,6 +179,10 @@
     -webkit-text-fill-color: var(--foreground) !important;
     opacity: 0.6;
   }
+
+  .form-control-select .MuiFormHelperText-root {
+    color: var(--muted-foreground) !important;
+  }
   
   .form-control-select .MuiInputBase-root {
     color: var(--foreground) !important;
@@ -213,6 +217,15 @@
   .form-control-textfield .MuiInputLabel-root {
     color: var(--muted-foreground) !important;
     font-family: var(--font-sans);
+  }
+
+  .form-control-textfield .MuiFormHelperText-root {
+    color: var(--muted-foreground) !important;
+  }
+
+  .form-control-textfield .MuiInputBase-input::placeholder {
+    color: var(--muted-foreground) !important;
+    opacity: 0.7;
   }
 }
 
