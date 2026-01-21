@@ -356,35 +356,35 @@ export default function DashboardPage() {
     }
   };
 
-  // Dinamik stats cards
+  // Dinamik stats cards - Modern, Gradient-Free Design
   const statsCards = [
     { 
       title: 'Toplam Stok', 
       value: statsLoading ? '...' : stats.toplamStok.toLocaleString('tr-TR'), 
       icon: Inventory, 
-      color: '#06b6d4', 
-      gradient: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)' 
+      bgColor: 'var(--chart-1)',
+      iconBg: 'color-mix(in srgb, var(--chart-1) 15%, transparent)',
     },
     { 
       title: 'Cari Sayısı', 
       value: statsLoading ? '...' : stats.cariSayisi.toLocaleString('tr-TR'), 
       icon: People, 
-      color: '#8b5cf6', 
-      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)' 
+      bgColor: 'var(--secondary)',
+      iconBg: 'color-mix(in srgb, var(--secondary) 15%, transparent)',
     },
     { 
       title: 'Aylık Satış', 
       value: statsLoading ? '...' : `₺${stats.aylikSatis.toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`, 
       icon: Receipt, 
-      color: '#10b981', 
-      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)' 
+      bgColor: 'var(--chart-2)',
+      iconBg: 'color-mix(in srgb, var(--chart-2) 15%, transparent)',
     },
     { 
       title: 'Kâr Marjı', 
       value: statsLoading ? '...' : `%${stats.karMarji.toFixed(1)}`, 
       icon: TrendingUp, 
-      color: '#f59e0b', 
-      gradient: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+      bgColor: 'var(--primary)',
+      iconBg: 'color-mix(in srgb, var(--primary) 15%, transparent)',
     },
   ];
 
@@ -392,34 +392,64 @@ export default function DashboardPage() {
     <MainLayout>
       <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
-          <Typography variant="h4" gutterBottom fontWeight="bold" sx={{ 
-            background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-            display: 'inline-block'
-          }}>
+          <Typography 
+            variant="h4" 
+            gutterBottom 
+            sx={{ 
+              fontWeight: 700,
+              fontSize: '1.875rem',
+              color: 'var(--foreground)',
+              letterSpacing: '-0.02em',
+              mb: 0.5,
+            }}
+          >
             Dashboard
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography 
+            variant="body2" 
+            sx={{ 
+              color: 'var(--muted-foreground)',
+              fontSize: '0.875rem',
+            }}
+          >
             Hoş geldiniz! İşte sistemin genel görünümü
           </Typography>
         </Box>
         
         {/* Hatırlatıcı Bildirimi */}
-        <Badge badgeContent={toplamHatirlatici} color="error" max={99}>
+        <Badge 
+          badgeContent={toplamHatirlatici} 
+          max={99}
+          sx={{
+            '& .MuiBadge-badge': {
+              bgcolor: 'var(--destructive)',
+              color: 'var(--destructive-foreground)',
+              fontWeight: 600,
+            },
+          }}
+        >
           <IconButton 
             onClick={() => setHatirlaticiOpen(!hatirlaticiOpen)}
             sx={{ 
-              bgcolor: toplamHatirlatici > 0 ? '#fef3c7' : '#f3f4f6', 
-              '&:hover': { bgcolor: toplamHatirlatici > 0 ? '#fde68a' : '#e5e7eb' },
+              bgcolor: toplamHatirlatici > 0 
+                ? 'color-mix(in srgb, var(--primary) 12%, transparent)' 
+                : 'var(--muted)', 
+              color: toplamHatirlatici > 0 ? 'var(--primary)' : 'var(--muted-foreground)',
+              '&:hover': { 
+                bgcolor: toplamHatirlatici > 0 
+                  ? 'color-mix(in srgb, var(--primary) 20%, transparent)' 
+                  : 'var(--muted-hover)',
+                transform: 'scale(1.05)',
+              },
               animation: toplamHatirlatici > 0 ? 'pulse 2s ease-in-out infinite' : 'none',
               '@keyframes pulse': {
                 '0%, 100%': { transform: 'scale(1)' },
                 '50%': { transform: 'scale(1.05)' },
               },
+              transition: 'all 0.2s ease',
             }}
           >
-            <Notifications sx={{ color: toplamHatirlatici > 0 ? '#f59e0b' : '#6b7280' }} />
+            <Notifications sx={{ fontSize: 22 }} />
           </IconButton>
         </Badge>
       </Box>
@@ -431,21 +461,34 @@ export default function DashboardPage() {
             sx={{ 
               p: 3, 
               mb: 3, 
-              borderRadius: 3,
-              background: 'linear-gradient(135deg, #fef3c7 0%, #fde68a 100%)',
-              border: '2px solid #f59e0b',
+              borderRadius: 'var(--radius)',
+              bgcolor: 'color-mix(in srgb, var(--primary) 8%, var(--card) 92%)',
+              border: '2px solid var(--primary)',
+              boxShadow: 'var(--shadow-md)',
             }}
           >
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, flexWrap: 'wrap', gap: 2 }}>
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <Notifications sx={{ color: '#f59e0b' }} />
-                <Typography variant="h6" fontWeight="bold" color="#92400e">
+                <Notifications sx={{ color: 'var(--primary)', fontSize: 24 }} />
+                <Typography 
+                  variant="h6" 
+                  sx={{ 
+                    fontWeight: 700,
+                    fontSize: '1.125rem',
+                    color: 'var(--foreground)',
+                  }}
+                >
                   🔔 Hatırlatıcılar
                 </Typography>
                 <Chip 
                   label={`${toplamHatirlatici} İşlem`} 
                   size="small" 
-                  sx={{ bgcolor: '#f59e0b', color: 'white' }}
+                  sx={{ 
+                    bgcolor: 'var(--primary)', 
+                    color: 'var(--primary-foreground)',
+                    fontWeight: 600,
+                    fontSize: '0.75rem',
+                  }}
                 />
               </Box>
               
@@ -455,21 +498,87 @@ export default function DashboardPage() {
                   <Button 
                     onClick={() => setFiltre('bugun')}
                     variant={filtre === 'bugun' ? 'contained' : 'outlined'}
-                    startIcon={<Today />}
+                    startIcon={<Today sx={{ fontSize: 18 }} />}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: filtre === 'bugun' ? 600 : 500,
+                      ...(filtre === 'bugun' && {
+                        bgcolor: 'var(--secondary)',
+                        color: 'var(--secondary-foreground)',
+                        borderColor: 'var(--secondary)',
+                        '&:hover': {
+                          bgcolor: 'var(--secondary-hover)',
+                          borderColor: 'var(--secondary-hover)',
+                        },
+                      }),
+                      ...(filtre !== 'bugun' && {
+                        borderColor: 'var(--border)',
+                        color: 'var(--muted-foreground)',
+                        '&:hover': {
+                          bgcolor: 'var(--muted)',
+                          borderColor: 'var(--ring)',
+                          color: 'var(--foreground)',
+                        },
+                      }),
+                    }}
                   >
                     Bugün
                   </Button>
                   <Button 
                     onClick={() => setFiltre('yarin')}
                     variant={filtre === 'yarin' ? 'contained' : 'outlined'}
-                    startIcon={<Event />}
+                    startIcon={<Event sx={{ fontSize: 18 }} />}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: filtre === 'yarin' ? 600 : 500,
+                      ...(filtre === 'yarin' && {
+                        bgcolor: 'var(--secondary)',
+                        color: 'var(--secondary-foreground)',
+                        borderColor: 'var(--secondary)',
+                        '&:hover': {
+                          bgcolor: 'var(--secondary-hover)',
+                          borderColor: 'var(--secondary-hover)',
+                        },
+                      }),
+                      ...(filtre !== 'yarin' && {
+                        borderColor: 'var(--border)',
+                        color: 'var(--muted-foreground)',
+                        '&:hover': {
+                          bgcolor: 'var(--muted)',
+                          borderColor: 'var(--ring)',
+                          color: 'var(--foreground)',
+                        },
+                      }),
+                    }}
                   >
                     Yarın
                   </Button>
                   <Button 
                     onClick={() => setFiltre('bu-hafta')}
                     variant={filtre === 'bu-hafta' ? 'contained' : 'outlined'}
-                    startIcon={<DateRange />}
+                    startIcon={<DateRange sx={{ fontSize: 18 }} />}
+                    sx={{
+                      textTransform: 'none',
+                      fontWeight: filtre === 'bu-hafta' ? 600 : 500,
+                      ...(filtre === 'bu-hafta' && {
+                        bgcolor: 'var(--secondary)',
+                        color: 'var(--secondary-foreground)',
+                        borderColor: 'var(--secondary)',
+                        '&:hover': {
+                          bgcolor: 'var(--secondary-hover)',
+                          borderColor: 'var(--secondary-hover)',
+                        },
+                      }),
+                      ...(filtre !== 'bu-hafta' && {
+                        borderColor: 'var(--border)',
+                        color: 'var(--muted-foreground)',
+                        '&:hover': {
+                          bgcolor: 'var(--muted)',
+                          borderColor: 'var(--ring)',
+                          color: 'var(--foreground)',
+                        },
+                      }),
+                    }}
                   >
                     Bu Hafta
                   </Button>
@@ -481,23 +590,51 @@ export default function DashboardPage() {
                     size="small" 
                     onClick={() => setSesAktif(!sesAktif)}
                     sx={{ 
-                      color: sesAktif ? '#10b981' : '#6b7280',
-                      bgcolor: sesAktif ? '#d1fae5' : 'transparent',
+                      color: sesAktif ? 'var(--chart-2)' : 'var(--muted-foreground)',
+                      bgcolor: sesAktif 
+                        ? 'color-mix(in srgb, var(--chart-2) 12%, transparent)' 
+                        : 'transparent',
+                      '&:hover': {
+                        bgcolor: sesAktif 
+                          ? 'color-mix(in srgb, var(--chart-2) 20%, transparent)' 
+                          : 'var(--muted)',
+                      },
+                      transition: 'all 0.2s ease',
                     }}
                   >
-                    <NotificationsActive />
+                    <NotificationsActive sx={{ fontSize: 20 }} />
                   </IconButton>
                 </Tooltip>
                 
-                <IconButton size="small" onClick={() => setHatirlaticiOpen(false)}>
-                  <ExpandLess />
+                <IconButton 
+                  size="small" 
+                  onClick={() => setHatirlaticiOpen(false)}
+                  sx={{
+                    color: 'var(--muted-foreground)',
+                    '&:hover': {
+                      bgcolor: 'var(--muted)',
+                      color: 'var(--foreground)',
+                    },
+                    transition: 'all 0.2s ease',
+                  }}
+                >
+                  <ExpandLess sx={{ fontSize: 20 }} />
                 </IconButton>
               </Box>
             </Box>
             
             {/* Bilgi Mesajı */}
             {filtre === 'bu-hafta' && (
-              <Alert severity="info" sx={{ mb: 2 }}>
+              <Alert 
+                severity="info" 
+                sx={{ 
+                  mb: 2,
+                  bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)',
+                  border: '1px solid var(--chart-1)',
+                  color: 'var(--foreground)',
+                  borderRadius: 'var(--radius-md)',
+                }}
+              >
                 Bu hafta içinde (7 gün) vadesi gelecek işlemler gösteriliyor
               </Alert>
             )}
@@ -505,47 +642,123 @@ export default function DashboardPage() {
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
               {/* Çek/Senet Hatırlatıcısı */}
               {hatirlaticilar.cekSenetler.length > 0 && (
-                <Card sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 280 }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <Description sx={{ color: '#3b82f6' }} />
-                      <Typography variant="subtitle2" fontWeight="bold">
+                <Card sx={{ 
+                  flex: '1 1 calc(33.33% - 16px)', 
+                  minWidth: 280,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  bgcolor: 'var(--card)',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    boxShadow: 'var(--shadow-md)',
+                    borderColor: 'var(--ring)',
+                  },
+                }}>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                      <Box
+                        sx={{
+                          bgcolor: 'color-mix(in srgb, var(--chart-1) 15%, transparent)',
+                          borderRadius: 'var(--radius-md)',
+                          p: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Description sx={{ color: 'var(--chart-1)', fontSize: 20 }} />
+                      </Box>
+                      <Typography 
+                        variant="subtitle2" 
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '0.9375rem',
+                          color: 'var(--foreground)',
+                          flex: 1,
+                        }}
+                      >
                         Vadesi Gelen Çek/Senetler
                       </Typography>
-                      <Chip label={hatirlaticilar.cekSenetler.length} size="small" color="primary" />
+                      <Chip 
+                        label={hatirlaticilar.cekSenetler.length} 
+                        size="small" 
+                        sx={{ 
+                          bgcolor: 'var(--chart-1)',
+                          color: 'white',
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                        }} 
+                      />
                     </Box>
-                    <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                    <Typography 
+                      variant="caption" 
+                      sx={{ 
+                        display: 'block', 
+                        mb: 2,
+                        color: 'var(--muted-foreground)',
+                        fontSize: '0.8125rem',
+                      }}
+                    >
                       Ödenmemiş / Tahsil edilmemiş çek ve senetler
                     </Typography>
-                    <List dense>
+                    <List dense sx={{ p: 0 }}>
                       {hatirlaticilar.cekSenetler.slice(0, 3).map((cs: any) => (
                         <ListItem 
                           key={cs.id} 
                           sx={{ 
-                            px: 0, 
+                            px: 1.5,
+                            py: 1,
+                            mb: 0.75,
                             cursor: 'pointer',
-                            '&:hover': { bgcolor: '#f0f9ff' },
-                            borderRadius: 1,
+                            borderRadius: 'var(--radius-md)',
+                            bgcolor: 'transparent',
+                            border: '1px solid transparent',
+                            transition: 'all 0.2s ease',
+                            '&:hover': { 
+                              bgcolor: 'var(--muted)',
+                              borderColor: 'var(--border)',
+                            },
                           }}
                           onClick={() => router.push('/bordro/vade-takvim')}
                         >
                           <ListItemText
                             primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="body2" fontWeight="600">
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{
+                                    fontWeight: 600,
+                                    fontSize: '0.875rem',
+                                    color: 'var(--foreground)',
+                                  }}
+                                >
                                   {cs.tip === 'CEK' ? '📄 Çek' : '📋 Senet'} #{cs.cekNo || cs.seriNo || 'Belge Yok'}
                                 </Typography>
                                 <Chip 
                                   label={cs.portfoyTip === 'ALACAK' ? 'Alacak' : 'Borç'} 
                                   size="small" 
-                                  color={cs.portfoyTip === 'ALACAK' ? 'success' : 'error'}
-                                  sx={{ height: 18, fontSize: '0.65rem' }}
+                                  sx={{ 
+                                    height: 20,
+                                    fontSize: '0.6875rem',
+                                    fontWeight: 600,
+                                    bgcolor: cs.portfoyTip === 'ALACAK' 
+                                      ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)'
+                                      : 'color-mix(in srgb, var(--destructive) 15%, transparent)',
+                                    color: cs.portfoyTip === 'ALACAK' ? 'var(--chart-2)' : 'var(--destructive)',
+                                  }}
                                 />
-                                <ArrowForward sx={{ fontSize: 14, color: '#3b82f6' }} />
+                                <ArrowForward sx={{ fontSize: 14, color: 'var(--chart-1)', ml: 'auto' }} />
                               </Box>
                             }
                             secondary={
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography 
+                                variant="caption" 
+                                sx={{
+                                  color: 'var(--muted-foreground)',
+                                  fontSize: '0.75rem',
+                                }}
+                              >
                                 {cs.cari?.unvan} - ₺{Number(cs.tutar).toLocaleString('tr-TR')} - {cs.durum}
                               </Typography>
                             }
@@ -557,7 +770,17 @@ export default function DashboardPage() {
                           size="small" 
                           fullWidth 
                           onClick={() => router.push('/bordro/vade-takvim')}
-                          sx={{ mt: 1 }}
+                          sx={{ 
+                            mt: 1,
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            bgcolor: 'var(--muted)',
+                            color: 'var(--foreground)',
+                            '&:hover': {
+                              bgcolor: 'var(--secondary-light)',
+                              color: 'var(--secondary)',
+                            },
+                          }}
                         >
                           Tümünü Gör ({hatirlaticilar.cekSenetler.length})
                         </Button>
@@ -569,38 +792,99 @@ export default function DashboardPage() {
 
               {/* Personel Maaş Hatırlatıcısı */}
               {hatirlaticilar.personelOdemeleri.length > 0 && (
-                <Card sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 280 }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <Payment sx={{ color: '#10b981' }} />
-                      <Typography variant="subtitle2" fontWeight="bold">
+                <Card sx={{ 
+                  flex: '1 1 calc(33.33% - 16px)', 
+                  minWidth: 280,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  bgcolor: 'var(--card)',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    boxShadow: 'var(--shadow-md)',
+                    borderColor: 'var(--ring)',
+                  },
+                }}>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                      <Box
+                        sx={{
+                          bgcolor: 'color-mix(in srgb, var(--chart-2) 15%, transparent)',
+                          borderRadius: 'var(--radius-md)',
+                          p: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <Payment sx={{ color: 'var(--chart-2)', fontSize: 20 }} />
+                      </Box>
+                      <Typography 
+                        variant="subtitle2" 
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '0.9375rem',
+                          color: 'var(--foreground)',
+                          flex: 1,
+                        }}
+                      >
                         Maaş Ödeme Günü
                       </Typography>
-                      <Chip label={hatirlaticilar.personelOdemeleri.length} size="small" color="success" />
+                      <Chip 
+                        label={hatirlaticilar.personelOdemeleri.length} 
+                        size="small" 
+                        sx={{ 
+                          bgcolor: 'var(--chart-2)',
+                          color: 'white',
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                        }} 
+                      />
                     </Box>
-                    <List dense>
+                    <List dense sx={{ p: 0 }}>
                       {hatirlaticilar.personelOdemeleri.slice(0, 3).map((p: any) => (
                         <ListItem 
                           key={p.id} 
                           sx={{ 
-                            px: 0,
+                            px: 1.5,
+                            py: 1,
+                            mb: 0.75,
                             cursor: 'pointer',
-                            '&:hover': { bgcolor: '#f0fdf4' },
-                            borderRadius: 1,
+                            borderRadius: 'var(--radius-md)',
+                            bgcolor: 'transparent',
+                            border: '1px solid transparent',
+                            transition: 'all 0.2s ease',
+                            '&:hover': { 
+                              bgcolor: 'var(--muted)',
+                              borderColor: 'var(--border)',
+                            },
                           }}
                           onClick={() => router.push('/ik/personel')}
                         >
                           <ListItemText
                             primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="body2" fontWeight="600">
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{
+                                    fontWeight: 600,
+                                    fontSize: '0.875rem',
+                                    color: 'var(--foreground)',
+                                  }}
+                                >
                                   💰 {p.ad} {p.soyad}
                                 </Typography>
-                                <ArrowForward sx={{ fontSize: 14, color: '#10b981' }} />
+                                <ArrowForward sx={{ fontSize: 14, color: 'var(--chart-2)', ml: 'auto' }} />
                               </Box>
                             }
                             secondary={
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography 
+                                variant="caption" 
+                                sx={{
+                                  color: 'var(--muted-foreground)',
+                                  fontSize: '0.75rem',
+                                }}
+                              >
                                 Maaş: ₺{Number(p.maas || 0).toLocaleString('tr-TR')} - 
                                 Bakiye: {Number(p.bakiye) >= 0 ? '-' : '+'}₺{Math.abs(Number(p.bakiye)).toLocaleString('tr-TR')}
                               </Typography>
@@ -613,7 +897,17 @@ export default function DashboardPage() {
                           size="small" 
                           fullWidth 
                           onClick={() => router.push('/ik/personel')}
-                          sx={{ mt: 1 }}
+                          sx={{ 
+                            mt: 1,
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            bgcolor: 'var(--muted)',
+                            color: 'var(--foreground)',
+                            '&:hover': {
+                              bgcolor: 'var(--secondary-light)',
+                              color: 'var(--secondary)',
+                            },
+                          }}
                         >
                           Tümünü Gör ({hatirlaticilar.personelOdemeleri.length})
                         </Button>
@@ -625,38 +919,100 @@ export default function DashboardPage() {
 
               {/* Vadesi Geçmiş Faturalar */}
               {hatirlaticilar.vadesiGecenFaturalar.length > 0 && (
-                <Card sx={{ flex: '1 1 calc(33.33% - 16px)', minWidth: 280 }}>
-                  <CardContent>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                      <AccountBalance sx={{ color: '#ef4444' }} />
-                      <Typography variant="subtitle2" fontWeight="bold">
+                <Card sx={{ 
+                  flex: '1 1 calc(33.33% - 16px)', 
+                  minWidth: 280,
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  bgcolor: 'var(--card)',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'all 0.2s ease',
+                  '&:hover': {
+                    boxShadow: 'var(--shadow-md)',
+                    borderColor: 'var(--ring)',
+                  },
+                }}>
+                  <CardContent sx={{ p: 2.5 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 2 }}>
+                      <Box
+                        sx={{
+                          bgcolor: 'color-mix(in srgb, var(--destructive) 15%, transparent)',
+                          borderRadius: 'var(--radius-md)',
+                          p: 1,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                        }}
+                      >
+                        <AccountBalance sx={{ color: 'var(--destructive)', fontSize: 20 }} />
+                      </Box>
+                      <Typography 
+                        variant="subtitle2" 
+                        sx={{
+                          fontWeight: 700,
+                          fontSize: '0.9375rem',
+                          color: 'var(--foreground)',
+                          flex: 1,
+                        }}
+                      >
                         Vadesi Geçmiş Faturalar
                       </Typography>
-                      <Chip label={hatirlaticilar.vadesiGecenFaturalar.length} size="small" color="error" />
+                      <Chip 
+                        label={hatirlaticilar.vadesiGecenFaturalar.length} 
+                        size="small" 
+                        sx={{ 
+                          bgcolor: 'var(--destructive)',
+                          color: 'var(--destructive-foreground)',
+                          fontWeight: 600,
+                          fontSize: '0.75rem',
+                        }} 
+                      />
                     </Box>
-                    <List dense>
+                    <List dense sx={{ p: 0 }}>
                       {hatirlaticilar.vadesiGecenFaturalar.slice(0, 3).map((f: any) => (
                         <ListItem 
                           key={f.id} 
                           sx={{ 
-                            px: 0,
+                            px: 1.5,
+                            py: 1,
+                            mb: 0.75,
                             cursor: 'pointer',
-                            '&:hover': { bgcolor: '#fef2f2' },
-                            borderRadius: 1,
+                            borderRadius: 'var(--radius-md)',
+                            bgcolor: 'transparent',
+                            border: '1px solid transparent',
+                            transition: 'all 0.2s ease',
+                            '&:hover': { 
+                              bgcolor: 'var(--muted)',
+                              borderColor: 'var(--border)',
+                            },
                           }}
                           onClick={() => router.push('/fatura/arsiv')}
                         >
                           <ListItemText
                             primary={
-                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                                <Typography variant="body2" fontWeight="600">
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.5 }}>
+                                <Typography 
+                                  variant="body2" 
+                                  sx={{
+                                    fontWeight: 600,
+                                    fontSize: '0.875rem',
+                                    color: 'var(--foreground)',
+                                  }}
+                                >
                                   📋 {f.faturaNo}
                                 </Typography>
-                                <ArrowForward sx={{ fontSize: 14, color: '#ef4444' }} />
+                                <ArrowForward sx={{ fontSize: 14, color: 'var(--destructive)', ml: 'auto' }} />
                               </Box>
                             }
                             secondary={
-                              <Typography variant="caption" color="error">
+                              <Typography 
+                                variant="caption" 
+                                sx={{
+                                  color: 'var(--destructive)',
+                                  fontSize: '0.75rem',
+                                  fontWeight: 500,
+                                }}
+                              >
                                 Vade: {new Date(f.vade).toLocaleDateString('tr-TR')} - 
                                 Kalan: ₺{Number(f.odenecekTutar).toLocaleString('tr-TR')}
                               </Typography>
@@ -669,7 +1025,17 @@ export default function DashboardPage() {
                           size="small" 
                           fullWidth 
                           onClick={() => router.push('/fatura/arsiv')}
-                          sx={{ mt: 1 }}
+                          sx={{ 
+                            mt: 1,
+                            textTransform: 'none',
+                            fontWeight: 600,
+                            bgcolor: 'var(--muted)',
+                            color: 'var(--foreground)',
+                            '&:hover': {
+                              bgcolor: 'var(--secondary-light)',
+                              color: 'var(--secondary)',
+                            },
+                          }}
                         >
                           Tümünü Gör ({hatirlaticilar.vadesiGecenFaturalar.length})
                         </Button>
@@ -681,13 +1047,33 @@ export default function DashboardPage() {
             </Box>
           </Paper>
         ) : (
-          <Paper sx={{ p: 3, mb: 3, borderRadius: 3 }}>
+          <Paper sx={{ 
+            p: 3, 
+            mb: 3, 
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            bgcolor: 'var(--card)',
+            boxShadow: 'var(--shadow-sm)',
+          }}>
             <Box sx={{ textAlign: 'center', py: 4 }}>
-              <Notifications sx={{ fontSize: 64, color: '#d1d5db', mb: 2 }} />
-              <Typography variant="h6" color="text.secondary" gutterBottom>
+              <Notifications sx={{ fontSize: 64, color: 'var(--muted-foreground)', mb: 2, opacity: 0.5 }} />
+              <Typography 
+                variant="h6" 
+                sx={{
+                  color: 'var(--muted-foreground)',
+                  fontWeight: 600,
+                  mb: 1,
+                }}
+              >
                 Hatırlatıcı Yok
               </Typography>
-              <Typography variant="body2" color="text.secondary">
+              <Typography 
+                variant="body2" 
+                sx={{
+                  color: 'var(--muted-foreground)',
+                  fontSize: '0.875rem',
+                }}
+              >
                 {filtre === 'bugun' && 'Bugün için bekleyen işlem bulunmuyor'}
                 {filtre === 'yarin' && 'Yarın için bekleyen işlem bulunmuyor'}
                 {filtre === 'bu-hafta' && 'Bu hafta için bekleyen işlem bulunmuyor'}
@@ -704,32 +1090,55 @@ export default function DashboardPage() {
             <Box key={index} sx={{ flex: '1 1 calc(25% - 24px)', minWidth: 200 }}>
               <Card 
                 sx={{ 
-                  borderRadius: 3,
-                  transition: 'all 0.3s ease',
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  bgcolor: 'var(--card)',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
                   '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: '0 12px 24px rgba(0,0,0,0.15)',
+                    transform: 'translateY(-2px)',
+                    boxShadow: 'var(--shadow-md)',
+                    borderColor: 'var(--ring)',
                   }
                 }}
               >
-                <CardContent>
+                <CardContent sx={{ p: 2.5 }}>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
                     <Box
                       sx={{
-                        background: card.gradient,
-                        borderRadius: 2,
+                        bgcolor: card.iconBg,
+                        borderRadius: 'var(--radius-md)',
                         p: 1.5,
                         display: 'flex',
-                        boxShadow: `0 4px 12px ${card.color}40`,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 48,
+                        height: 48,
                       }}
                     >
-                      <card.icon sx={{ color: 'white', fontSize: 32 }} />
+                      <card.icon sx={{ color: card.bgColor, fontSize: 24 }} />
                     </Box>
-                    <Box>
-                      <Typography variant="body2" color="text.secondary" sx={{ fontSize: '0.85rem' }}>
+                    <Box sx={{ flex: 1, minWidth: 0 }}>
+                      <Typography 
+                        variant="body2" 
+                        sx={{ 
+                          fontSize: '0.8125rem',
+                          color: 'var(--muted-foreground)',
+                          fontWeight: 500,
+                          mb: 0.5,
+                        }}
+                      >
                         {card.title}
                       </Typography>
-                      <Typography variant="h5" fontWeight="bold" sx={{ color: card.color }}>
+                      <Typography 
+                        variant="h5" 
+                        sx={{ 
+                          fontWeight: 700,
+                          fontSize: '1.5rem',
+                          color: card.bgColor,
+                          lineHeight: 1.2,
+                        }}
+                      >
                         {card.value}
                       </Typography>
                     </Box>
@@ -744,62 +1153,68 @@ export default function DashboardPage() {
           <Box sx={{ flex: '1 1 65%', minWidth: 400 }}>
             <Paper sx={{ 
               p: 3, 
-              borderRadius: 3,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              border: '1px solid',
-              borderColor: 'divider',
+              borderRadius: 'var(--radius)',
+              boxShadow: 'var(--shadow-sm)',
+              border: '1px solid var(--border)',
+              bgcolor: 'var(--card)',
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                 <Box sx={{ 
                   width: 4, 
                   height: 24, 
-                  borderRadius: 1,
-                  background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)' 
+                  borderRadius: 'var(--radius-sm)',
+                  bgcolor: 'var(--primary)',
                 }} />
-                <Typography variant="h6" fontWeight="bold">
+                <Typography 
+                  variant="h6" 
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '1.125rem',
+                    color: 'var(--foreground)',
+                  }}
+                >
                   Satış Trendi
                 </Typography>
               </Box>
               <ResponsiveContainer width="100%" height={300}>
                 <LineChart data={salesData}>
-                  <defs>
-                    <linearGradient id="colorSatis" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#667eea" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#667eea" stopOpacity={0}/>
-                    </linearGradient>
-                    <linearGradient id="colorKar" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#10b981" stopOpacity={0.8}/>
-                      <stop offset="95%" stopColor="#10b981" stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" stroke="#888" />
-                  <YAxis stroke="#888" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="var(--muted-foreground)"
+                    tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    stroke="var(--muted-foreground)"
+                    tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                  />
                   <RechartsTooltip 
                     contentStyle={{ 
-                      borderRadius: 8, 
-                      border: 'none', 
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)' 
+                      borderRadius: 'var(--radius)', 
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--card)',
+                      boxShadow: 'var(--shadow-lg)',
+                      color: 'var(--foreground)',
                     }} 
                   />
-                  <Legend />
+                  <Legend 
+                    wrapperStyle={{ color: 'var(--foreground)' }}
+                  />
                   <Line 
                     type="monotone" 
                     dataKey="satis" 
-                    stroke="#667eea" 
+                    stroke="var(--primary)" 
                     strokeWidth={3}
-                    fill="url(#colorSatis)"
-                    dot={{ fill: '#667eea', r: 5 }}
-                    activeDot={{ r: 7 }}
+                    dot={{ fill: 'var(--primary)', r: 5 }}
+                    activeDot={{ r: 7, fill: 'var(--primary)' }}
                   />
                   <Line 
                     type="monotone" 
                     dataKey="kar" 
-                    stroke="#10b981" 
+                    stroke="var(--chart-2)" 
                     strokeWidth={3}
-                    fill="url(#colorKar)"
-                    dot={{ fill: '#10b981', r: 5 }}
-                    activeDot={{ r: 7 }}
+                    dot={{ fill: 'var(--chart-2)', r: 5 }}
+                    activeDot={{ r: 7, fill: 'var(--chart-2)' }}
                   />
                 </LineChart>
               </ResponsiveContainer>
@@ -809,43 +1224,53 @@ export default function DashboardPage() {
           <Box sx={{ flex: '1 1 30%', minWidth: 300 }}>
             <Paper sx={{ 
               p: 3,
-              borderRadius: 3,
-              boxShadow: '0 4px 12px rgba(0,0,0,0.08)',
-              border: '1px solid',
-              borderColor: 'divider',
+              borderRadius: 'var(--radius)',
+              boxShadow: 'var(--shadow-sm)',
+              border: '1px solid var(--border)',
+              bgcolor: 'var(--card)',
             }}>
-              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 3 }}>
                 <Box sx={{ 
                   width: 4, 
                   height: 24, 
-                  borderRadius: 1,
-                  background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' 
+                  borderRadius: 'var(--radius-sm)',
+                  bgcolor: 'var(--secondary)',
                 }} />
-                <Typography variant="h6" fontWeight="bold">
+                <Typography 
+                  variant="h6" 
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '1.125rem',
+                    color: 'var(--foreground)',
+                  }}
+                >
                   Aylık Karşılaştırma
                 </Typography>
               </Box>
               <ResponsiveContainer width="100%" height={300}>
                 <BarChart data={salesData}>
-                  <defs>
-                    <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor="#667eea" stopOpacity={1}/>
-                      <stop offset="95%" stopColor="#764ba2" stopOpacity={0.8}/>
-                    </linearGradient>
-                  </defs>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                  <XAxis dataKey="name" stroke="#888" />
-                  <YAxis stroke="#888" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                  <XAxis 
+                    dataKey="name" 
+                    stroke="var(--muted-foreground)"
+                    tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                  />
+                  <YAxis 
+                    stroke="var(--muted-foreground)"
+                    tick={{ fill: 'var(--muted-foreground)', fontSize: 12 }}
+                  />
                   <RechartsTooltip 
                     contentStyle={{ 
-                      borderRadius: 8, 
-                      border: 'none', 
-                      boxShadow: '0 4px 12px rgba(0,0,0,0.15)' 
+                      borderRadius: 'var(--radius)', 
+                      border: '1px solid var(--border)',
+                      backgroundColor: 'var(--card)',
+                      boxShadow: 'var(--shadow-lg)',
+                      color: 'var(--foreground)',
                     }} 
                   />
                   <Bar 
                     dataKey="satis" 
-                    fill="url(#barGradient)" 
+                    fill="var(--primary)" 
                     radius={[8, 8, 0, 0]}
                   />
                 </BarChart>

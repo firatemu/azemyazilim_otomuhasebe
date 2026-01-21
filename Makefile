@@ -2,6 +2,7 @@ SHELL := /bin/bash
 
 BASE = docker/compose/docker-compose.base.yml
 STAGING = docker/compose/docker-compose.staging.yml
+STAGING_DEV = docker/compose/docker-compose.staging.dev.yml
 PROD = docker/compose/docker-compose.prod.yml
 COMPOSE ?= docker compose
 
@@ -13,6 +14,10 @@ up-staging:
 	@echo "Starting staging environment..."
 	$(COMPOSE) -f $(BASE) -f $(STAGING) up -d --build
 
+up-staging-dev:
+	@echo "Starting staging DEV (hot-reload) environment..."
+	$(COMPOSE) --env-file docker/compose/.env.staging -f $(BASE) -f $(STAGING_DEV) up -d
+
 migrate-staging:
 	@echo "Running database migrations (staging)..."
 	$(COMPOSE) -f $(BASE) -f $(STAGING) run --rm backend-staging npx prisma migrate deploy
@@ -21,11 +26,22 @@ logs-staging:
 	@echo "Following logs from staging services..."
 	$(COMPOSE) -f $(BASE) -f $(STAGING) logs -f
 
+logs-staging-dev:
+	@echo "Following logs from staging DEV services..."
+	$(COMPOSE) --env-file docker/compose/.env.staging -f $(BASE) -f $(STAGING_DEV) logs -f
+
 down-staging:
 	@echo "Stopping staging environment..."
 	$(COMPOSE) -f $(BASE) -f $(STAGING) down
 
+down-staging-dev:
+	@echo "Stopping staging DEV environment..."
+	$(COMPOSE) --env-file docker/compose/.env.staging -f $(BASE) -f $(STAGING_DEV) down
+
 # --- PRODUCTION (image pull) ---
+build-prod:
+	IMAGE_TAG=$(IMAGE_TAG) $(COMPOSE) -f $(BASE) -f $(PROD) build
+
 pull-prod:
 	IMAGE_TAG=$(IMAGE_TAG) $(COMPOSE) -f $(BASE) -f $(PROD) pull
 
@@ -41,8 +57,8 @@ logs-prod:
 down-prod:
 	$(COMPOSE) -f $(BASE) -f $(PROD) down
 
-.PHONY: up-staging migrate-staging logs-staging down-staging \
-        pull-prod migrate-prod up-prod logs-prod down-prod
+.PHONY: up-staging up-staging-dev migrate-staging logs-staging logs-staging-dev down-staging down-staging-dev \
+        build-prod pull-prod migrate-prod up-prod logs-prod down-prod
 
 deploy-prod:
 	IMAGE_TAG=${IMAGE_TAG:-latest} make -C /var/www pull-prod && make -C /var/www migrate-prod && make -C /var/www up-prod

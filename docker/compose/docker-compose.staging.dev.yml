@@ -1,0 +1,110 @@
+version: "3.9"
+
+services:
+  # =========================
+  # STAGING = DEV (HOT RELOAD)
+  # =========================
+
+  backend-staging:
+    image: node:20-bullseye
+    working_dir: /app
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: development
+      PORT: "3020"
+    volumes:
+      - ../../api-stage/server:/app
+      - api_stage_node_modules:/app/node_modules
+    command: bash -lc "npm install --legacy-peer-deps && npm run start:dev"
+    networks: [app_net]
+    depends_on:
+      - postgres
+      - redis
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3020/api/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+
+  user-panel-staging:
+    image: node:20-bullseye
+    working_dir: /app
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: development
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      NEXT_TELEMETRY_DISABLED: "1"
+    volumes:
+      - ../../panel-stage/client:/app
+      - panel_stage_node_modules:/app/node_modules
+      - panel_stage_next_cache:/app/.next
+    command: bash -lc "corepack enable && pnpm install && pnpm dev"
+    networks: [app_net]
+    depends_on:
+      - backend-staging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/login"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  admin-panel-staging:
+    image: node:20-bullseye
+    working_dir: /app
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: development
+    volumes:
+      - ../../admin-stage:/app
+      - admin_stage_node_modules:/app/node_modules
+    # Vite dev server (vite.config.ts port: 3001)
+    command: bash -lc "npm ci || npm install && npm run dev -- --host 0.0.0.0 --port 3001"
+    networks: [app_net]
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3001/"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+  landing-page-staging:
+    image: node:20-bullseye
+    working_dir: /app
+    env_file:
+      - .env.staging
+    environment:
+      NODE_ENV: development
+      HOSTNAME: "0.0.0.0"
+      PORT: "3000"
+      TURBOPACK: "0"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_BASE_URL: https://staging-api.otomuhasebe.com
+    volumes:
+      - ../../otomuhasebe-landing:/app
+      - landing_node_modules:/app/node_modules
+      - landing_next_cache:/app/.next
+    command: bash -lc "npm ci || npm install && npm run dev"
+    networks: [app_net]
+    depends_on:
+      - backend-staging
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://127.0.0.1:3000/"]
+      interval: 10s
+      timeout: 3s
+      retries: 12
+      start_period: 20s
+
+volumes:
+  api_stage_node_modules:
+  panel_stage_node_modules:
+  panel_stage_next_cache:
+  admin_stage_node_modules:
+  landing_node_modules:
+  landing_next_cache:
+

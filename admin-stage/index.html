@@ -15,6 +15,11 @@
     <meta http-equiv="Pragma" content="no-cache" />
     <meta http-equiv="Expires" content="-1" />
     
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=AR+One+Sans:wght@400..800&family=JetBrains+Mono:wght@400..800&display=swap" rel="stylesheet" />
+    
     <title>admin-otomuhasebe</title>
     
     <script>
@@ -36,12 +41,20 @@
         });
       }
       
-      // LocalStorage ve SessionStorage için version control
-      const CACHE_VERSION = Date.now();
-      if (!localStorage.getItem('cacheVersion') || localStorage.getItem('cacheVersion') !== String(CACHE_VERSION)) {
+      // LocalStorage ve SessionStorage için version control - AGGRESSIVE
+      const BUILD_VERSION = 'v2.0.0-' + Date.now(); // Yeni tema versiyonu
+      const storedVersion = localStorage.getItem('appVersion');
+      
+      if (storedVersion !== BUILD_VERSION) {
+        console.log('[CACHE CLEAR] Clearing all cache due to version change:', storedVersion, '->', BUILD_VERSION);
         localStorage.clear();
         sessionStorage.clear();
-        localStorage.setItem('cacheVersion', String(CACHE_VERSION));
+        localStorage.setItem('appVersion', BUILD_VERSION);
+        
+        // Hard reload ile tüm kaynakları temizle
+        if (storedVersion) {
+          window.location.reload(true);
+        }
       }
     </script>
   </head>

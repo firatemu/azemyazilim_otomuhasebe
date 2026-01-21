@@ -743,7 +743,7 @@ export default function Home() {
       {/* Final CTA */}
       <section className="py-20 md:py-32 relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600 via-purple-600 to-pink-600"></div>
-        <div className="absolute inset-0 bg-[url('/grid.svg')] opacity-10"></div>
+        <div className="absolute inset-0 opacity-10" style={{ backgroundImage: 'url(/grid.svg)', backgroundRepeat: 'repeat', backgroundSize: 'auto' }}></div>
         
         <div className="container mx-auto px-4 text-center relative z-10">
           <Rocket className="w-16 h-16 text-white mx-auto mb-6 animate-bounce" />

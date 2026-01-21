@@ -1,0 +1,479 @@
+/* Malzeme Form Dialog - Design System ile Modern Tasarım */
+
+/* CSS Custom Properties - Design System Variables */
+:root {
+  --background: oklch(0.9751 0.0127 244.2507);
+  --foreground: oklch(0.3729 0.0306 259.7328);
+  --card: oklch(1.0000 0 0);
+  --card-foreground: oklch(0.3729 0.0306 259.7328);
+  --popover: oklch(1.0000 0 0);
+  --popover-foreground: oklch(0.3729 0.0306 259.7328);
+  --primary: oklch(0.7227 0.1920 149.5793);
+  --primary-foreground: oklch(1.0000 0 0);
+  --secondary: oklch(0.9514 0.0250 236.8242);
+  --secondary-foreground: oklch(0.4461 0.0263 256.8018);
+  --muted: oklch(0.9670 0.0029 264.5419);
+  --muted-foreground: oklch(0.5510 0.0234 264.3637);
+  --accent: oklch(0.9505 0.0507 163.0508);
+  --accent-foreground: oklch(0.3729 0.0306 259.7328);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --destructive-foreground: oklch(1.0000 0 0);
+  --border: oklch(0.9276 0.0058 264.5313);
+  --input: oklch(0.9276 0.0058 264.5313);
+  --ring: oklch(0.7227 0.1920 149.5793);
+  --radius: 0.5rem;
+  --shadow-sm: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10);
+  --shadow-md: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10);
+  --shadow-lg: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10);
+  --font-sans: 'DM Sans', sans-serif;
+}
+
+/* Dark mode - Sistem tercihine göre otomatik */
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: oklch(0.2077 0.0398 265.7549);
+    --foreground: oklch(0.8717 0.0093 258.3382);
+    --card: oklch(0.2795 0.0368 260.0310);
+    --card-foreground: oklch(0.8717 0.0093 258.3382);
+    --popover: oklch(0.2795 0.0368 260.0310);
+    --popover-foreground: oklch(0.8717 0.0093 258.3382);
+    --primary: oklch(0.7729 0.1535 163.2231);
+    --primary-foreground: oklch(0.2077 0.0398 265.7549);
+    --secondary: oklch(0.3351 0.0331 260.9120);
+    --secondary-foreground: oklch(0.7118 0.0129 286.0665);
+    --muted: oklch(0.2463 0.0275 259.9628);
+    --muted-foreground: oklch(0.5510 0.0234 264.3637);
+    --accent: oklch(0.3729 0.0306 259.7328);
+    --accent-foreground: oklch(0.7118 0.0129 286.0665);
+    --destructive: oklch(0.6368 0.2078 25.3313);
+    --destructive-foreground: oklch(0.2077 0.0398 265.7549);
+    --border: oklch(0.4461 0.0263 256.8018);
+    --input: oklch(0.4461 0.0263 256.8018);
+    --ring: oklch(0.7729 0.1535 163.2231);
+  }
+}
+
+/* Manuel dark mode desteği için .dark sınıfı */
+.dark {
+  --background: oklch(0.2077 0.0398 265.7549);
+  --foreground: oklch(0.8717 0.0093 258.3382);
+  --card: oklch(0.2795 0.0368 260.0310);
+  --card-foreground: oklch(0.8717 0.0093 258.3382);
+  --popover: oklch(0.2795 0.0368 260.0310);
+  --popover-foreground: oklch(0.8717 0.0093 258.3382);
+  --primary: oklch(0.7729 0.1535 163.2231);
+  --primary-foreground: oklch(0.2077 0.0398 265.7549);
+  --secondary: oklch(0.3351 0.0331 260.9120);
+  --secondary-foreground: oklch(0.7118 0.0129 286.0665);
+  --muted: oklch(0.2463 0.0275 259.9628);
+  --muted-foreground: oklch(0.5510 0.0234 264.3637);
+  --accent: oklch(0.3729 0.0306 259.7328);
+  --accent-foreground: oklch(0.7118 0.0129 286.0665);
+  --destructive: oklch(0.6368 0.2078 25.3313);
+  --destructive-foreground: oklch(0.2077 0.0398 265.7549);
+  --border: oklch(0.4461 0.0263 256.8018);
+  --input: oklch(0.4461 0.0263 256.8018);
+  --ring: oklch(0.7729 0.1535 163.2231);
+}
+
+/* Dialog Container */
+.MuiDialog-paper {
+  border-radius: var(--radius, 0.5rem) !important;
+  overflow: hidden !important;
+  box-shadow: var(--shadow-lg, 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10)) !important;
+  background-color: var(--card, oklch(1.0000 0 0)) !important;
+  color: var(--card-foreground, oklch(0.3729 0.0306 259.7328)) !important;
+}
+
+/* Dialog Header - Primary Color */
+.MuiDialogTitle-root.malzeme-dialog-header,
+.malzeme-dialog-header {
+  background-color: var(--primary, oklch(0.7227 0.1920 149.5793)) !important;
+  color: var(--primary-foreground, oklch(1.0000 0 0)) !important;
+  padding: 24px 32px !important;
+  font-size: 1.5rem !important;
+  font-weight: 600 !important;
+  letter-spacing: 0.5px !important;
+  box-shadow: var(--shadow-md, 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10)) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 12px !important;
+  margin: 0 !important;
+  font-family: var(--font-sans, 'DM Sans', sans-serif) !important;
+  border-bottom: none !important;
+}
+
+/* Dialog Content */
+.MuiDialogContent-root.malzeme-dialog-content,
+.malzeme-dialog-content {
+  padding: 24px 32px !important;
+  background-color: var(--card, oklch(1.0000 0 0)) !important;
+  margin-top: 0 !important;
+  color: var(--card-foreground, oklch(0.3729 0.0306 259.7328)) !important;
+}
+
+/* Dialog Actions */
+.MuiDialogActions-root.malzeme-dialog-actions,
+.malzeme-dialog-actions {
+  padding: 16px 32px !important;
+  background-color: var(--card, oklch(1.0000 0 0)) !important;
+  border-top: 1px solid var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+  gap: 12px !important;
+  justify-content: flex-end !important;
+}
+
+/* Section Container - Card Style */
+.malzeme-section-container {
+  background-color: var(--card, oklch(1.0000 0 0)) !important;
+  color: var(--card-foreground, oklch(0.3729 0.0306 259.7328)) !important;
+  border-radius: var(--radius, 0.5rem) !important;
+  padding: 24px !important;
+  margin-bottom: 24px !important;
+  box-shadow: var(--shadow-sm, 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10)) !important;
+  border: 1px solid var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+  transition: all 0.3s ease !important;
+}
+
+.malzeme-section-container:hover {
+  box-shadow: var(--shadow-md, 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10)) !important;
+  border-color: var(--accent, oklch(0.9505 0.0507 163.0508)) !important;
+  transform: translateY(-2px) !important;
+}
+
+/* Section Title */
+.malzeme-section-title {
+  font-size: 1.1rem !important;
+  font-weight: 600 !important;
+  color: var(--foreground, oklch(0.3729 0.0306 259.7328)) !important;
+  margin-bottom: 20px !important;
+  padding-bottom: 12px !important;
+  border-bottom: 2px solid var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 8px !important;
+  position: relative !important;
+  font-family: var(--font-sans, 'DM Sans', sans-serif) !important;
+}
+
+.malzeme-section-title::before {
+  content: '' !important;
+  width: 4px !important;
+  height: 24px !important;
+  background-color: var(--primary, oklch(0.7227 0.1920 149.5793)) !important;
+  border-radius: 2px !important;
+  display: inline-block !important;
+  margin-right: 8px !important;
+}
+
+/* TextField Styling */
+.malzeme-dialog-content .MuiTextField-root .MuiOutlinedInput-root {
+  border-radius: var(--radius, 0.5rem) !important;
+  transition: all 0.3s ease !important;
+  background-color: var(--input, oklch(0.9276 0.0058 264.5313)) !important;
+}
+
+.malzeme-dialog-content .MuiTextField-root .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+}
+
+.malzeme-dialog-content .MuiTextField-root .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--ring, oklch(0.7227 0.1920 149.5793)) !important;
+  border-width: 2px !important;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.7227 0.1920 149.5793)) 20%, transparent) !important;
+}
+
+.malzeme-dialog-content .MuiTextField-root .MuiInputBase-input {
+  padding: 12px 16px !important;
+  color: var(--foreground, oklch(0.3729 0.0306 259.7328)) !important;
+}
+
+.malzeme-dialog-content .MuiTextField-root .MuiInputLabel-root {
+  color: var(--muted-foreground, oklch(0.5510 0.0234 264.3637)) !important;
+}
+
+.malzeme-dialog-content .MuiTextField-root .MuiFormHelperText-root {
+  color: var(--muted-foreground, oklch(0.5510 0.0234 264.3637)) !important;
+}
+
+/* Select Styling */
+.malzeme-dialog-content .MuiFormControl-root .MuiOutlinedInput-root {
+  border-radius: var(--radius, 0.5rem) !important;
+  transition: all 0.3s ease !important;
+  background-color: var(--input, oklch(0.9276 0.0058 264.5313)) !important;
+}
+
+.malzeme-dialog-content .MuiFormControl-root .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+}
+
+.malzeme-dialog-content .MuiFormControl-root .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--ring, oklch(0.7227 0.1920 149.5793)) !important;
+  border-width: 2px !important;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.7227 0.1920 149.5793)) 20%, transparent) !important;
+}
+
+.malzeme-dialog-content .MuiFormControl-root .MuiInputBase-input {
+  padding: 12px 16px !important;
+  color: var(--foreground, oklch(0.3729 0.0306 259.7328)) !important;
+}
+
+.malzeme-dialog-content .MuiFormControl-root .MuiInputLabel-root {
+  color: var(--muted-foreground, oklch(0.5510 0.0234 264.3637)) !important;
+}
+
+.malzeme-dialog-content .MuiFormControl-root .MuiFormHelperText-root {
+  color: var(--muted-foreground, oklch(0.5510 0.0234 264.3637)) !important;
+}
+
+/* Autocomplete Styling */
+.malzeme-dialog-content .MuiAutocomplete-root .MuiOutlinedInput-root {
+  border-radius: var(--radius, 0.5rem) !important;
+  background-color: var(--input, oklch(0.9276 0.0058 264.5313)) !important;
+}
+
+.malzeme-dialog-content .MuiAutocomplete-root .MuiOutlinedInput-root:hover .MuiOutlinedInput-notchedOutline {
+  border-color: var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+}
+
+.malzeme-dialog-content .MuiAutocomplete-root .MuiOutlinedInput-root.Mui-focused .MuiOutlinedInput-notchedOutline {
+  border-color: var(--ring, oklch(0.7227 0.1920 149.5793)) !important;
+  border-width: 2px !important;
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring, oklch(0.7227 0.1920 149.5793)) 20%, transparent) !important;
+}
+
+/* Price Section */
+.malzeme-price-section {
+  background-color: var(--muted, oklch(0.9670 0.0029 264.5419)) !important;
+  border-radius: var(--radius, 0.5rem) !important;
+  padding: 20px !important;
+  margin-top: 16px !important;
+  border: 1px solid var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+  color: var(--foreground, oklch(0.3729 0.0306 259.7328)) !important;
+}
+
+/* Dialog Actions */
+.MuiDialogActions-root.malzeme-dialog-actions {
+  padding: 20px 32px !important;
+  background-color: var(--muted, oklch(0.9670 0.0029 264.5419)) !important;
+  border-top: 1px solid var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+  display: flex !important;
+  justify-content: flex-end !important;
+  gap: 12px !important;
+}
+
+/* Cancel Button */
+.malzeme-btn-cancel {
+  padding: 12px 24px !important;
+  border: 2px solid var(--border, oklch(0.9276 0.0058 264.5313)) !important;
+  border-radius: var(--radius, 0.5rem) !important;
+  background-color: var(--card, oklch(1.0000 0 0)) !important;
+  color: var(--foreground, oklch(0.3729 0.0306 259.7328)) !important;
+  font-weight: 500 !important;
+  text-transform: none !important;
+  transition: all 0.3s ease !important;
+  font-family: var(--font-sans, 'DM Sans', sans-serif) !important;
+}
+
+.malzeme-btn-cancel:hover {
+  background-color: var(--secondary, oklch(0.9514 0.0250 236.8242)) !important;
+  border-color: var(--accent, oklch(0.9505 0.0507 163.0508)) !important;
+  color: var(--secondary-foreground, oklch(0.4461 0.0263 256.8018)) !important;
+}
+
+/* Submit Button */
+.malzeme-btn-submit {
+  padding: 12px 32px !important;
+  border: none !important;
+  border-radius: var(--radius, 0.5rem) !important;
+  background-color: var(--primary, oklch(0.7227 0.1920 149.5793)) !important;
+  color: var(--primary-foreground, oklch(1.0000 0 0)) !important;
+  font-weight: 600 !important;
+  text-transform: none !important;
+  box-shadow: var(--shadow-md, 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10)) !important;
+  transition: all 0.3s ease !important;
+  font-family: var(--font-sans, 'DM Sans', sans-serif) !important;
+}
+
+.malzeme-btn-submit:hover:not(:disabled) {
+  transform: translateY(-2px) !important;
+  box-shadow: var(--shadow-lg, 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 4px 6px -2px hsl(0 0% 0% / 0.10)) !important;
+  background-color: color-mix(in oklch, var(--primary, oklch(0.7227 0.1920 149.5793)) 90%, black) !important;
+}
+
+.malzeme-btn-submit:disabled {
+  opacity: 0.6 !important;
+  cursor: not-allowed !important;
+  background-color: var(--muted, oklch(0.9670 0.0029 264.5419)) !important;
+  color: var(--muted-foreground, oklch(0.5510 0.0234 264.3637)) !important;
+}
+
+/* Scrollbar */
+.malzeme-dialog-content::-webkit-scrollbar {
+  width: 8px !important;
+}
+
+.malzeme-dialog-content::-webkit-scrollbar-track {
+  background-color: var(--muted, oklch(0.9670 0.0029 264.5419)) !important;
+  border-radius: 4px !important;
+}
+
+.malzeme-dialog-content::-webkit-scrollbar-thumb {
+  background-color: var(--primary, oklch(0.7227 0.1920 149.5793)) !important;
+  border-radius: 4px !important;
+}
+
+.malzeme-dialog-content::-webkit-scrollbar-thumb:hover {
+  background-color: color-mix(in oklch, var(--primary, oklch(0.7227 0.1920 149.5793)) 80%, black) !important;
+}
+
+/* Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.malzeme-section-container {
+  animation: slideIn 0.3s ease-out !important;
+}
+
+/* Dark Mode Support - Sistem tercihine göre otomatik */
+@media (prefers-color-scheme: dark) {
+  .MuiDialog-paper {
+    background-color: var(--card, oklch(0.2795 0.0368 260.0310)) !important;
+    color: var(--card-foreground, oklch(0.8717 0.0093 258.3382)) !important;
+  }
+
+  .MuiDialogTitle-root.malzeme-dialog-header {
+    background-color: var(--primary, oklch(0.7729 0.1535 163.2231)) !important;
+    color: var(--primary-foreground, oklch(0.2077 0.0398 265.7549)) !important;
+  }
+
+  .MuiDialogContent-root.malzeme-dialog-content {
+    background-color: var(--background, oklch(0.2077 0.0398 265.7549)) !important;
+    color: var(--foreground, oklch(0.8717 0.0093 258.3382)) !important;
+  }
+
+  .malzeme-section-container {
+    background-color: var(--card, oklch(0.2795 0.0368 260.0310)) !important;
+    color: var(--card-foreground, oklch(0.8717 0.0093 258.3382)) !important;
+    border-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+  }
+
+  .malzeme-section-title {
+    color: var(--foreground, oklch(0.8717 0.0093 258.3382)) !important;
+    border-bottom-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+  }
+
+  .malzeme-price-section {
+    background-color: var(--muted, oklch(0.2463 0.0275 259.9628)) !important;
+    border-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+    color: var(--foreground, oklch(0.8717 0.0093 258.3382)) !important;
+  }
+
+  .MuiDialogActions-root.malzeme-dialog-actions {
+    background-color: var(--muted, oklch(0.2463 0.0275 259.9628)) !important;
+    border-top-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+  }
+
+  .malzeme-btn-cancel {
+    background-color: var(--card, oklch(0.2795 0.0368 260.0310)) !important;
+    color: var(--foreground, oklch(0.8717 0.0093 258.3382)) !important;
+    border-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+  }
+
+  .malzeme-btn-cancel:hover {
+    background-color: var(--secondary, oklch(0.3351 0.0331 260.9120)) !important;
+    color: var(--secondary-foreground, oklch(0.7118 0.0129 286.0665)) !important;
+  }
+
+  .malzeme-btn-submit {
+    background-color: var(--primary, oklch(0.7729 0.1535 163.2231)) !important;
+    color: var(--primary-foreground, oklch(0.2077 0.0398 265.7549)) !important;
+  }
+}
+
+/* Manuel Dark Mode - .dark sınıfı ile */
+.dark .MuiDialog-paper {
+  background-color: var(--card, oklch(0.2795 0.0368 260.0310)) !important;
+  color: var(--card-foreground, oklch(0.8717 0.0093 258.3382)) !important;
+}
+
+.dark .MuiDialogTitle-root.malzeme-dialog-header {
+  background-color: var(--primary, oklch(0.7729 0.1535 163.2231)) !important;
+  color: var(--primary-foreground, oklch(0.2077 0.0398 265.7549)) !important;
+}
+
+.dark .MuiDialogContent-root.malzeme-dialog-content {
+  background-color: var(--background, oklch(0.2077 0.0398 265.7549)) !important;
+  color: var(--foreground, oklch(0.8717 0.0093 258.3382)) !important;
+}
+
+.dark .malzeme-section-container {
+  background-color: var(--card, oklch(0.2795 0.0368 260.0310)) !important;
+  color: var(--card-foreground, oklch(0.8717 0.0093 258.3382)) !important;
+  border-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+}
+
+.dark .malzeme-section-title {
+  color: var(--foreground, oklch(0.8717 0.0093 258.3382)) !important;
+  border-bottom-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+}
+
+.dark .malzeme-price-section {
+  background-color: var(--muted, oklch(0.2463 0.0275 259.9628)) !important;
+  border-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+  color: var(--foreground, oklch(0.8717 0.0093 258.3382)) !important;
+}
+
+.dark .MuiDialogActions-root.malzeme-dialog-actions {
+  background-color: var(--muted, oklch(0.2463 0.0275 259.9628)) !important;
+  border-top-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+}
+
+.dark .malzeme-btn-cancel {
+  background-color: var(--card, oklch(0.2795 0.0368 260.0310)) !important;
+  color: var(--foreground, oklch(0.8717 0.0093 258.3382)) !important;
+  border-color: var(--border, oklch(0.4461 0.0263 256.8018)) !important;
+}
+
+.dark .malzeme-btn-cancel:hover {
+  background-color: var(--secondary, oklch(0.3351 0.0331 260.9120)) !important;
+  color: var(--secondary-foreground, oklch(0.7118 0.0129 286.0665)) !important;
+}
+
+.dark .malzeme-btn-submit {
+  background-color: var(--primary, oklch(0.7729 0.1535 163.2231)) !important;
+  color: var(--primary-foreground, oklch(0.2077 0.0398 265.7549)) !important;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .MuiDialogTitle-root.malzeme-dialog-header {
+    padding: 20px 24px !important;
+    font-size: 1.25rem !important;
+  }
+
+  .MuiDialogContent-root.malzeme-dialog-content {
+    padding: 20px !important;
+  }
+
+  .malzeme-section-container {
+    padding: 16px !important;
+  }
+
+  .MuiDialogActions-root.malzeme-dialog-actions {
+    padding: 16px 20px !important;
+    flex-direction: column !important;
+  }
+
+  .malzeme-btn-cancel,
+  .malzeme-btn-submit {
+    width: 100% !important;
+  }
+}

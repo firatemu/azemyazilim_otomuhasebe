@@ -19,9 +19,9 @@ services:
     image: caddy:2
     container_name: otomuhasebe-caddy
     restart: unless-stopped
-    # ports:
-    #   - "80:80"
-    #   - "443:443"
+    ports:
+      - "80:80"
+      - "443:443"
     volumes:
       - ../caddy/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
@@ -41,6 +41,8 @@ services:
     image: postgres:16-alpine
     container_name: otomuhasebe-postgres
     restart: unless-stopped
+    ports:
+      - "5432:5432"
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: IKYYJ1R8fUZ3PItqxf6qel12VNbLYiOe
@@ -51,7 +53,7 @@ services:
     networks:
       - app_net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready", "-U", "user"]
+      test: ["CMD-SHELL", "pg_isready", "-U", "postgres"]
       interval: 5s
       timeout: 3s
       retries: 20

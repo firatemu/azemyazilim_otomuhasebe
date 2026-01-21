@@ -26,24 +26,10 @@
   # }
 }
 
-# ---- Basit rate-limit snippet (IP başına) ----
-# Not: Caddy'nin built-in basit limit örneği (golang matcher + requests)
-# Daha gelişmiş ihtiyaçlar için rate-limiter eklentisi veya upstream limit önerilir.
-(rate_limited_auth) {
-  @authPaths {
-    path /login*
-    path /auth*
-    path /api/login*
-    path /api/auth*
-  }
-  # Client IP başına 1dk'da 60 istek (örnek)
-  rate_limit @authPaths {
-    key {remote_host}
-    window 1m
-    burst 20
-    rate 60
-  }
-}
+#
+# NOTE:
+# `rate_limit` direktifi Caddy'nin default binary'sinde yoktur (plugin gerekir).
+# Bu yüzden rate-limit konfigürasyonu devre dışı bırakıldı.
 
 # ==========================================================
 #    PROD ROUTING (Service-name → Docker içi :3000)
@@ -55,24 +41,59 @@ panel.otomuhasebe.com {
   reverse_proxy user-panel:3000
 }
 
+# ==========================
+# STAGING (DEV) ROUTING
+# ==========================
+
+staging.otomuhasebe.com {
+  import common_security
+  reverse_proxy compose-user-panel-staging-1:3000
+}
+
+staging-api.otomuhasebe.com {
+  import common_security
+  
+  # Root path redirect to health endpoint
+  @root path /
+  redir @root /api/health temporary
+  
+  # API routes
+  reverse_proxy backend-staging:3020
+}
+
+admin-staging.otomuhasebe.com {
+  import common_security
+  reverse_proxy admin-panel-staging:3001 {
+    header_up Host localhost:3001
+  }
+}
+
+landing-staging.otomuhasebe.com {
+  import common_security
+  reverse_proxy landing-page-staging:3000
+}
+
 # Admin Panel
 admin.otomuhasebe.com {
   import common_security
-  import rate_limited_auth
   # Admin panel container port 80 (Vite)
   reverse_proxy admin-panel:80
 }
 
-# Landing (www)
-www.otomuhasebe.com {
+# Landing (www + root domain)
+otomuhasebe.com, www.otomuhasebe.com {
   import common_security
   reverse_proxy landing-page:3000
 }
 
-# API (opsiyonel ayrı domain)
+# API (production)
 api.otomuhasebe.com {
   import common_security
-  # API login/auth rate-limit uygula
-  import rate_limited_auth
+  
+  # Root path redirect to health endpoint
+  @root path /
+  redir @root /api/health temporary
+  
+  # API routes
   reverse_proxy backend:3000
 }

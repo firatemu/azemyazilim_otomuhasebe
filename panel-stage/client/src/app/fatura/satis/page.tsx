@@ -632,7 +632,13 @@ export default function SatisFaturalariPage() {
                   size="small"
                   onClick={handleAddKalem}
                   sx={{
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    bgcolor: 'var(--secondary)',
+                    color: 'var(--secondary-foreground)',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    '&:hover': {
+                      bgcolor: 'var(--secondary-hover)',
+                    },
                   }}
                 >
                   Kalem Ekle
@@ -741,23 +747,56 @@ export default function SatisFaturalariPage() {
             </Box>
 
             {/* Toplam */}
-            <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f9fafb' }}>
+            <Paper 
+              variant="outlined" 
+              sx={{ 
+                p: 2, 
+                bgcolor: 'var(--muted)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Ara Toplam:</Typography>
-                  <Typography variant="h6" fontWeight="bold">{formatCurrency(toplamTutar)}</Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Ara Toplam:
+                  </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ fontWeight: 700, color: 'var(--foreground)' }}
+                  >
+                    {formatCurrency(toplamTutar)}
+                  </Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">KDV Toplamı:</Typography>
-                  <Typography variant="h6" fontWeight="bold">{formatCurrency(kdvTutar)}</Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    KDV Toplamı:
+                  </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ fontWeight: 700, color: 'var(--foreground)' }}
+                  >
+                    {formatCurrency(kdvTutar)}
+                  </Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Genel Toplam:</Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Genel Toplam:
+                  </Typography>
                   <Typography
                     variant="h6"
-                    fontWeight="bold"
                     sx={{
-                      color: '#8b5cf6',
+                      fontWeight: 700,
+                      color: 'var(--secondary)',
                     }}
                   >
                     {formatCurrency(genelToplam)}
@@ -768,14 +807,30 @@ export default function SatisFaturalariPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setOpenAdd(false); setOpenEdit(false); }}>
+          <Button 
+            onClick={() => { setOpenAdd(false); setOpenEdit(false); }}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              color: 'var(--muted-foreground)',
+              '&:hover': {
+                bgcolor: 'var(--muted)',
+              },
+            }}
+          >
             İptal
           </Button>
           <Button
             onClick={handleSave}
             variant="contained"
             sx={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+              bgcolor: 'var(--secondary)',
+              color: 'var(--secondary-foreground)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'var(--secondary-hover)',
+              },
             }}
           >
             {openAdd ? 'Oluştur' : 'Güncelle'}
@@ -789,14 +844,25 @@ export default function SatisFaturalariPage() {
     <MainLayout>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" fontWeight="bold" sx={{
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}>
+          <Typography 
+            variant="h4" 
+            sx={{
+              fontWeight: 700,
+              fontSize: '1.875rem',
+              color: 'var(--foreground)',
+              letterSpacing: '-0.02em',
+              mb: 0.5,
+            }}
+          >
             Satış Faturaları
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography 
+            variant="body2" 
+            sx={{
+              color: 'var(--muted-foreground)',
+              fontSize: '0.875rem',
+            }}
+          >
             Satış faturalarını yönetin
           </Typography>
         </Box>
@@ -805,11 +871,15 @@ export default function SatisFaturalariPage() {
           startIcon={<Add />}
           onClick={() => router.push('/fatura/satis/yeni')}
           sx={{
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)',
+            bgcolor: 'var(--secondary)',
+            color: 'var(--secondary-foreground)',
+            boxShadow: 'var(--shadow-sm)',
+            textTransform: 'none',
+            fontWeight: 600,
             '&:hover': {
-              background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-              boxShadow: '0 6px 16px rgba(139, 92, 246, 0.6)',
+              bgcolor: 'var(--secondary-hover)',
+              boxShadow: 'var(--shadow-md)',
+              transform: 'translateY(-1px)',
             }
           }}
         >
@@ -840,13 +910,28 @@ export default function SatisFaturalariPage() {
         </Box>
       </Paper>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+      <TableContainer 
+        component={Paper} 
+        sx={{ 
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
         <Table>
-          <TableHead sx={{ bgcolor: '#f8f9fa' }}>
+          <TableHead sx={{ bgcolor: 'var(--muted)' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => handleSort('faturaNo')}>
+              <TableCell 
+                sx={{ 
+                  fontWeight: 600, 
+                  cursor: 'pointer',
+                  color: 'var(--foreground)',
+                  fontSize: '0.875rem',
+                }} 
+                onClick={() => handleSort('faturaNo')}
+              >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" fontWeight="600">Fatura No</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>Fatura No</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
                     {sortBy === 'faturaNo' && (
                       sortOrder === 'asc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />
@@ -924,10 +1009,19 @@ export default function SatisFaturalariPage() {
                 <TableRow
                   key={fatura.id}
                   hover
-                  sx={{ '&:hover': { bgcolor: '#f9f9f9' } }}
+                  sx={{ 
+                    '&:hover': { bgcolor: 'var(--muted)' },
+                    transition: 'background-color 0.2s ease',
+                  }}
                 >
                   <TableCell>
-                    <Typography variant="body2" fontWeight="600" color="#8b5cf6">
+                    <Typography 
+                      variant="body2" 
+                      sx={{
+                        fontWeight: 600,
+                        color: 'var(--secondary)',
+                      }}
+                    >
                       {fatura.faturaNo}
                     </Typography>
                   </TableCell>
@@ -951,10 +1045,10 @@ export default function SatisFaturalariPage() {
                       size="small"
                       onClick={(e) => handleMenuOpen(e, fatura.id)}
                       sx={{
-                        color: '#6b7280',
+                        color: 'var(--muted-foreground)',
                         '&:hover': {
-                          bgcolor: '#f3f4f6',
-                          color: '#8b5cf6'
+                          bgcolor: 'var(--muted)',
+                          color: 'var(--secondary)'
                         }
                       }}
                     >
@@ -982,11 +1076,11 @@ export default function SatisFaturalariPage() {
                         sx={{
                           gap: 1.5,
                           py: 1,
-                          '&:hover': { bgcolor: '#eff6ff' }
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)' }
                         }}
                       >
-                        <Visibility fontSize="small" sx={{ color: '#3b82f6' }} />
-                        <Typography variant="body2">Görüntüle</Typography>
+                        <Visibility fontSize="small" sx={{ color: 'var(--chart-1)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Görüntüle</Typography>
                       </MenuItem>
 
                       <MenuItem
@@ -997,11 +1091,11 @@ export default function SatisFaturalariPage() {
                         sx={{
                           gap: 1.5,
                           py: 1,
-                          '&:hover': { bgcolor: '#fffbeb' }
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)' }
                         }}
                       >
-                        <Edit fontSize="small" sx={{ color: '#f59e0b' }} />
-                        <Typography variant="body2">Düzenle</Typography>
+                        <Edit fontSize="small" sx={{ color: 'var(--primary)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Düzenle</Typography>
                       </MenuItem>
 
                       <MenuItem
@@ -1012,11 +1106,11 @@ export default function SatisFaturalariPage() {
                         sx={{
                           gap: 1.5,
                           py: 1,
-                          '&:hover': { bgcolor: '#ecfdf5' }
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)' }
                         }}
                       >
-                        <Print fontSize="small" sx={{ color: '#10b981' }} />
-                        <Typography variant="body2">Yazdır</Typography>
+                        <Print fontSize="small" sx={{ color: 'var(--chart-2)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Yazdır</Typography>
                       </MenuItem>
 
                       <MenuItem
@@ -1027,11 +1121,11 @@ export default function SatisFaturalariPage() {
                         sx={{
                           gap: 1.5,
                           py: 1,
-                          '&:hover': { bgcolor: '#f5f3ff' }
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)' }
                         }}
                       >
-                        <Assignment fontSize="small" sx={{ color: '#8b5cf6' }} />
-                        <Typography variant="body2">Malzeme Hazırlama Fişi</Typography>
+                        <Assignment fontSize="small" sx={{ color: 'var(--secondary)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Malzeme Hazırlama Fişi</Typography>
                       </MenuItem>
 
                       <MenuItem

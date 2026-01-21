@@ -373,6 +373,12 @@ window.getCurrentTenantId = async () => {
   }
 })();
 
+// Dark mode initialization - sistem temasına göre .dark sınıfı ekle
+if (typeof window !== 'undefined') {
+  const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+  document.documentElement.classList.toggle('dark', prefersDark);
+}
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <App />

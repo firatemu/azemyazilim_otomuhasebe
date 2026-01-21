@@ -11,6 +11,7 @@ import {
   Menu,
   MenuItem,
   Chip,
+  Divider,
 } from '@mui/material';
 import {
   Logout,
@@ -19,6 +20,8 @@ import {
   Menu as MenuIcon,
   PushPin,
   PushPinOutlined,
+  Settings,
+  Notifications,
 } from '@mui/icons-material';
 import { useAuthStore } from '@/stores/authStore';
 import { useRouter } from 'next/navigation';
@@ -51,8 +54,8 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
       setCurrentDateTime(formatted);
     };
 
-    updateDateTime(); // İlk yükleme
-    const interval = setInterval(updateDateTime, 1000); // Her saniye güncelle
+    updateDateTime();
+    const interval = setInterval(updateDateTime, 1000);
 
     return () => clearInterval(interval);
   }, []);
@@ -68,6 +71,7 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
   const handleLogout = () => {
     clearAuth();
     router.push('/login');
+    handleClose();
   };
 
   return (
@@ -76,106 +80,241 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
       sx={{
         width: `calc(100% - ${sidebarPinned ? SIDEBAR_WIDTH : 0}px)`,
         ml: sidebarPinned ? `${SIDEBAR_WIDTH}px` : 0,
-        bgcolor: 'background.paper',
-        color: 'text.primary',
-        boxShadow: '0 2px 8px rgba(0,0,0,0.08)',
-        borderBottom: '1px solid',
-        borderColor: 'divider',
-        transition: 'background-color 0.15s ease-out',
+        bgcolor: 'var(--card)',
+        color: 'var(--foreground)',
+        boxShadow: 'var(--shadow-sm)',
+        borderBottom: '1px solid var(--border)',
+        transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
         zIndex: (theme) => (sidebarPinned ? theme.zIndex.drawer + 1 : theme.zIndex.appBar),
       }}
     >
-      <Toolbar>
-        <IconButton
-          edge="start"
-          color="inherit"
-          aria-label="open drawer"
-          onClick={onToggleSidebar}
-          sx={{ mr: 2 }}
+      <Toolbar sx={{ px: 3, py: 1.5, minHeight: '64px !important' }}>
+        {/* Left Section - Menu Controls */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <IconButton
+            edge="start"
+            aria-label="open drawer"
+            onClick={onToggleSidebar}
+            sx={{
+              color: 'var(--muted-foreground)',
+              '&:hover': {
+                bgcolor: 'var(--muted)',
+                color: 'var(--foreground)',
+              },
+              transition: 'all 0.2s ease',
+            }}
+          >
+            <MenuIcon />
+          </IconButton>
+          <IconButton
+            aria-label={sidebarPinned ? 'Menüyü sabitlemeyi kaldır' : 'Menüyü sabitle'}
+            onClick={onToggleSidebarPin}
+            sx={{
+              color: sidebarPinned ? 'var(--primary)' : 'var(--muted-foreground)',
+              bgcolor: sidebarPinned ? 'color-mix(in srgb, var(--primary) 10%, transparent)' : 'transparent',
+              '&:hover': {
+                bgcolor: 'var(--muted)',
+                color: sidebarPinned ? 'var(--primary)' : 'var(--foreground)',
+              },
+              transition: 'all 0.2s ease',
+            }}
+          >
+            {sidebarPinned ? <PushPin sx={{ fontSize: 18 }} /> : <PushPinOutlined sx={{ fontSize: 18 }} />}
+          </IconButton>
+        </Box>
+
+        {/* Center Section - Page Title (will be populated by TabBar) */}
+        <Typography 
+          variant="h6" 
+          noWrap 
+          component="div" 
+          sx={{ 
+            flexGrow: 1,
+            ml: 2,
+            fontWeight: 600,
+            fontSize: '1rem',
+            color: 'var(--foreground)',
+            letterSpacing: '-0.01em',
+          }}
         >
-          <MenuIcon />
-        </IconButton>
-        <IconButton
-          color={sidebarPinned ? 'primary' : 'default'}
-          aria-label={sidebarPinned ? 'Menüyü sabitlemeyi kaldır' : 'Menüyü sabitle'}
-          onClick={onToggleSidebarPin}
-          sx={{ mr: 2 }}
-        >
-          {sidebarPinned ? <PushPin /> : <PushPinOutlined />}
-        </IconButton>
-        <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
           {/* Tab başlığı buraya gelecek */}
         </Typography>
 
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          {/* Sistem Tarihi */}
+        {/* Right Section - Actions & User */}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          {/* Date/Time Chip */}
           <Chip
-            icon={<CalendarMonth />}
+            icon={<CalendarMonth sx={{ fontSize: 16 }} />}
             label={currentDateTime}
             variant="outlined"
-            size="medium"
+            size="small"
             sx={{
-              fontWeight: 600,
-              borderColor: '#191970',
-              color: '#191970',
+              fontWeight: 500,
+              fontSize: '0.8125rem',
+              borderColor: 'var(--border)',
+              color: 'var(--muted-foreground)',
+              bgcolor: 'var(--muted)',
               '& .MuiChip-icon': {
-                color: '#191970',
+                color: 'var(--muted-foreground)',
               },
+              '&:hover': {
+                borderColor: 'var(--secondary)',
+                color: 'var(--secondary)',
+                bgcolor: 'var(--secondary-light)',
+              },
+              transition: 'all 0.2s ease',
             }}
           />
-          
-          <Box sx={{ textAlign: 'right', mr: 1 }}>
-            <Typography variant="body2" fontWeight="600" color="text.primary">
-              {user?.fullName}
-            </Typography>
-            <Typography variant="caption" color="text.secondary">
-              {user?.role}
-            </Typography>
-          </Box>
+
+          {/* Notifications Button */}
           <IconButton
-            size="large"
-            aria-label="account of current user"
-            aria-controls="menu-appbar"
-            aria-haspopup="true"
-            onClick={handleMenu}
+            size="small"
             sx={{
-              border: '2px solid',
-              borderColor: 'divider',
+              color: 'var(--muted-foreground)',
               '&:hover': {
-                borderColor: '#191970',
-                bgcolor: 'rgba(25, 25, 112, 0.05)',
-              }
+                bgcolor: 'var(--muted)',
+                color: 'var(--foreground)',
+              },
+              transition: 'all 0.2s ease',
             }}
           >
-            <Avatar sx={{ 
-              width: 36, 
-              height: 36, 
-              background: 'linear-gradient(135deg, #191970 0%, #0f0f40 100%)',
-              fontWeight: 'bold',
-            }}>
-              {user?.fullName?.[0] || 'U'}
-            </Avatar>
+            <Notifications sx={{ fontSize: 20 }} />
           </IconButton>
+
+          {/* User Info */}
+          <Box 
+            sx={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1.5,
+              px: 1.5,
+              py: 0.75,
+              borderRadius: 'var(--radius)',
+              cursor: 'pointer',
+              transition: 'all 0.2s ease',
+              '&:hover': {
+                bgcolor: 'var(--muted)',
+              },
+            }}
+            onClick={handleMenu}
+          >
+            <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
+              <Typography 
+                variant="body2" 
+                sx={{ 
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  color: 'var(--foreground)',
+                  lineHeight: 1.2,
+                }}
+              >
+                {user?.fullName || 'Kullanıcı'}
+              </Typography>
+              <Typography 
+                variant="caption" 
+                sx={{ 
+                  fontSize: '0.75rem',
+                  color: 'var(--muted-foreground)',
+                  display: 'block',
+                }}
+              >
+                {user?.role || 'Rol'}
+              </Typography>
+            </Box>
+            <Avatar
+              sx={{
+                width: 36,
+                height: 36,
+                bgcolor: 'var(--secondary)',
+                color: 'var(--secondary-foreground)',
+                fontWeight: 700,
+                fontSize: '0.875rem',
+                border: '2px solid var(--border)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  borderColor: 'var(--secondary)',
+                  transform: 'scale(1.05)',
+                },
+              }}
+            >
+              {user?.fullName?.[0]?.toUpperCase() || 'U'}
+            </Avatar>
+          </Box>
+
+          {/* User Menu */}
           <Menu
             id="menu-appbar"
             anchorEl={anchorEl}
             anchorOrigin={{
-              vertical: 'top',
+              vertical: 'bottom',
               horizontal: 'right',
             }}
-            keepMounted
             transformOrigin={{
               vertical: 'top',
               horizontal: 'right',
             }}
             open={Boolean(anchorEl)}
             onClose={handleClose}
+            PaperProps={{
+              sx: {
+                mt: 1,
+                minWidth: 220,
+                borderRadius: 'var(--radius)',
+                border: '1px solid var(--border)',
+                boxShadow: 'var(--shadow-lg)',
+                bgcolor: 'var(--card)',
+              },
+            }}
           >
-            <MenuItem onClick={handleClose}>
-              <Person sx={{ mr: 1 }} /> Profil
+            <Box sx={{ px: 2, py: 1.5 }}>
+              <Typography variant="body2" fontWeight={600} sx={{ color: 'var(--foreground)' }}>
+                {user?.fullName || 'Kullanıcı'}
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontSize: '0.75rem' }}>
+                {user?.email || user?.role || 'Bilgi yok'}
+              </Typography>
+            </Box>
+            <Divider sx={{ borderColor: 'var(--border)' }} />
+            <MenuItem 
+              onClick={handleClose}
+              sx={{
+                py: 1.25,
+                px: 2,
+                '&:hover': {
+                  bgcolor: 'var(--muted)',
+                },
+              }}
+            >
+              <Person sx={{ mr: 1.5, fontSize: 18, color: 'var(--muted-foreground)' }} />
+              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Profil</Typography>
             </MenuItem>
-            <MenuItem onClick={handleLogout}>
-              <Logout sx={{ mr: 1 }} /> Çıkış
+            <MenuItem 
+              onClick={handleClose}
+              sx={{
+                py: 1.25,
+                px: 2,
+                '&:hover': {
+                  bgcolor: 'var(--muted)',
+                },
+              }}
+            >
+              <Settings sx={{ mr: 1.5, fontSize: 18, color: 'var(--muted-foreground)' }} />
+              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Ayarlar</Typography>
+            </MenuItem>
+            <Divider sx={{ borderColor: 'var(--border)' }} />
+            <MenuItem 
+              onClick={handleLogout}
+              sx={{
+                py: 1.25,
+                px: 2,
+                color: 'var(--destructive)',
+                '&:hover': {
+                  bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+                },
+              }}
+            >
+              <Logout sx={{ mr: 1.5, fontSize: 18 }} />
+              <Typography variant="body2" fontWeight={500}>Çıkış Yap</Typography>
             </MenuItem>
           </Menu>
         </Box>
@@ -183,4 +322,3 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
     </AppBar>
   );
 }
-

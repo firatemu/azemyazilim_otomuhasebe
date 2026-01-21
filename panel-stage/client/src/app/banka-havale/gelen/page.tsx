@@ -305,7 +305,15 @@ const HavaleDialog = memo(({
           variant="contained"
           onClick={handleLocalSubmit}
           disabled={loading}
-          sx={{ bgcolor: '#10b981', '&:hover': { bgcolor: '#059669' } }}
+          sx={{ 
+            bgcolor: 'var(--chart-2)',
+            color: 'white',
+            textTransform: 'none',
+            fontWeight: 600,
+            '&:hover': { 
+              bgcolor: 'color-mix(in srgb, var(--chart-2) 90%, black)',
+            },
+          }}
         >
           {editMode ? 'Güncelle' : 'Kaydet'}
         </Button>
@@ -566,16 +574,50 @@ export default function GelenHavalePage() {
   return (
     <MainLayout>
       <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TrendingUp sx={{ fontSize: 40, color: '#10b981' }} />
-            Gelen Havale İşlemleri
-          </Typography>
+        {/* Header */}
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography 
+              variant="h4" 
+              sx={{ 
+                fontWeight: 700,
+                fontSize: '1.875rem',
+                color: 'var(--foreground)',
+                letterSpacing: '-0.02em',
+                mb: 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}
+            >
+              <TrendingUp sx={{ fontSize: 40, color: 'var(--chart-2)' }} />
+              Gelen Havale İşlemleri
+            </Typography>
+            <Typography 
+              variant="body2" 
+              sx={{
+                color: 'var(--muted-foreground)',
+                fontSize: '0.875rem',
+              }}
+            >
+              Gelen havale kayıtlarını görüntüleyin ve yönetin
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
               variant="outlined"
               startIcon={<Refresh />}
               onClick={fetchHavaleler}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                borderColor: 'var(--border)',
+                color: 'var(--foreground)',
+                '&:hover': {
+                  borderColor: 'var(--primary)',
+                  bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                },
+              }}
             >
               Yenile
             </Button>
@@ -584,8 +626,13 @@ export default function GelenHavalePage() {
               startIcon={<Add />}
               onClick={() => handleOpenDialog()}
               sx={{
-                bgcolor: '#10b981',
-                '&:hover': { bgcolor: '#059669' }
+                bgcolor: 'var(--chart-2)',
+                color: 'white',
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: 'color-mix(in srgb, var(--chart-2) 90%, black)',
+                },
               }}
             >
               Yeni Gelen Havale
@@ -595,32 +642,95 @@ export default function GelenHavalePage() {
 
         {/* İstatistikler */}
         {stats && (
-          <Grid container spacing={2} sx={{ mb: 3, justifyContent: 'center' }}>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: '#ecfdf5', border: '1px solid #10b981' }}>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)', 
+                borderLeft: '4px solid var(--chart-2)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Toplam Kayıt</Typography>
-                  <Typography variant="h4" sx={{ color: '#10b981', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{
+                      color: 'var(--muted-foreground)',
+                      fontSize: '0.875rem',
+                      mb: 1,
+                    }}
+                  >
+                    Toplam Kayıt
+                  </Typography>
+                  <Typography 
+                    variant="h4" 
+                    sx={{ 
+                      color: 'var(--chart-2)', 
+                      fontWeight: 700,
+                      fontSize: '1.875rem',
+                    }}
+                  >
                     {stats.toplamKayit}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: '#f0fdf4', border: '1px solid #10b981' }}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)', 
+                borderLeft: '4px solid var(--chart-2)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Gelen Havale Sayısı</Typography>
-                  <Typography variant="h5" sx={{ color: '#10b981', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{
+                      color: 'var(--muted-foreground)',
+                      fontSize: '0.875rem',
+                      mb: 1,
+                    }}
+                  >
+                    Gelen Havale Sayısı
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--chart-2)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {stats.gelenHavale.adet}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: '#f0fdf4', border: '1px solid #10b981' }}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)', 
+                borderLeft: '4px solid var(--chart-2)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Toplam Gelen</Typography>
-                  <Typography variant="h5" sx={{ color: '#10b981', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{
+                      color: 'var(--muted-foreground)',
+                      fontSize: '0.875rem',
+                      mb: 1,
+                    }}
+                  >
+                    Toplam Gelen
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--chart-2)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {formatCurrency(stats.gelenHavale.toplam)}
                   </Typography>
                 </CardContent>
@@ -630,9 +740,25 @@ export default function GelenHavalePage() {
         )}
 
         {/* Filtreler */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterList />
+        <Paper sx={{ 
+          p: 2, 
+          mb: 3,
+          borderRadius: 'var(--radius)',
+          boxShadow: 'var(--shadow-sm)',
+          bgcolor: 'var(--card)',
+        }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              mb: 2, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              fontWeight: 700,
+              color: 'var(--foreground)',
+            }}
+          >
+            <FilterList sx={{ color: 'var(--primary)' }} />
             Filtreler
           </Typography>
           <Grid container spacing={2}>
@@ -696,18 +822,25 @@ export default function GelenHavalePage() {
         </Paper>
 
         {/* Tablo */}
-        <TableContainer component={Paper}>
+        <TableContainer 
+          component={Paper}
+          sx={{ 
+            borderRadius: 'var(--radius)',
+            boxShadow: 'var(--shadow-sm)',
+            bgcolor: 'var(--card)',
+          }}
+        >
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f9fafb' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Tarih</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Banka Hesabı</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Cari</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Tutar</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Referans No</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Açıklama</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Kayıt Tarihi</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="right">İşlemler</TableCell>
+              <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Tarih</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Banka Hesabı</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Cari</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Tutar</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Referans No</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Açıklama</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Kayıt Tarihi</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }} align="right">İşlemler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -751,7 +884,12 @@ export default function GelenHavalePage() {
                       <Chip
                         label={formatCurrency(havale.tutar)}
                         size="small"
-                        sx={{ bgcolor: '#ecfdf5', color: '#10b981', fontWeight: 600 }}
+                        sx={{ 
+                          bgcolor: 'color-mix(in srgb, var(--chart-2) 15%, transparent)', 
+                          color: 'var(--chart-2)', 
+                          fontWeight: 700,
+                          border: '1px solid color-mix(in srgb, var(--chart-2) 30%, transparent)',
+                        }}
                       />
                     </TableCell>
                     <TableCell>{havale.referansNo || '-'}</TableCell>
@@ -777,7 +915,12 @@ export default function GelenHavalePage() {
                         <IconButton
                           size="small"
                           onClick={() => handleViewDetail(havale)}
-                          sx={{ color: '#3b82f6' }}
+                          sx={{ 
+                            color: 'var(--primary)',
+                            '&:hover': {
+                              bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                            },
+                          }}
                         >
                           <Visibility fontSize="small" />
                         </IconButton>
@@ -786,7 +929,12 @@ export default function GelenHavalePage() {
                         <IconButton
                           size="small"
                           onClick={() => handleOpenDialog(havale)}
-                          sx={{ color: '#f59e0b' }}
+                          sx={{ 
+                            color: 'var(--chart-1)',
+                            '&:hover': {
+                              bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)',
+                            },
+                          }}
                         >
                           <Edit fontSize="small" />
                         </IconButton>
@@ -798,7 +946,12 @@ export default function GelenHavalePage() {
                             setSelectedHavale(havale);
                             setOpenDelete(true);
                           }}
-                          sx={{ color: '#ef4444' }}
+                          sx={{ 
+                            color: 'var(--destructive)',
+                            '&:hover': {
+                              bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+                            },
+                          }}
                         >
                           <Delete fontSize="small" />
                         </IconButton>
@@ -895,7 +1048,7 @@ export default function GelenHavalePage() {
                   </Grid>
                   <Grid size={{ xs: 6 }}>
                     <Typography variant="caption" color="textSecondary">Tutar</Typography>
-                    <Typography variant="h5" sx={{ color: '#10b981', fontWeight: 600 }}>
+                    <Typography variant="h5" sx={{ color: 'var(--chart-2)', fontWeight: 700 }}>
                       {formatCurrency(selectedHavale.tutar)}
                     </Typography>
                   </Grid>

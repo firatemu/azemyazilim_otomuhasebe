@@ -257,36 +257,36 @@ export default function RaporlamaPage() {
         title: 'Net Satış',
         value: data.financialSummary.totalSales,
         subtitle: `${formatNumber(data.financialSummary.totalSalesCount)} fatura | İade: ${formatCurrency(data.financialSummary.totalSalesReturns)}`,
-        icon: <TrendingUp sx={{ color: '#2563eb' }} />,
-        gradient: 'linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%)',
+        icon: <TrendingUp sx={{ color: 'var(--chart-1)' }} />,
+        color: 'var(--chart-1)',
       },
       {
         title: 'Net Satın Alma',
         value: data.financialSummary.totalPurchases,
         subtitle: `${formatNumber(data.financialSummary.totalPurchaseCount)} fatura | İade: ${formatCurrency(data.financialSummary.totalPurchaseReturns)}`,
-        icon: <TrendingDown sx={{ color: '#dc2626' }} />,
-        gradient: 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+        icon: <TrendingDown sx={{ color: 'var(--destructive)' }} />,
+        color: 'var(--destructive)',
       },
       {
         title: 'Tahsilatlar',
         value: data.financialSummary.collections,
         subtitle: `${formatNumber(data.financialSummary.collectionsCount)} işlem`,
-        icon: <ShoppingCart sx={{ color: '#9333ea' }} />,
-        gradient: 'linear-gradient(135deg, #ede9fe 0%, #ddd6fe 100%)',
+        icon: <ShoppingCart sx={{ color: 'var(--secondary)' }} />,
+        color: 'var(--secondary)',
       },
       {
         title: 'Ödemeler',
         value: data.financialSummary.payments,
         subtitle: `${formatNumber(data.financialSummary.paymentsCount)} işlem`,
-        icon: <TrendingDown sx={{ color: '#f97316' }} />,
-        gradient: 'linear-gradient(135deg, #ffedd5 0%, #fed7aa 100%)',
+        icon: <TrendingDown sx={{ color: 'var(--primary)' }} />,
+        color: 'var(--primary)',
       },
       {
         title: 'Masraflar',
         value: data.financialSummary.expenses,
         subtitle: `${formatNumber(data.financialSummary.expensesCount)} kayıt`,
-        icon: <Inventory2 sx={{ color: '#64748b' }} />,
-        gradient: 'linear-gradient(135deg, #e2e8f0 0%, #cbd5f5 100%)',
+        icon: <Inventory2 sx={{ color: 'var(--muted-foreground)' }} />,
+        color: 'var(--muted-foreground)',
       },
       {
         title: 'Net Nakit Akışı',
@@ -295,11 +295,8 @@ export default function RaporlamaPage() {
           data.financialSummary.netCashFlow >= 0
             ? 'Pozitif nakit akışı'
             : 'Negatif nakit akışı',
-        icon: <Assessment sx={{ color: data.financialSummary.netCashFlow >= 0 ? '#0ea5e9' : '#dc2626' }} />,
-        gradient:
-          data.financialSummary.netCashFlow >= 0
-            ? 'linear-gradient(135deg, #e0f2fe 0%, #bae6fd 100%)'
-            : 'linear-gradient(135deg, #fee2e2 0%, #fecaca 100%)',
+        icon: <Assessment sx={{ color: data.financialSummary.netCashFlow >= 0 ? 'var(--chart-2)' : 'var(--destructive)' }} />,
+        color: data.financialSummary.netCashFlow >= 0 ? 'var(--chart-2)' : 'var(--destructive)',
       },
     ];
 
@@ -482,7 +479,7 @@ export default function RaporlamaPage() {
                   sx={{
                     p: 2.5,
                     borderRadius: 3,
-                    background: card.gradient,
+                    bgcolor: `color-mix(in srgb, ${card.color} 15%, transparent)`,
                     height: '100%',
                   }}
                 >

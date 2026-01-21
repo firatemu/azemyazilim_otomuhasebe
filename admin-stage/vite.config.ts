@@ -7,7 +7,7 @@ const DEV_SERVER_PORT = 3001;
 const PREVIEW_SERVER_PORT = 3001;
 
 // SABİT API BASE URL - ASLA DEĞİŞMEMELİ
-const API_BASE_URL = 'https://api.otomuhasebe.com';
+const API_BASE_URL = 'https://staging-api.otomuhasebe.com';
 
 export default defineConfig({
   plugins: [react()],
@@ -58,6 +58,8 @@ export default defineConfig({
     port: DEV_SERVER_PORT,
     strictPort: true, // Port kullanılıyorsa hata ver, başka porta geçme
     host: true, // Tüm network interface'lerinden erişilebilir
+    // Docker + reverse proxy (Caddy) arkasında 403 "host not allowed" yaşamamak için
+    allowedHosts: 'all',
     open: false, // Otomatik browser açma
     // Development mode'da cache'i tamamen kapat
     hmr: {

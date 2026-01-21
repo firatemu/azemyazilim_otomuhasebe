@@ -767,21 +767,37 @@ function YeniSatisFaturasiPageContent() {
           <IconButton
             onClick={() => router.push('/fatura/satis')}
             sx={{
-              bgcolor: '#f3f4f6',
-              '&:hover': { bgcolor: '#e5e7eb' }
+              bgcolor: 'var(--muted)',
+              color: 'var(--foreground)',
+              '&:hover': { 
+                bgcolor: 'var(--accent)',
+                transform: 'translateX(-2px)',
+              },
+              transition: 'all 0.2s ease',
             }}
           >
             <ArrowBack />
           </IconButton>
           <Box>
-            <Typography variant="h4" fontWeight="bold" sx={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}>
+            <Typography 
+              variant="h4" 
+              sx={{
+                fontWeight: 700,
+                fontSize: '1.875rem',
+                color: 'var(--foreground)',
+                letterSpacing: '-0.02em',
+                mb: 0.5,
+              }}
+            >
               Yeni Satış Faturası
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography 
+              variant="body2" 
+              sx={{
+                color: 'var(--muted-foreground)',
+                fontSize: '0.875rem',
+              }}
+            >
               {siparisId ? 'Siparişten fatura oluşturuluyor...' : 'Satış faturası oluşturun'}
             </Typography>
           </Box>
@@ -798,21 +814,44 @@ function YeniSatisFaturasiPageContent() {
           </Box>
         </Box>
       ) : (
-        <Paper sx={{ p: 3, borderRadius: 2 }}>
+        <Paper sx={{ 
+          p: 3, 
+          borderRadius: 'var(--radius)',
+          boxShadow: 'var(--shadow-sm)',
+          bgcolor: 'var(--card)',
+        }}>
           <Stack spacing={3}>
             {/* Fatura Bilgileri */}
             {siparisId && (
-              <Box sx={{ p: 2, bgcolor: '#f0f9ff', borderRadius: 1, border: '1px solid #bfdbfe' }}>
-                <Typography variant="body2" color="primary" fontWeight="600">
+              <Box sx={{ 
+                p: 2, 
+                bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)', 
+                borderRadius: 'var(--radius)', 
+                border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
+              }}>
+                <Typography 
+                  variant="body2" 
+                  sx={{ 
+                    color: 'var(--primary)',
+                    fontWeight: 600,
+                  }}
+                >
                   ℹ️ Bu fatura sipariş bilgilerinden otomatik olarak doldurulmuştur.
                 </Typography>
               </Box>
             )}
             <Box>
-              <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  fontWeight: 700,
+                  color: 'var(--foreground)',
+                  mb: 2,
+                }}
+              >
                 Fatura Bilgileri
               </Typography>
-              <Divider sx={{ mb: 2 }} />
+              <Divider sx={{ mb: 2, borderColor: 'var(--border)' }} />
             </Box>
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -905,7 +944,15 @@ function YeniSatisFaturasiPageContent() {
           {/* Kalemler */}
           <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" fontWeight="bold">Fatura Kalemleri</Typography>
+              <Typography 
+                variant="h6" 
+                sx={{ 
+                  fontWeight: 700,
+                  color: 'var(--foreground)',
+                }}
+              >
+                Fatura Kalemleri
+              </Typography>
               <Box sx={{ display: 'flex', gap: 1 }}>
                 <Button
                   variant="outlined"
@@ -913,11 +960,13 @@ function YeniSatisFaturasiPageContent() {
                   onClick={() => fetchIrsaliyeler(formData.cariId)}
                   disabled={!formData.cariId || loadingIrsaliyeler}
                   sx={{
-                    borderColor: '#8b5cf6',
-                    color: '#8b5cf6',
+                    borderColor: 'var(--primary)',
+                    color: 'var(--primary)',
+                    textTransform: 'none',
+                    fontWeight: 600,
                     '&:hover': {
-                      borderColor: '#7c3aed',
-                      bgcolor: '#f3f4f6',
+                      borderColor: 'var(--primary)',
+                      bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
                     },
                   }}
                 >
@@ -933,11 +982,13 @@ function YeniSatisFaturasiPageContent() {
                   }}
                   disabled={loadingSiparisler}
                   sx={{
-                    borderColor: '#8b5cf6',
-                    color: '#8b5cf6',
+                    borderColor: 'var(--secondary)',
+                    color: 'var(--secondary)',
+                    textTransform: 'none',
+                    fontWeight: 600,
                     '&:hover': {
-                      borderColor: '#7c3aed',
-                      bgcolor: '#f3f4f6',
+                      borderColor: 'var(--secondary)',
+                      bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)',
                     },
                   }}
                 >
@@ -947,28 +998,45 @@ function YeniSatisFaturasiPageContent() {
                   variant="contained"
                   onClick={handleAddKalem}
                   sx={{
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    bgcolor: 'var(--primary)',
+                    color: 'var(--primary-foreground)',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    '&:hover': {
+                      bgcolor: 'var(--primary-hover)',
+                      transform: 'translateY(-1px)',
+                      boxShadow: 'var(--shadow-md)',
+                    },
+                    transition: 'all 0.2s ease',
                   }}
                 >
                   + Yeni Kalem Ekle
                 </Button>
               </Box>
             </Box>
-            <Divider sx={{ mb: 2 }} />
+            <Divider sx={{ mb: 2, borderColor: 'var(--border)' }} />
 
-            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
+            <TableContainer 
+              component={Paper} 
+              variant="outlined" 
+              sx={{ 
+                maxHeight: 400,
+                borderRadius: 'var(--radius)',
+                borderColor: 'var(--border)',
+              }}
+            >
               <Table stickyHeader size="small">
                 <TableHead>
-                  <TableRow>
-                    <TableCell width="25%" sx={{ fontWeight: 600 }}>Stok</TableCell>
-                    <TableCell width="8%" sx={{ fontWeight: 600 }}>Miktar</TableCell>
-                    <TableCell width="10%" sx={{ fontWeight: 600 }}>Birim Fiyat</TableCell>
-                    <TableCell width="8%" sx={{ fontWeight: 600 }}>KDV %</TableCell>
-                    <TableCell width="3%" sx={{ fontWeight: 600 }} title="Çoklu İskonto">Ç.İ.</TableCell>
-                    <TableCell width="10%" sx={{ fontWeight: 600 }}>İsk. Oran %</TableCell>
-                    <TableCell width="12%" sx={{ fontWeight: 600 }}>İsk. Tutar</TableCell>
-                    <TableCell width="12%" align="right" sx={{ fontWeight: 600 }}>Toplam</TableCell>
-                    <TableCell width="5%" align="center" sx={{ fontWeight: 600 }}>Sil</TableCell>
+                  <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                    <TableCell width="25%" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Stok</TableCell>
+                    <TableCell width="8%" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Miktar</TableCell>
+                    <TableCell width="10%" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Birim Fiyat</TableCell>
+                    <TableCell width="8%" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>KDV %</TableCell>
+                    <TableCell width="3%" sx={{ fontWeight: 700, color: 'var(--foreground)' }} title="Çoklu İskonto">Ç.İ.</TableCell>
+                    <TableCell width="10%" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>İsk. Oran %</TableCell>
+                    <TableCell width="12%" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>İsk. Tutar</TableCell>
+                    <TableCell width="12%" align="right" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Toplam</TableCell>
+                    <TableCell width="5%" align="center" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Sil</TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
@@ -1192,7 +1260,13 @@ function YeniSatisFaturasiPageContent() {
                           />
                         </TableCell>
                         <TableCell align="right">
-                          <Typography variant="body2" fontWeight="bold" color="primary">
+                          <Typography 
+                            variant="body2" 
+                            sx={{ 
+                              fontWeight: 700,
+                              color: 'var(--primary)',
+                            }}
+                          >
                             {formatCurrency(calculateKalemTutar(kalem))}
                           </Typography>
                         </TableCell>
@@ -1274,8 +1348,23 @@ function YeniSatisFaturasiPageContent() {
           </Box>
 
           {/* Toplam Bilgileri */}
-          <Paper variant="outlined" sx={{ p: 3, bgcolor: '#f9fafb' }}>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
+          <Paper 
+            variant="outlined" 
+            sx={{ 
+              p: 3, 
+              bgcolor: 'color-mix(in srgb, var(--muted) 50%, transparent)',
+              borderRadius: 'var(--radius)',
+              borderColor: 'var(--border)',
+            }}
+          >
+            <Typography 
+              variant="h6" 
+              sx={{ 
+                fontWeight: 700,
+                color: 'var(--foreground)',
+                mb: 2,
+              }}
+            >
               Fatura Özeti
             </Typography>
             <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
@@ -1308,14 +1397,22 @@ function YeniSatisFaturasiPageContent() {
                     <Typography variant="body1">KDV Toplamı:</Typography>
                     <Typography variant="body1" fontWeight="600">{formatCurrency(totals.toplamKdv)}</Typography>
                   </Box>
-                  <Divider sx={{ my: 1 }} />
+                  <Divider sx={{ my: 1, borderColor: 'var(--border)' }} />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
+                    <Typography 
+                      variant="h6" 
+                      sx={{ 
+                        fontWeight: 700,
+                        color: 'var(--foreground)',
+                      }}
+                    >
+                      Genel Toplam:
+                    </Typography>
                     <Typography
                       variant="h6"
-                      fontWeight="bold"
                       sx={{
-                        color: '#8b5cf6',
+                        fontWeight: 700,
+                        color: 'var(--primary)',
                       }}
                     >
                       {formatCurrency(totals.genelToplam)}
@@ -1332,6 +1429,16 @@ function YeniSatisFaturasiPageContent() {
                 variant="outlined"
                 size="large"
                 onClick={() => router.push('/fatura/satis')}
+                sx={{
+                  textTransform: 'none',
+                  fontWeight: 600,
+                  borderColor: 'var(--border)',
+                  color: 'var(--foreground)',
+                  '&:hover': {
+                    borderColor: 'var(--primary)',
+                    bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                  },
+                }}
               >
                 İptal
               </Button>
@@ -1342,8 +1449,18 @@ function YeniSatisFaturasiPageContent() {
                 onClick={handleSave}
                 disabled={loading}
                 sx={{
-                  background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                  bgcolor: 'var(--primary)',
+                  color: 'var(--primary-foreground)',
+                  textTransform: 'none',
+                  fontWeight: 600,
                   minWidth: 150,
+                  boxShadow: 'var(--shadow-sm)',
+                  '&:hover': {
+                    bgcolor: 'var(--primary-hover)',
+                    boxShadow: 'var(--shadow-md)',
+                    transform: 'translateY(-1px)',
+                  },
+                  transition: 'all 0.2s ease',
                 }}
               >
                 {loading ? 'Kaydediliyor...' : 'Faturayı Kaydet'}

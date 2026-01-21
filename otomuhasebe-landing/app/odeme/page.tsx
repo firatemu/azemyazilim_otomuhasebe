@@ -2,7 +2,7 @@
 
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { Check, CreditCard, Calendar, AlertCircle, Loader, CheckCircle, Building2, Banknote } from 'lucide-react';
+import { Check, CreditCard, Calendar, AlertCircle, Loader, CheckCircle, Building2, Banknote, Sparkles } from 'lucide-react';
 import Link from 'next/link';
 
 interface Plan {
@@ -295,28 +295,59 @@ function PaymentPageContent() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 py-12 px-4">
-      <div className="max-w-4xl mx-auto">
-        {/* Header */}
-        <div className="text-center mb-8">
-          <Link href="/" className="inline-block mb-4">
-            <h1 className="text-3xl font-bold text-blue-600">OtoMuhasebe</h1>
+    <div className="min-h-screen bg-white overflow-hidden">
+      {/* Animated Background Elements */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none z-0">
+        <div className="absolute w-96 h-96 bg-gradient-to-r from-blue-400/20 to-purple-400/20 rounded-full blur-3xl top-0 left-0" />
+        <div className="absolute w-96 h-96 bg-gradient-to-r from-pink-400/20 to-cyan-400/20 rounded-full blur-3xl bottom-0 right-0" />
+      </div>
+
+      {/* Hero Section */}
+      <section className="relative py-16 md:py-24 bg-gradient-to-br from-blue-600 via-purple-600 to-pink-600">
+        <div className="absolute inset-0 overflow-hidden">
+          {[...Array(15)].map((_, i) => (
+            <div
+              key={i}
+              className="absolute w-2 h-2 bg-white/30 rounded-full animate-float"
+              style={{
+                left: `${Math.random() * 100}%`,
+                top: `${Math.random() * 100}%`,
+                animationDelay: `${Math.random() * 5}s`,
+                animationDuration: `${5 + Math.random() * 5}s`
+              }}
+            />
+          ))}
+        </div>
+        
+        <div className="container mx-auto px-4 text-center relative z-10">
+          <Link href="/" className="inline-block mb-4 group">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent group-hover:scale-105 transition-transform duration-300">
+              OtoMuhasebe
+            </h1>
           </Link>
-          <h2 className="text-3xl font-bold text-gray-900 mb-2">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-md rounded-full text-white text-sm font-medium mb-6 animate-fade-in">
+            <CreditCard className="w-4 h-4" />
+            <span>{isTrial ? 'Ücretsiz Deneme' : 'Güvenli Ödeme'}</span>
+          </div>
+          <h2 className="text-4xl md:text-6xl font-extrabold mb-4 text-white animate-slide-up">
             {isTrial ? 'Deneme Sürümünü Başlat' : 'Ödeme'}
           </h2>
-          <p className="text-gray-600">
+          <p className="text-xl md:text-2xl text-blue-100 max-w-2xl mx-auto animate-slide-up-delay">
             {isTrial 
               ? '14 gün ücretsiz deneme sürümünü başlatın'
               : 'Paket seçiminizi tamamlayın'
             }
           </p>
         </div>
+      </section>
+
+      <div className="relative z-10 py-12 px-4">
+        <div className="max-w-4xl mx-auto">
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Paket Özeti */}
           <div className="lg:col-span-2">
-            <div className="bg-white rounded-lg shadow-xl p-8 mb-6">
+            <div className="bg-white rounded-xl shadow-xl p-8 mb-6 border border-gray-100">
               <h3 className="text-xl font-bold text-gray-900 mb-6">Seçilen Paket</h3>
               
               <div className="border-2 border-blue-600 rounded-lg p-6">
@@ -636,6 +667,24 @@ function PaymentPageContent() {
           </div>
         </div>
       )}
+
+      <style jsx global>{`
+        .animate-float {
+          animation: float 6s ease-in-out infinite;
+        }
+        
+        .animate-fade-in {
+          animation: fade-in 1s ease-out;
+        }
+        
+        .animate-slide-up {
+          animation: slide-up 1s ease-out;
+        }
+        
+        .animate-slide-up-delay {
+          animation: slide-up 1s ease-out 0.2s both;
+        }
+      `}</style>
     </div>
   );
 }

@@ -340,14 +340,25 @@ export default function CariPage() {
     <MainLayout>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" fontWeight="bold" sx={{
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}>
+          <Typography 
+            variant="h4" 
+            sx={{
+              fontWeight: 700,
+              fontSize: '1.875rem',
+              color: 'var(--foreground)',
+              letterSpacing: '-0.02em',
+              mb: 0.5,
+            }}
+          >
             Cari Yönetimi
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography 
+            variant="body2" 
+            sx={{
+              color: 'var(--muted-foreground)',
+              fontSize: '0.875rem',
+            }}
+          >
             Müşteri ve tedarikçi bilgilerini yönetin
           </Typography>
         </Box>
@@ -357,11 +368,13 @@ export default function CariPage() {
             startIcon={<AccountBalance />}
             onClick={() => router.push('/cari/fatura-kapatma')}
             sx={{
-              borderColor: '#8b5cf6',
-              color: '#8b5cf6',
+              borderColor: 'var(--secondary)',
+              color: 'var(--secondary)',
+              textTransform: 'none',
+              fontWeight: 600,
               '&:hover': {
-                borderColor: '#7c3aed',
-                bgcolor: '#f5f3ff',
+                borderColor: 'var(--secondary-hover)',
+                bgcolor: 'var(--secondary-light)',
               }
             }}
           >
@@ -372,11 +385,15 @@ export default function CariPage() {
             startIcon={<Add />}
             onClick={() => { resetForm(); setOpenAdd(true); }}
             sx={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-              boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)',
+              bgcolor: 'var(--secondary)',
+              color: 'var(--secondary-foreground)',
+              boxShadow: 'var(--shadow-sm)',
+              textTransform: 'none',
+              fontWeight: 600,
               '&:hover': {
-                background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-                boxShadow: '0 6px 16px rgba(139, 92, 246, 0.6)',
+                bgcolor: 'var(--secondary-hover)',
+                boxShadow: 'var(--shadow-md)',
+                transform: 'translateY(-1px)',
               },
             }}
           >
@@ -385,7 +402,14 @@ export default function CariPage() {
         </Box>
       </Box>
 
-      <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
+      <Paper sx={{ 
+        p: 2, 
+        mb: 3, 
+        borderRadius: 'var(--radius)',
+        border: '1px solid var(--border)',
+        bgcolor: 'var(--card)',
+        boxShadow: 'var(--shadow-sm)',
+      }}>
         <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
           <TextField
             fullWidth
@@ -395,13 +419,36 @@ export default function CariPage() {
             onChange={(e) => setSearch(e.target.value)}
             onKeyPress={(e) => e.key === 'Enter' && fetchCariler()}
             InputProps={{
-              startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
+              startAdornment: <Search sx={{ mr: 1, color: 'var(--muted-foreground)' }} />,
+            }}
+            sx={{
+              '& .MuiOutlinedInput-root': {
+                bgcolor: 'var(--input)',
+                '& fieldset': {
+                  borderColor: 'var(--border)',
+                },
+                '&:hover fieldset': {
+                  borderColor: 'var(--muted-foreground)',
+                },
+                '&.Mui-focused fieldset': {
+                  borderColor: 'var(--ring)',
+                },
+              },
             }}
           />
           <Button
             variant="contained"
             onClick={fetchCariler}
-            sx={{ minWidth: 100 }}
+            sx={{ 
+              minWidth: 100,
+              bgcolor: 'var(--secondary)',
+              color: 'var(--secondary-foreground)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'var(--secondary-hover)',
+              },
+            }}
           >
             Ara
           </Button>
@@ -413,34 +460,52 @@ export default function CariPage() {
           size="small"
           onClick={() => setShowInactive(!showInactive)}
           sx={{
-            color: showInactive ? '#ef4444' : '#10b981',
-            bgcolor: showInactive ? '#fef2f2' : '#f0fdf4',
+            color: showInactive ? 'var(--destructive)' : 'var(--chart-2)',
+            bgcolor: showInactive 
+              ? 'color-mix(in srgb, var(--destructive) 10%, transparent)' 
+              : 'color-mix(in srgb, var(--chart-2) 10%, transparent)',
             '&:hover': {
-              bgcolor: showInactive ? '#fee2e2' : '#dcfce7',
+              bgcolor: showInactive 
+                ? 'color-mix(in srgb, var(--destructive) 20%, transparent)' 
+                : 'color-mix(in srgb, var(--chart-2) 20%, transparent)',
             },
-            borderRadius: 2,
+            borderRadius: 'var(--radius-md)',
             px: 2,
             py: 1,
           }}
           title={showInactive ? 'Kullanım İçi Carileri Göster' : 'Kullanım Dışı Carileri Göster'}
         >
           {showInactive ? <ToggleOff fontSize="small" /> : <ToggleOn fontSize="small" />}
-          <Typography variant="caption" sx={{ ml: 1, fontWeight: 600 }}>
+          <Typography 
+            variant="caption" 
+            sx={{ 
+              ml: 1, 
+              fontWeight: 600,
+              fontSize: '0.8125rem',
+            }}
+          >
             {showInactive ? 'Kullanım Dışı' : 'Kullanım İçi'}
           </Typography>
         </IconButton>
       </Box>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+      <TableContainer 
+        component={Paper} 
+        sx={{ 
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
         <Table>
-          <TableHead sx={{ bgcolor: '#f8f9fa' }}>
+          <TableHead sx={{ bgcolor: 'var(--muted)' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600 }}>Tip</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Cari Kodu</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Ünvan</TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Yetkili</TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600 }}>Bakiye</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 600 }}>İşlemler</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Tip</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Cari Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Ünvan</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Yetkili</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Bakiye</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -465,11 +530,10 @@ export default function CariPage() {
                       label={cari.tip === 'MUSTERI' ? 'Müşteri' : 'Tedarikçi'}
                       size="small"
                       sx={{
-                        background: cari.tip === 'MUSTERI'
-                          ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
-                          : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                        bgcolor: cari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
                         color: 'white',
                         fontWeight: 600,
+                        fontSize: '0.75rem',
                       }}
                     />
                   </TableCell>
@@ -484,10 +548,10 @@ export default function CariPage() {
                       size="small"
                       onClick={(e) => handleMenuOpen(e, cari.id)}
                       sx={{
-                        color: '#6b7280',
+                        color: 'var(--muted-foreground)',
                         '&:hover': {
-                          bgcolor: '#f3f4f6',
-                          color: '#8b5cf6'
+                          bgcolor: 'var(--muted)',
+                          color: 'var(--secondary)'
                         }
                       }}
                     >
@@ -515,11 +579,11 @@ export default function CariPage() {
                         sx={{
                           gap: 1.5,
                           py: 1,
-                          '&:hover': { bgcolor: '#f0fdf4' }
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)' }
                         }}
                       >
-                        <Receipt fontSize="small" sx={{ color: '#10b981' }} />
-                        <Typography variant="body2">Ekstre</Typography>
+                        <Receipt fontSize="small" sx={{ color: 'var(--chart-2)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Ekstre</Typography>
                       </MenuItem>
 
                       <MenuItem
@@ -530,11 +594,11 @@ export default function CariPage() {
                         sx={{
                           gap: 1.5,
                           py: 1,
-                          '&:hover': { bgcolor: '#ecfeff' }
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)' }
                         }}
                       >
-                        <Visibility fontSize="small" sx={{ color: '#06b6d4' }} />
-                        <Typography variant="body2">İncele</Typography>
+                        <Visibility fontSize="small" sx={{ color: 'var(--chart-1)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>İncele</Typography>
                       </MenuItem>
 
                       <MenuItem
@@ -545,11 +609,11 @@ export default function CariPage() {
                         sx={{
                           gap: 1.5,
                           py: 1,
-                          '&:hover': { bgcolor: '#f5f3ff' }
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)' }
                         }}
                       >
-                        <Edit fontSize="small" sx={{ color: '#8b5cf6' }} />
-                        <Typography variant="body2">Düzenle</Typography>
+                        <Edit fontSize="small" sx={{ color: 'var(--secondary)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Düzenle</Typography>
                       </MenuItem>
 
                       <MenuItem
@@ -561,12 +625,12 @@ export default function CariPage() {
                         sx={{
                           gap: 1.5,
                           py: 1,
-                          '&:hover': { bgcolor: '#fef2f2' },
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)' },
                           '&.Mui-disabled': { opacity: 0.5 }
                         }}
                       >
-                        <Delete fontSize="small" sx={{ color: '#ef4444' }} />
-                        <Typography variant="body2">Sil</Typography>
+                        <Delete fontSize="small" sx={{ color: 'var(--destructive)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Sil</Typography>
                       </MenuItem>
                     </Menu>
                   </TableCell>
@@ -578,17 +642,29 @@ export default function CariPage() {
       </TableContainer>
 
       {/* Yeni Cari Ekle Dialog */}
-      <Dialog open={openAdd} onClose={() => setOpenAdd(false)} maxWidth="md" fullWidth>
+      <Dialog 
+        open={openAdd} 
+        onClose={() => setOpenAdd(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+          },
+        }}
+      >
         <DialogTitle sx={{
-          background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-          color: 'white',
+          bgcolor: 'var(--secondary)',
+          color: 'var(--secondary-foreground)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontWeight: 'bold',
+          fontWeight: 700,
+          fontSize: '1.125rem',
         }}>
           Yeni Cari Ekle
-          <IconButton size="small" onClick={() => setOpenAdd(false)} sx={{ color: 'white' }}>
+          <IconButton size="small" onClick={() => setOpenAdd(false)} sx={{ color: 'var(--secondary-foreground)' }}>
             <Close />
           </IconButton>
         </DialogTitle>
@@ -601,12 +677,30 @@ export default function CariPage() {
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenAdd(false)}>İptal</Button>
+          <Button 
+            onClick={() => setOpenAdd(false)}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              color: 'var(--muted-foreground)',
+              '&:hover': {
+                bgcolor: 'var(--muted)',
+              },
+            }}
+          >
+            İptal
+          </Button>
           <Button
             variant="contained"
             onClick={handleAdd}
             sx={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+              bgcolor: 'var(--secondary)',
+              color: 'var(--secondary-foreground)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'var(--secondary-hover)',
+              },
             }}
           >
             Kaydet
@@ -615,17 +709,29 @@ export default function CariPage() {
       </Dialog>
 
       {/* Cari Düzenle Dialog */}
-      <Dialog open={openEdit} onClose={() => setOpenEdit(false)} maxWidth="md" fullWidth>
+      <Dialog 
+        open={openEdit} 
+        onClose={() => setOpenEdit(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+          },
+        }}
+      >
         <DialogTitle sx={{
-          background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-          color: 'white',
+          bgcolor: 'var(--secondary)',
+          color: 'var(--secondary-foreground)',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontWeight: 'bold',
+          fontWeight: 700,
+          fontSize: '1.125rem',
         }}>
           Cari Düzenle
-          <IconButton size="small" onClick={() => setOpenEdit(false)} sx={{ color: 'white' }}>
+          <IconButton size="small" onClick={() => setOpenEdit(false)} sx={{ color: 'var(--secondary-foreground)' }}>
             <Close />
           </IconButton>
         </DialogTitle>
@@ -638,12 +744,30 @@ export default function CariPage() {
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenEdit(false)}>İptal</Button>
+          <Button 
+            onClick={() => setOpenEdit(false)}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              color: 'var(--muted-foreground)',
+              '&:hover': {
+                bgcolor: 'var(--muted)',
+              },
+            }}
+          >
+            İptal
+          </Button>
           <Button
             variant="contained"
             onClick={handleEdit}
             sx={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+              bgcolor: 'var(--secondary)',
+              color: 'var(--secondary-foreground)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'var(--secondary-hover)',
+              },
             }}
           >
             Güncelle
@@ -652,14 +776,26 @@ export default function CariPage() {
       </Dialog>
 
       {/* Cari İncele Dialog */}
-      <Dialog open={openView} onClose={() => setOpenView(false)} maxWidth="md" fullWidth>
+      <Dialog 
+        open={openView} 
+        onClose={() => setOpenView(false)} 
+        maxWidth="md" 
+        fullWidth
+        PaperProps={{
+          sx: {
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+          },
+        }}
+      >
         <DialogTitle sx={{
-          background: 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)',
+          bgcolor: 'var(--chart-1)',
           color: 'white',
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          fontWeight: 'bold',
+          fontWeight: 700,
+          fontSize: '1.125rem',
         }}>
           Cari Detayları
           <IconButton size="small" onClick={() => setOpenView(false)} sx={{ color: 'white' }}>
@@ -684,17 +820,22 @@ export default function CariPage() {
                     label={selectedCari.tip}
                     size="small"
                     sx={{
-                      background: selectedCari.tip === 'MUSTERI'
-                        ? 'linear-gradient(135deg, #06b6d4 0%, #0891b2 100%)'
-                        : 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                      bgcolor: selectedCari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
                       color: 'white',
                       fontWeight: 600,
+                      fontSize: '0.75rem',
                     }}
                   />
                 </Box>
                 <Box>
                   <Typography variant="caption" color="text.secondary">Bakiye</Typography>
-                  <Typography variant="h6" fontWeight="bold" color={parseFloat(selectedCari.bakiye) >= 0 ? '#10b981' : '#ef4444'}>
+                  <Typography 
+                    variant="h6" 
+                    sx={{
+                      fontWeight: 700,
+                      color: parseFloat(selectedCari.bakiye) >= 0 ? 'var(--chart-2)' : 'var(--destructive)',
+                    }}
+                  >
                     ₺{parseFloat(selectedCari.bakiye || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                   </Typography>
                 </Box>
@@ -734,27 +875,66 @@ export default function CariPage() {
       </Dialog>
 
       {/* Cari Sil Dialog */}
-      <Dialog open={openDelete} onClose={() => setOpenDelete(false)}>
+      <Dialog 
+        open={openDelete} 
+        onClose={() => setOpenDelete(false)}
+        PaperProps={{
+          sx: {
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+          },
+        }}
+      >
         <DialogTitle sx={{
-          background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-          color: 'white',
+          bgcolor: 'var(--destructive)',
+          color: 'var(--destructive-foreground)',
+          fontWeight: 700,
+          fontSize: '1.125rem',
         }}>
           Cari Sil
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
-          <Alert severity="warning" sx={{ mb: 2 }}>
+          <Alert 
+            severity="warning" 
+            sx={{ 
+              mb: 2,
+              bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+              border: '1px solid var(--primary)',
+              borderRadius: 'var(--radius-md)',
+            }}
+          >
             Bu işlem geri alınamaz!
           </Alert>
-          <Typography>
+          <Typography sx={{ color: 'var(--foreground)' }}>
             <strong>{selectedCari?.unvan}</strong> carisini silmek istediğinizden emin misiniz?
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button onClick={() => setOpenDelete(false)}>İptal</Button>
+          <Button 
+            onClick={() => setOpenDelete(false)}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              color: 'var(--muted-foreground)',
+              '&:hover': {
+                bgcolor: 'var(--muted)',
+              },
+            }}
+          >
+            İptal
+          </Button>
           <Button
             variant="contained"
-            color="error"
             onClick={handleDelete}
+            sx={{
+              bgcolor: 'var(--destructive)',
+              color: 'var(--destructive-foreground)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'var(--destructive-hover)',
+              },
+            }}
           >
             Sil
           </Button>

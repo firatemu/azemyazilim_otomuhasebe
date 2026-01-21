@@ -194,13 +194,21 @@ const MalzemeFormDialog = memo(({
         sx: { minHeight: '70vh' }
       }}
     >
-      <DialogTitle sx={{ bgcolor: '#191970', color: 'white', fontSize: '1.25rem', py: 2 }}>
+      <DialogTitle
+        sx={{
+          background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+          color: 'var(--primary-foreground)',
+          fontSize: '1.25rem',
+          py: 2,
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
         {editingMalzeme ? '✏️ Malzeme Düzenle' : '➕ Yeni Malzeme Ekle'}
       </DialogTitle>
-      <DialogContent sx={{ mt: 3 }}>
+      <DialogContent sx={{ mt: 3, background: 'var(--muted)', borderTop: '1px solid var(--border)', px: 3 }}>
         <Box sx={{ py: 1 }}>
           {/* Genel Bilgiler Bölümü */}
-          <Typography variant="h6" sx={{ mb: 2, color: '#191970', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>
             📋 Genel Bilgiler
           </Typography>
           <Grid container spacing={3}>
@@ -580,11 +588,19 @@ const MalzemeFormDialog = memo(({
 
         </Box>
       </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2, bgcolor: '#f5f5f5' }}>
+      <DialogActions sx={{ px: 3, py: 2, bgcolor: 'var(--muted)', borderTop: '1px solid var(--border)' }}>
         <Button
           onClick={onClose}
           size="large"
-          sx={{ minWidth: 100 }}
+          sx={{
+            minWidth: 100,
+            borderRadius: '999px',
+            px: 2.4,
+            border: '1px solid var(--border)',
+            color: 'var(--muted-foreground)',
+            textTransform: 'none',
+            '&:hover': { bgcolor: 'var(--card)' },
+          }}
         >
           İptal
         </Button>
@@ -594,9 +610,19 @@ const MalzemeFormDialog = memo(({
           size="large"
           disabled={!localFormData.stokAdi}
           sx={{
-            bgcolor: '#191970',
-            '&:hover': { bgcolor: '#0f0f40' },
-            minWidth: 120
+            background: '#527575',
+            color: '#0b0b0b',
+            minWidth: 140,
+            borderRadius: '999px',
+            px: 2.8,
+            fontWeight: 700,
+            letterSpacing: '-0.01em',
+            boxShadow: '0 10px 24px color-mix(in srgb, #527575 30%, transparent)',
+            textTransform: 'none',
+            '&:hover': {
+              background: 'color-mix(in srgb, #527575 90%, #000 10%)',
+              transform: 'translateY(-1px)',
+            },
           }}
         >
           {editingMalzeme ? '💾 Güncelle' : '➕ Ekle'}
@@ -1289,9 +1315,12 @@ export default function MalzemeListesiPage() {
             startIcon={<FileDownload />}
             onClick={handleExportExcel}
             sx={{
-              color: '#191970',
-              borderColor: '#191970',
-              '&:hover': { borderColor: '#0f0f40', color: '#0f0f40' }
+              color: 'var(--primary)',
+              borderColor: 'var(--primary)',
+              borderRadius: '999px',
+              px: 2.4,
+              fontWeight: 600,
+              '&:hover': { borderColor: 'color-mix(in srgb, var(--primary) 80%, var(--secondary) 20%)', color: 'color-mix(in srgb, var(--primary) 80%, var(--secondary) 20%)' }
             }}
           >
             Excel'e Aktar
@@ -1301,8 +1330,19 @@ export default function MalzemeListesiPage() {
             startIcon={<Add />}
             onClick={() => handleOpenDialog()}
             sx={{
-              bgcolor: '#191970',
-              '&:hover': { bgcolor: '#0f0f40' }
+              background: '#527575',
+              color: '#0b0b0b',
+              borderRadius: '999px',
+              px: 2.8,
+              py: 1.2,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+              boxShadow: '0 10px 20px color-mix(in srgb, #527575 35%, transparent)',
+              '&:hover': {
+                background: 'color-mix(in srgb, #527575 90%, #000 10%)',
+                transform: 'translateY(-1px)',
+              },
+              transition: 'all 0.2s ease',
             }}
           >
             Yeni Malzeme Ekle
@@ -1335,8 +1375,13 @@ export default function MalzemeListesiPage() {
             variant="contained"
             onClick={() => fetchStoklar()}
             sx={{
-              bgcolor: '#191970',
-              '&:hover': { bgcolor: '#0f0f40' }
+            background: '#527575',
+            color: '#0b0b0b',
+            fontWeight: 700,
+            borderRadius: '999px',
+            px: 2.6,
+            boxShadow: '0 8px 18px color-mix(in srgb, #527575 30%, transparent)',
+            '&:hover': { background: 'color-mix(in srgb, #527575 90%, #000 10%)' }
             }}
           >
             Ara

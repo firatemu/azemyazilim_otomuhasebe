@@ -6,134 +6,120 @@ import { Receipt, ShoppingCart, CloudDownload } from '@mui/icons-material';
 import MainLayout from '@/components/Layout/MainLayout';
 import { useRouter } from 'next/navigation';
 
+const menuItems = [
+  {
+    title: 'Satış Faturaları',
+    description: 'Müşterilerinize kestiğiniz faturaları görüntüleyin ve yönetin',
+    icon: Receipt,
+    href: '/fatura/satis',
+    color: 'var(--primary)',
+  },
+  {
+    title: 'Satın Alma Faturaları',
+    description: 'Tedarikçilerden aldığınız faturaları görüntüleyin ve yönetin',
+    icon: ShoppingCart,
+    href: '/fatura/alis',
+    color: 'var(--secondary)',
+  },
+  {
+    title: 'Gelen E-Faturalar',
+    description: 'Hızlı Teknoloji entegratöründen gelen e-faturaları görüntüleyin ve yönetin',
+    icon: CloudDownload,
+    href: '/efatura/gelen',
+    color: 'var(--chart-1)',
+  },
+];
+
 export default function FaturaPage() {
   const router = useRouter();
 
   return (
     <MainLayout>
-      <Typography variant="h4" fontWeight="bold" gutterBottom>
+      <Typography 
+        variant="h4" 
+        sx={{
+          fontWeight: 700,
+          fontSize: '1.875rem',
+          color: 'var(--foreground)',
+          letterSpacing: '-0.02em',
+          mb: 1,
+        }}
+      >
         Fatura Yönetimi
       </Typography>
 
-      <Typography variant="body1" color="text.secondary" sx={{ mb: 4 }}>
+      <Typography 
+        variant="body1" 
+        sx={{
+          mb: 4,
+          color: 'var(--muted-foreground)',
+          fontSize: '0.875rem',
+        }}
+      >
         Lütfen işlem yapmak istediğiniz fatura türünü seçiniz
       </Typography>
 
       <Grid container spacing={3}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Card
-            elevation={2}
-            sx={{
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: 6,
-              }
-            }}
-          >
-            <CardActionArea onClick={() => router.push('/fatura/satis')}>
-              <CardContent sx={{ p: 4, textAlign: 'center' }}>
-                <Box
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 2,
-                    bgcolor: '#fdf2f8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 16px',
-                  }}
-                >
-                  <Receipt sx={{ fontSize: 40, color: '#ec4899' }} />
-                </Box>
-                <Typography variant="h5" fontWeight="600" gutterBottom>
-                  Satış Faturaları
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Müşterilerinize kestiğiniz faturaları görüntüleyin ve yönetin
-                </Typography>
-              </CardContent>
-            </CardActionArea>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Card
-            elevation={2}
-            sx={{
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: 6,
-              }
-            }}
-          >
-            <CardActionArea onClick={() => router.push('/fatura/satin-alma')}>
-              <CardContent sx={{ p: 4, textAlign: 'center' }}>
-                <Box
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 2,
-                    bgcolor: '#fdf2f8',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 16px',
-                  }}
-                >
-                  <ShoppingCart sx={{ fontSize: 40, color: '#ec4899' }} />
-                </Box>
-                <Typography variant="h5" fontWeight="600" gutterBottom>
-                  Satın Alma Faturaları
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Tedarikçilerden aldığınız faturaları görüntüleyin ve yönetin
-                </Typography>
-              </CardContent>
-            </CardActionArea>
-          </Card>
-        </Grid>
-
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Card
-            elevation={2}
-            sx={{
-              transition: 'all 0.3s ease',
-              '&:hover': {
-                transform: 'translateY(-8px)',
-                boxShadow: 6,
-              }
-            }}
-          >
-            <CardActionArea onClick={() => router.push('/efatura/gelen')}>
-              <CardContent sx={{ p: 4, textAlign: 'center' }}>
-                <Box
-                  sx={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 2,
-                    bgcolor: '#f0f9ff',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    margin: '0 auto 16px',
-                  }}
-                >
-                  <CloudDownload sx={{ fontSize: 40, color: '#0ea5e9' }} />
-                </Box>
-                <Typography variant="h5" fontWeight="600" gutterBottom>
-                  Gelen E-Faturalar
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  Hızlı Teknoloji entegratöründen gelen e-faturaları görüntüleyin ve yönetin
-                </Typography>
-              </CardContent>
-            </CardActionArea>
-          </Card>
-        </Grid>
-
+        {menuItems.map((item, index) => {
+          const IconComponent = item.icon;
+          return (
+            <Grid key={index} size={{ xs: 12, md: 6 }}>
+              <Card
+                sx={{
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid var(--border)',
+                  bgcolor: 'var(--card)',
+                  boxShadow: 'var(--shadow-sm)',
+                  transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                  '&:hover': {
+                    transform: 'translateY(-4px)',
+                    boxShadow: 'var(--shadow-md)',
+                    borderColor: 'var(--ring)',
+                  }
+                }}
+              >
+                <CardActionArea onClick={() => router.push(item.href)}>
+                  <CardContent sx={{ p: 4, textAlign: 'center' }}>
+                    <Box
+                      sx={{
+                        width: 80,
+                        height: 80,
+                        borderRadius: 'var(--radius-md)',
+                        bgcolor: `color-mix(in srgb, ${item.color} 15%, transparent)`,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        margin: '0 auto 16px',
+                      }}
+                    >
+                      <IconComponent sx={{ fontSize: 40, color: item.color }} />
+                    </Box>
+                    <Typography 
+                      variant="h5" 
+                      sx={{
+                        fontWeight: 700,
+                        fontSize: '1.25rem',
+                        color: 'var(--foreground)',
+                        mb: 1,
+                      }}
+                    >
+                      {item.title}
+                    </Typography>
+                    <Typography 
+                      variant="body2" 
+                      sx={{
+                        color: 'var(--muted-foreground)',
+                        fontSize: '0.875rem',
+                      }}
+                    >
+                      {item.description}
+                    </Typography>
+                  </CardContent>
+                </CardActionArea>
+              </Card>
+            </Grid>
+          );
+        })}
       </Grid>
     </MainLayout>
   );
