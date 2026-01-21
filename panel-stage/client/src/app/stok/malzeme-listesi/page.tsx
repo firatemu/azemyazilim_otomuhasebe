@@ -219,11 +219,12 @@ const MalzemeFormDialog = memo(({
                 value={localFormData.stokKodu}
                 onChange={(e) => handleLocalChange('stokKodu', e.target.value)}
                 size="medium"
+                className="form-control-textfield"
                 helperText={localFormData.stokKodu ? "Önerilen kod (değiştirilebilir)" : "Otomatik üretilecek"}
                 placeholder="Otomatik"
                 sx={{
                   '& .MuiInputBase-input': {
-                    color: localFormData.stokKodu && !editingMalzeme ? '#0066cc' : 'inherit',
+                    color: localFormData.stokKodu && !editingMalzeme ? 'var(--primary)' : 'var(--foreground)',
                     fontWeight: localFormData.stokKodu && !editingMalzeme ? 500 : 'normal'
                   }
                 }}
@@ -237,6 +238,7 @@ const MalzemeFormDialog = memo(({
                 onChange={(e) => handleLocalChange('stokAdi', e.target.value)}
                 required
                 size="medium"
+                className="form-control-textfield"
                 helperText="Detaylı ürün açıklaması giriniz"
                 inputProps={{ style: { fontSize: '1rem' } }}
               />
@@ -248,6 +250,7 @@ const MalzemeFormDialog = memo(({
                 value={localFormData.barkod}
                 onChange={(e) => handleLocalChange('barkod', e.target.value)}
                 size="medium"
+                className="form-control-textfield"
                 helperText="Ürün barkod numarası"
                 placeholder="Örn: 8690123456789"
                 sx={{
@@ -263,7 +266,7 @@ const MalzemeFormDialog = memo(({
           <Divider sx={{ my: 4 }} />
 
           {/* Kategori ve Ölçü Bilgileri */}
-          <Typography variant="h6" sx={{ mb: 2, color: '#191970', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>
             🏷️ Kategori ve Ölçü Bilgileri
           </Typography>
           <Grid container spacing={3}>
@@ -275,6 +278,7 @@ const MalzemeFormDialog = memo(({
                 onChange={(e) => handleLocalChange('tedarikciKodu', e.target.value)}
                 placeholder="Tedarikçinin ürün kodu"
                 size="medium"
+                className="form-control-textfield"
                 helperText="Tedarikçinin kullandığı ürün kodu"
               />
             </Grid>
@@ -287,12 +291,13 @@ const MalzemeFormDialog = memo(({
                 onChange={(e) => handleLocalChange('oem', e.target.value)}
                 placeholder="Orijinal parça numarası"
                 size="medium"
+                className="form-control-textfield"
                 helperText="Orjinal ekipman üreticisi kodu"
               />
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth size="medium">
+              <FormControl fullWidth size="medium" className="form-control-select">
                 <InputLabel shrink>Marka</InputLabel>
                 <Select
                   value={localFormData.marka}
@@ -313,7 +318,7 @@ const MalzemeFormDialog = memo(({
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth size="medium">
+              <FormControl fullWidth size="medium" className="form-control-select">
                 <InputLabel shrink>Ana Kategori *</InputLabel>
                 <Select
                   value={localFormData.anaKategori}
@@ -337,6 +342,7 @@ const MalzemeFormDialog = memo(({
               <FormControl 
                 fullWidth 
                 size="medium" 
+                className="form-control-select"
                 disabled={!localFormData.anaKategori}
                 error={Boolean(localFormData.altKategori && altKategoriOptions.length > 0 && !altKategoriOptions.includes(localFormData.altKategori))}
               >
@@ -386,6 +392,7 @@ const MalzemeFormDialog = memo(({
                 onChange={(e) => handleLocalChange('olcu', e.target.value)}
                 placeholder="Örn: 12x1.5, 195/65R15, M14x1.5, 180x20mm"
                 size="medium"
+                className="form-control-textfield"
                 helperText="Ürünün ölçü veya teknik özelliklerini giriniz"
               />
             </Grid>
@@ -409,6 +416,7 @@ const MalzemeFormDialog = memo(({
                     label="Raf Adresi"
                     placeholder="Seçiniz veya yazınız"
                     size="medium"
+                    className="form-control-textfield"
                     helperText="Depo raf konumu"
                   />
                 )}
@@ -422,7 +430,7 @@ const MalzemeFormDialog = memo(({
             </Grid>
 
             <Grid size={{ xs: 12, md: 2 }}>
-              <FormControl fullWidth size="medium">
+              <FormControl fullWidth size="medium" className="form-control-select">
                 <InputLabel shrink>Birim *</InputLabel>
                 <Select
                   value={localFormData.birim}
@@ -444,7 +452,7 @@ const MalzemeFormDialog = memo(({
           <Divider sx={{ my: 4 }} />
 
           {/* Fiyat Bilgileri */}
-          <Typography variant="h6" sx={{ mb: 2, color: '#191970', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>
             💰 Fiyat Bilgileri
           </Typography>
           <Grid container spacing={3}>
@@ -456,6 +464,7 @@ const MalzemeFormDialog = memo(({
                 value={localFormData.alisFiyati}
                 onChange={(e) => handleLocalChange('alisFiyati', parseFloat(e.target.value) || 0)}
                 size="medium"
+                className="form-control-textfield"
                 InputProps={{
                   startAdornment: <InputAdornment position="start">₺</InputAdornment>,
                   readOnly: Boolean(editingMalzeme),
@@ -473,6 +482,7 @@ const MalzemeFormDialog = memo(({
                 value={localFormData.satisFiyati}
                 onChange={(e) => handleLocalChange('satisFiyati', parseFloat(e.target.value) || 0)}
                 size="medium"
+                className="form-control-textfield"
                 InputProps={{
                   startAdornment: <InputAdornment position="start">₺</InputAdornment>,
                   readOnly: Boolean(editingMalzeme),
@@ -484,23 +494,23 @@ const MalzemeFormDialog = memo(({
           </Grid>
 
           {localFormData.alisFiyati > 0 && localFormData.satisFiyati > 0 && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: '#f0f4ff', borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'color-mix(in srgb, var(--primary) 5%, transparent)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
                 <strong>Kâr Marjı:</strong> ₺{(localFormData.satisFiyati - localFormData.alisFiyati).toFixed(2)}
                 ({localFormData.alisFiyati > 0 ? ((localFormData.satisFiyati - localFormData.alisFiyati) / localFormData.alisFiyati * 100).toFixed(1) : 0}%)
               </Typography>
             </Box>
           )}
 
-          <Divider sx={{ my: 4 }} />
+          <Divider sx={{ my: 4, borderColor: 'var(--border)' }} />
 
           {/* Araç Bilgileri Bölümü */}
-          <Typography variant="h6" sx={{ mb: 2, color: '#191970', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>
             🚗 Araç Bilgileri
           </Typography>
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth size="medium">
+              <FormControl fullWidth size="medium" className="form-control-select">
                 <InputLabel shrink>Araç Markası</InputLabel>
                 <Select
                   value={localFormData.aracMarka || ''}
