@@ -175,6 +175,120 @@
     background-color: var(--card);
   }
   
+  /* Additional Material-UI dark mode overrides */
+  .dark .MuiButton-root {
+    color: var(--foreground);
+  }
+  
+  .dark .MuiButton-contained {
+    background-color: var(--primary);
+    color: var(--primary-foreground);
+  }
+  
+  .dark .MuiButton-contained:hover {
+    background-color: var(--primary-hover);
+  }
+  
+  .dark .MuiButton-outlined {
+    border-color: var(--border);
+    color: var(--foreground);
+  }
+  
+  .dark .MuiButton-outlined:hover {
+    border-color: var(--primary);
+    background-color: color-mix(in srgb, var(--primary) 10%, transparent);
+  }
+  
+  .dark .MuiChip-root {
+    background-color: var(--muted);
+    color: var(--foreground);
+  }
+  
+  .dark .MuiChip-outlined {
+    border-color: var(--border);
+  }
+  
+  .dark .MuiIconButton-root {
+    color: var(--muted-foreground);
+  }
+  
+  .dark .MuiIconButton-root:hover {
+    background-color: var(--muted);
+    color: var(--foreground);
+  }
+  
+  .dark .MuiTypography-root {
+    color: var(--foreground);
+  }
+  
+  .dark .MuiTypography-colorTextSecondary {
+    color: var(--muted-foreground);
+  }
+  
+  .dark .MuiAlert-root {
+    background-color: var(--card);
+    color: var(--foreground);
+    border: 1px solid var(--border);
+  }
+  
+  .dark .MuiAlert-standardInfo {
+    background-color: color-mix(in srgb, var(--chart-1) 10%, transparent);
+    border-color: var(--chart-1);
+  }
+  
+  .dark .MuiAlert-standardSuccess {
+    background-color: color-mix(in srgb, var(--chart-2) 10%, transparent);
+    border-color: var(--chart-2);
+  }
+  
+  .dark .MuiAlert-standardWarning {
+    background-color: color-mix(in srgb, var(--chart-3) 10%, transparent);
+    border-color: var(--chart-3);
+  }
+  
+  .dark .MuiAlert-standardError {
+    background-color: color-mix(in srgb, var(--destructive) 10%, transparent);
+    border-color: var(--destructive);
+  }
+  
+  .dark .MuiAutocomplete-paper {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+  }
+  
+  .dark .MuiAutocomplete-option {
+    color: var(--foreground);
+  }
+  
+  .dark .MuiAutocomplete-option:hover {
+    background-color: var(--muted);
+  }
+  
+  .dark .MuiMenu-paper {
+    background-color: var(--card);
+    border: 1px solid var(--border);
+  }
+  
+  .dark .MuiMenuItem-root:hover {
+    background-color: var(--muted);
+  }
+  
+  .dark .MuiSkeleton-root {
+    background-color: var(--muted);
+  }
+  
+  .dark .MuiCircularProgress-root {
+    color: var(--primary);
+  }
+  
+  .dark .MuiLinearProgress-root {
+    background-color: var(--muted);
+  }
+  
+  .dark .MuiLinearProgress-bar {
+    background-color: var(--primary);
+  }
+  
   /* Reusable MUI Component Styles */
   
   /* Form Control - Select Dropdown */
