@@ -6,34 +6,21 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
 import { CreateCariDto, UpdateCariDto } from './dto';
 import { CodeTemplateService } from '../code-template/code-template.service';
-import { isStagingEnvironment } from '../../common/utils/staging.util';
 
 @Injectable()
 export class CariService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => CodeTemplateService))
     private codeTemplateService: CodeTemplateService,
   ) {}
 
   async create(dto: CreateCariDto) {
-    console.log('[CariService.create] Received dto:', dto);
-    console.log('[CariService.create] dto.tip type:', typeof dto.tip);
-    console.log('[CariService.create] dto.tip value:', dto.tip);
-    console.log('[CariService.create] dto.unvan:', dto.unvan);
-    
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    const isStaging = isStagingEnvironment();
-
-    // Staging'de veya SUPER_ADMIN için tenant kontrolünü atla
-    if (!tenantId && !isSuperAdmin && !isStaging) {
-      throw new BadRequestException('Tenant ID is required');
-    }
+    const tenantId = await this.tenantResolver.resolveForCreate({ allowNull: true });
 
     // Eğer cariKodu girilmemişse veya boşsa otomatik üret
     let cariKodu = dto.cariKodu?.trim();
@@ -54,38 +41,18 @@ export class CariService {
 
     // tip verilmezse varsayılan olarak MUSTERI atanır
     const tip = dto.tip || 'MUSTERI';
-    
-    console.log('[CariService.create] Final tip value:', tip);
-    console.log('[CariService.create] Valid CariTip values:', ['MUSTERI', 'TEDARIKCI', 'HER_IKISI']);
-    console.log('[CariService.create] Is tip valid?', ['MUSTERI', 'TEDARIKCI', 'HER_IKISI'].includes(tip));
 
-    // Check uniqueness within tenant (SUPER_ADMIN için tenant kontrolünü atla)
-    if (tenantId) {
-      const existing = await this.prisma.cari.findFirst({
-        where: {
-          cariKodu,
-          tenantId,
-        },
-      });
+    const finalTenantId = (dto as any).tenantId ?? tenantId ?? undefined;
 
-      if (existing) {
-        throw new BadRequestException('Bu cari kodu zaten kullanılıyor');
-      }
-    } else if (isSuperAdmin) {
-      // SUPER_ADMIN için tenant olmadan kontrol et
-      const existing = await this.prisma.cari.findFirst({
-        where: {
-          cariKodu,
-        },
-      });
-
-      if (existing) {
-        throw new BadRequestException('Bu cari kodu zaten kullanılıyor');
-      }
+    // Check uniqueness within tenant
+    const existingWhere: any = { cariKodu };
+    if (finalTenantId) existingWhere.tenantId = finalTenantId;
+    const existing = await this.prisma.cari.findFirst({
+      where: existingWhere,
+    });
+    if (existing) {
+      throw new BadRequestException('Bu cari kodu zaten kullanılıyor');
     }
-
-    // SUPER_ADMIN için dto'dan tenantId alınabilir, yoksa mevcut tenantId kullan
-    const finalTenantId = (dto as any).tenantId || tenantId || undefined;
 
     return this.prisma.cari.create({
       data: {
@@ -98,22 +65,11 @@ export class CariService {
   }
 
   async findAll(page = 1, limit = 50, search?: string, tip?: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    const isStaging = isStagingEnvironment();
-
-    // Staging'de veya SUPER_ADMIN için tenant kontrolünü atla
-    if (!tenantId && !isSuperAdmin && !isStaging) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
 
     const where: any = {};
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
+    if (tenantId) where.tenantId = tenantId;
 
     if (search) {
       where.OR = [

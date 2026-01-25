@@ -302,7 +302,15 @@ const HavaleDialog = memo(({
           variant="contained"
           onClick={handleLocalSubmit}
           disabled={loading}
-          sx={{ bgcolor: '#ef4444', '&:hover': { bgcolor: '#dc2626' } }}
+          sx={{ 
+            bgcolor: 'var(--destructive)',
+            color: 'white',
+            textTransform: 'none',
+            fontWeight: 600,
+            '&:hover': { 
+              bgcolor: 'color-mix(in srgb, var(--destructive) 90%, black)',
+            },
+          }}
         >
           {editMode ? 'Güncelle' : 'Kaydet'}
         </Button>
@@ -557,16 +565,50 @@ export default function GidenHavalePage() {
   return (
     <MainLayout>
       <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <TrendingDown sx={{ fontSize: 40, color: '#ef4444' }} />
-            Giden Havale İşlemleri
-          </Typography>
+        {/* Header */}
+        <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography 
+              variant="h4" 
+              sx={{ 
+                fontWeight: 700,
+                fontSize: '1.875rem',
+                color: 'var(--foreground)',
+                letterSpacing: '-0.02em',
+                mb: 0.5,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 1.5,
+              }}
+            >
+              <TrendingDown sx={{ fontSize: 40, color: 'var(--destructive)' }} />
+              Giden Havale İşlemleri
+            </Typography>
+            <Typography 
+              variant="body2" 
+              sx={{
+                color: 'var(--muted-foreground)',
+                fontSize: '0.875rem',
+              }}
+            >
+              Giden havale kayıtlarını görüntüleyin ve yönetin
+            </Typography>
+          </Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
             <Button
               variant="outlined"
               startIcon={<Refresh />}
               onClick={fetchHavaleler}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                borderColor: 'var(--border)',
+                color: 'var(--foreground)',
+                '&:hover': {
+                  borderColor: 'var(--primary)',
+                  bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                },
+              }}
             >
               Yenile
             </Button>
@@ -575,8 +617,13 @@ export default function GidenHavalePage() {
               startIcon={<Add />}
               onClick={() => handleOpenDialog()}
               sx={{
-                bgcolor: '#ef4444',
-                '&:hover': { bgcolor: '#dc2626' }
+                bgcolor: 'var(--destructive)',
+                color: 'white',
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': {
+                  bgcolor: 'color-mix(in srgb, var(--destructive) 90%, black)',
+                },
               }}
             >
               Yeni Giden Havale
@@ -586,32 +633,95 @@ export default function GidenHavalePage() {
 
         {/* İstatistikler */}
         {stats && (
-          <Grid container spacing={2} sx={{ mb: 3, justifyContent: 'center' }}>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: '#fef2f2', border: '1px solid #ef4444' }}>
+          <Grid container spacing={2} sx={{ mb: 3 }}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)', 
+                borderLeft: '4px solid var(--destructive)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Toplam Kayıt</Typography>
-                  <Typography variant="h4" sx={{ color: '#ef4444', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{
+                      color: 'var(--muted-foreground)',
+                      fontSize: '0.875rem',
+                      mb: 1,
+                    }}
+                  >
+                    Toplam Kayıt
+                  </Typography>
+                  <Typography 
+                    variant="h4" 
+                    sx={{ 
+                      color: 'var(--destructive)', 
+                      fontWeight: 700,
+                      fontSize: '1.875rem',
+                    }}
+                  >
                     {stats.toplamKayit}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: '#fef2f2', border: '1px solid #ef4444' }}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)', 
+                borderLeft: '4px solid var(--destructive)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Giden Havale Sayısı</Typography>
-                  <Typography variant="h5" sx={{ color: '#ef4444', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{
+                      color: 'var(--muted-foreground)',
+                      fontSize: '0.875rem',
+                      mb: 1,
+                    }}
+                  >
+                    Giden Havale Sayısı
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--destructive)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {stats.gidenHavale.adet}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: '#fef2f2', border: '1px solid #ef4444' }}>
+            <Grid size={{ xs: 12, md: 4 }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)', 
+                borderLeft: '4px solid var(--destructive)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Toplam Giden</Typography>
-                  <Typography variant="h5" sx={{ color: '#ef4444', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{
+                      color: 'var(--muted-foreground)',
+                      fontSize: '0.875rem',
+                      mb: 1,
+                    }}
+                  >
+                    Toplam Giden
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--destructive)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {formatCurrency(stats.gidenHavale.toplam)}
                   </Typography>
                 </CardContent>
@@ -621,9 +731,25 @@ export default function GidenHavalePage() {
         )}
 
         {/* Filtreler */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <FilterList />
+        <Paper sx={{ 
+          p: 2, 
+          mb: 3,
+          borderRadius: 'var(--radius)',
+          boxShadow: 'var(--shadow-sm)',
+          bgcolor: 'var(--card)',
+        }}>
+          <Typography 
+            variant="h6" 
+            sx={{ 
+              mb: 2, 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1,
+              fontWeight: 700,
+              color: 'var(--foreground)',
+            }}
+          >
+            <FilterList sx={{ color: 'var(--primary)' }} />
             Filtreler
           </Typography>
           <Grid container spacing={2}>
@@ -687,19 +813,26 @@ export default function GidenHavalePage() {
         </Paper>
 
         {/* Tablo */}
-        <TableContainer component={Paper}>
+        <TableContainer 
+          component={Paper}
+          sx={{ 
+            borderRadius: 'var(--radius)',
+            boxShadow: 'var(--shadow-sm)',
+            bgcolor: 'var(--card)',
+          }}
+        >
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f9fafb' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Tarih</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Banka Hesabı</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Cari</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Alıcı</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Tutar</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Referans No</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Açıklama</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Kayıt Tarihi</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="right">İşlemler</TableCell>
+              <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Tarih</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Banka Hesabı</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Cari</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Alıcı</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Tutar</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Referans No</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Açıklama</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Kayıt Tarihi</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)' }} align="right">İşlemler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -744,7 +877,12 @@ export default function GidenHavalePage() {
                       <Chip
                         label={formatCurrency(havale.tutar)}
                         size="small"
-                        sx={{ bgcolor: '#fef2f2', color: '#ef4444', fontWeight: 600 }}
+                        sx={{ 
+                          bgcolor: 'color-mix(in srgb, var(--destructive) 15%, transparent)', 
+                          color: 'var(--destructive)', 
+                          fontWeight: 700,
+                          border: '1px solid color-mix(in srgb, var(--destructive) 30%, transparent)',
+                        }}
                       />
                     </TableCell>
                     <TableCell>{havale.referansNo || '-'}</TableCell>
@@ -770,7 +908,12 @@ export default function GidenHavalePage() {
                         <IconButton
                           size="small"
                           onClick={() => handleViewDetail(havale)}
-                          sx={{ color: '#3b82f6' }}
+                          sx={{ 
+                            color: 'var(--primary)',
+                            '&:hover': {
+                              bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                            },
+                          }}
                         >
                           <Visibility fontSize="small" />
                         </IconButton>
@@ -779,7 +922,12 @@ export default function GidenHavalePage() {
                         <IconButton
                           size="small"
                           onClick={() => handleOpenDialog(havale)}
-                          sx={{ color: '#f59e0b' }}
+                          sx={{ 
+                            color: 'var(--chart-1)',
+                            '&:hover': {
+                              bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)',
+                            },
+                          }}
                         >
                           <Edit fontSize="small" />
                         </IconButton>
@@ -791,7 +939,12 @@ export default function GidenHavalePage() {
                             setSelectedHavale(havale);
                             setOpenDelete(true);
                           }}
-                          sx={{ color: '#ef4444' }}
+                          sx={{ 
+                            color: 'var(--destructive)',
+                            '&:hover': {
+                              bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+                            },
+                          }}
                         >
                           <Delete fontSize="small" />
                         </IconButton>
@@ -887,7 +1040,7 @@ export default function GidenHavalePage() {
                   </Grid>
                   <Grid size={{ xs: 6 }}>
                     <Typography variant="caption" color="textSecondary">Tutar</Typography>
-                    <Typography variant="h5" sx={{ color: '#ef4444', fontWeight: 600 }}>
+                    <Typography variant="h5" sx={{ color: 'var(--destructive)', fontWeight: 700 }}>
                       {formatCurrency(selectedHavale.tutar)}
                     </Typography>
                   </Grid>

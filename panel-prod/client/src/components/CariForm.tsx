@@ -43,18 +43,19 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
         <TextField
           fullWidth
           label="Cari Kodu *"
+          className="form-control-textfield"
           value={data.cariKodu}
           onChange={(e) => onChange('cariKodu', e.target.value)}
           placeholder="Otomatik üretilecek"
           helperText={data.cariKodu ? "Önerilen kod (değiştirilebilir veya silinebilir)" : "Boş bırakılırsa otomatik üretilecek"}
           sx={{
             '& .MuiInputBase-input': {
-              color: data.cariKodu ? '#0066cc' : 'inherit',
+              color: data.cariKodu ? 'var(--primary)' : 'var(--foreground)',
               fontWeight: data.cariKodu ? 500 : 'normal'
             }
           }}
         />
-        <FormControl fullWidth>
+        <FormControl fullWidth className="form-control-select">
           <InputLabel>Tip</InputLabel>
           <Select
             value={data.tip}
@@ -66,7 +67,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
             <MenuItem value="HER_IKISI">Her İkisi</MenuItem>
           </Select>
         </FormControl>
-        <FormControl fullWidth>
+        <FormControl fullWidth className="form-control-select">
           <InputLabel>Durum</InputLabel>
           <Select
             value={data.aktif ? 'true' : 'false'}
@@ -75,13 +76,13 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
           >
             <MenuItem value="true">
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <span style={{ color: '#10b981', fontSize: '1.2em' }}>✓</span>
+                <span style={{ color: 'var(--chart-2)', fontSize: '1.2em' }}>✓</span>
                 <Typography>Kullanım İçi</Typography>
               </Box>
             </MenuItem>
             <MenuItem value="false">
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                <span style={{ color: '#ef4444', fontSize: '1.2em' }}>✗</span>
+                <span style={{ color: 'var(--destructive)', fontSize: '1.2em' }}>✗</span>
                 <Typography>Kullanım Dışı</Typography>
               </Box>
             </MenuItem>
@@ -92,6 +93,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
       <TextField
         fullWidth
         label="Ünvan *"
+        className="form-control-textfield"
         value={data.unvan}
         onChange={(e) => onChange('unvan', e.target.value)}
         required
@@ -101,16 +103,15 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
       {/* TİCARİ BİLGİLER */}
       <Box sx={{
         p: 2,
-        border: '2px dashed',
-        borderColor: '#ec4899',
-        borderRadius: 2,
-        bgcolor: '#fdf2f8'
+        border: '2px dashed var(--primary)',
+        borderRadius: 'var(--radius)',
+        bgcolor: 'color-mix(in srgb, var(--primary) 5%, transparent)'
       }}>
-        <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2, color: '#ec4899' }}>
+        <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2, color: 'var(--primary)' }}>
           🏢 Ticari Bilgiler
         </Typography>
 
-        <FormControl fullWidth sx={{ mb: 2 }}>
+        <FormControl fullWidth sx={{ mb: 2 }} className="form-control-select">
           <InputLabel>Şirket Tipi</InputLabel>
           <Select
             value={data.sirketTipi}
@@ -120,7 +121,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
             <MenuItem value="KURUMSAL">
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography>🏢 Kurumsal Şirket</Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
                   (Ltd, A.Ş, vb.)
                 </Typography>
               </Box>
@@ -128,7 +129,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
             <MenuItem value="SAHIS">
               <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                 <Typography>👤 Şahıs Şirketi</Typography>
-                <Typography variant="caption" color="text.secondary">
+                <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
                   (Şahıs işletmesi)
                 </Typography>
               </Box>
@@ -141,6 +142,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
             <TextField
               fullWidth
               label="Vergi No"
+              className="form-control-textfield"
               value={data.vergiNo}
               onChange={(e) => onChange('vergiNo', e.target.value)}
               inputProps={{ maxLength: 10 }}
@@ -149,6 +151,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
             <TextField
               fullWidth
               label="Vergi Dairesi"
+              className="form-control-textfield"
               value={data.vergiDairesi}
               onChange={(e) => onChange('vergiDairesi', e.target.value)}
               helperText="Bağlı olduğu vergi dairesi"
@@ -165,6 +168,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
             <TextField
               fullWidth
               label="TC Kimlik No"
+              className="form-control-textfield"
               value={data.tcKimlikNo}
               onChange={(e) => {
                 const value = e.target.value.replace(/\D/g, '');
@@ -179,6 +183,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
             <TextField
               fullWidth
               label="İşletme Sahibi Adı Soyadı"
+              className="form-control-textfield"
               value={data.isimSoyisim}
               onChange={(e) => onChange('isimSoyisim', e.target.value)}
               placeholder="Ahmet Yılmaz"
@@ -192,6 +197,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
         <TextField
           fullWidth
           label="Telefon"
+          className="form-control-textfield"
           value={data.telefon}
           onChange={(e) => onChange('telefon', e.target.value)}
           placeholder="0555 123 4567"
@@ -199,6 +205,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
         <TextField
           fullWidth
           label="Email"
+          className="form-control-textfield"
           type="email"
           value={data.email}
           onChange={(e) => onChange('email', e.target.value)}
@@ -210,6 +217,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
         <TextField
           fullWidth
           label="Yetkili"
+          className="form-control-textfield"
           value={data.yetkili}
           onChange={(e) => onChange('yetkili', e.target.value)}
           placeholder="Yetkili kişi adı"
@@ -217,6 +225,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
         <TextField
           fullWidth
           label="Vade Süresi (gün)"
+          className="form-control-textfield"
           type="number"
           value={data.vadeSuresi}
           onChange={(e) => onChange('vadeSuresi', e.target.value)}
@@ -229,12 +238,11 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
       {/* ADRES BİLGİLERİ */}
       <Box sx={{
         p: 2,
-        border: '2px dashed',
-        borderColor: '#8b5cf6',
-        borderRadius: 2,
-        bgcolor: '#f5f3ff'
+        border: '2px dashed var(--secondary)',
+        borderRadius: 'var(--radius)',
+        bgcolor: 'color-mix(in srgb, var(--secondary) 5%, transparent)'
       }}>
-        <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2, color: '#8b5cf6' }}>
+        <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 2, color: 'var(--secondary)' }}>
           📍 Adres Bilgileri
         </Typography>
 
@@ -242,21 +250,17 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
           <TextField
             fullWidth
             label="Ülke"
+            className="form-control-textfield"
             value={data.ulke}
             disabled
             InputProps={{
               readOnly: true,
             }}
-            sx={{
-              '& .MuiInputBase-input': {
-                bgcolor: '#f9fafb',
-              }
-            }}
           />
         </Box>
 
         <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
-          <FormControl fullWidth>
+          <FormControl fullWidth className="form-control-select">
             <InputLabel>İl</InputLabel>
             <Select
               value={data.il}
@@ -269,7 +273,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
             </Select>
           </FormControl>
 
-          <FormControl fullWidth>
+          <FormControl fullWidth className="form-control-select">
             <InputLabel>İlçe</InputLabel>
             <Select
               value={data.ilce}
@@ -286,6 +290,7 @@ const CariForm = React.memo(({ data, onChange, onCityChange, availableDistricts 
         <TextField
           fullWidth
           label="Adres Detayı"
+          className="form-control-textfield"
           multiline
           rows={3}
           value={data.adres}

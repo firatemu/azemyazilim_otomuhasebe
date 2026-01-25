@@ -117,9 +117,9 @@ export default function KasaPage() {
   };
 
   const openAddDialog = async () => {
-    await resetForm();
     setEditMode(false);
     setOpenDialog(true);
+    await resetForm();
   };
 
   const openEditDialog = (kasa: Kasa) => {
@@ -183,21 +183,21 @@ export default function KasaPage() {
 
   const getKasaIcon = (tip: string) => {
     switch (tip) {
-      case 'NAKIT': return <AttachMoney sx={{ color: '#10b981' }} />;
-      case 'BANKA': return <AccountBalance sx={{ color: '#3b82f6' }} />;
-      case 'FIRMA_KREDI_KARTI': return <CreditCard sx={{ color: '#ef4444' }} />;
-      case 'CEK_SENET': return <AccountBalanceWallet sx={{ color: '#8b5cf6' }} />;
+      case 'NAKIT': return <AttachMoney sx={{ color: 'var(--chart-2)' }} />;
+      case 'BANKA': return <AccountBalance sx={{ color: 'var(--chart-1)' }} />;
+      case 'FIRMA_KREDI_KARTI': return <CreditCard sx={{ color: 'var(--destructive)' }} />;
+      case 'CEK_SENET': return <AccountBalanceWallet sx={{ color: 'var(--secondary)' }} />;
       default: return null;
     }
   };
 
   const getKasaColor = (tip: string) => {
     switch (tip) {
-      case 'NAKIT': return '#10b981';
-      case 'BANKA': return '#3b82f6';
-      case 'FIRMA_KREDI_KARTI': return '#ef4444';
-      case 'CEK_SENET': return '#8b5cf6';
-      default: return '#6b7280';
+      case 'NAKIT': return 'var(--chart-2)';
+      case 'BANKA': return 'var(--chart-1)';
+      case 'FIRMA_KREDI_KARTI': return 'var(--destructive)';
+      case 'CEK_SENET': return 'var(--secondary)';
+      default: return 'var(--muted-foreground)';
     }
   };
 
@@ -227,10 +227,25 @@ export default function KasaPage() {
         {/* Header */}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography variant="h4" fontWeight="bold" sx={{ mb: 0.5 }}>
+            <Typography 
+              variant="h4" 
+              sx={{ 
+                fontWeight: 700,
+                fontSize: '1.875rem',
+                color: 'var(--foreground)',
+                letterSpacing: '-0.02em',
+                mb: 0.5,
+              }}
+            >
               💰 Kasa Yönetimi
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography 
+              variant="body2" 
+              sx={{
+                color: 'var(--muted-foreground)',
+                fontSize: '0.875rem',
+              }}
+            >
               Nakit, Banka, Firma Kredi Kartı ve Çek/Senet kasalarını yönetin
             </Typography>
           </Box>
@@ -239,8 +254,15 @@ export default function KasaPage() {
               onClick={() => setShowInactive(!showInactive)}
               title={showInactive ? 'Kullanım İçi Kasaları Göster' : 'Kullanım Dışı Kasaları Göster'}
               sx={{
-                color: showInactive ? '#f59e0b' : '#10b981',
-                bgcolor: showInactive ? '#fffbeb' : '#ecfdf5',
+                color: showInactive ? 'var(--primary)' : 'var(--chart-2)',
+                bgcolor: showInactive 
+                  ? 'color-mix(in srgb, var(--primary) 10%, transparent)' 
+                  : 'color-mix(in srgb, var(--chart-2) 10%, transparent)',
+                '&:hover': {
+                  bgcolor: showInactive 
+                    ? 'color-mix(in srgb, var(--primary) 20%, transparent)' 
+                    : 'color-mix(in srgb, var(--chart-2) 20%, transparent)',
+                },
               }}
             >
               {showInactive ? <ToggleOff /> : <ToggleOn />}
@@ -250,9 +272,12 @@ export default function KasaPage() {
               startIcon={<Add />}
               onClick={openAddDialog}
               sx={{
-                background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
+                bgcolor: 'var(--secondary)',
+                color: 'var(--secondary-foreground)',
+                textTransform: 'none',
+                fontWeight: 600,
                 '&:hover': {
-                  background: 'linear-gradient(135deg, #d97706 0%, #b45309 100%)',
+                  bgcolor: 'var(--secondary-hover)',
                 },
               }}
             >
@@ -264,13 +289,33 @@ export default function KasaPage() {
         {/* Kasa Tipleri Bilgilendirme */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid size={{ xs: 12, md: 3 }}>
-            <Card sx={{ bgcolor: '#ecfdf5', borderLeft: '4px solid #10b981' }}>
+            <Card sx={{ 
+              bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)', 
+              borderLeft: '4px solid var(--chart-2)',
+              borderRadius: 'var(--radius)',
+              boxShadow: 'var(--shadow-sm)',
+            }}>
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <AttachMoney sx={{ color: '#10b981' }} />
-                  <Typography variant="subtitle2" fontWeight="bold">Nakit Kasa</Typography>
+                  <AttachMoney sx={{ color: 'var(--chart-2)' }} />
+                  <Typography 
+                    variant="subtitle2" 
+                    sx={{
+                      fontWeight: 700,
+                      fontSize: '0.9375rem',
+                      color: 'var(--foreground)',
+                    }}
+                  >
+                    Nakit Kasa
+                  </Typography>
                 </Box>
-                <Typography variant="caption" color="text.secondary">
+                <Typography 
+                  variant="caption" 
+                  sx={{
+                    color: 'var(--muted-foreground)',
+                    fontSize: '0.8125rem',
+                  }}
+                >
                   Nakit tahsilat ve ödeme işlemleri
                 </Typography>
               </CardContent>

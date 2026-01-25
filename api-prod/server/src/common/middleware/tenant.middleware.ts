@@ -18,11 +18,47 @@ declare global {
 
 @Injectable()
 export class TenantMiddleware implements NestMiddleware {
+  // Cache for staging default tenant ID
+  private cachedStagingDefaultTenantId: string | null | undefined = undefined;
+
   constructor(
     private jwtService: JwtService,
     private prisma: PrismaService,
     private tenantContext: TenantContextService,
   ) {}
+
+  /**
+   * Staging default tenant ID'yi veritabanından al (cache'li)
+   */
+  private async getStagingDefaultTenantId(): Promise<string | null> {
+    // Cache kontrolü
+    if (this.cachedStagingDefaultTenantId !== undefined) {
+      return this.cachedStagingDefaultTenantId;
+    }
+
+    try {
+      // Veritabanından oku
+      const parameter = await this.prisma.systemParameter.findFirst({
+        where: {
+          key: 'STAGING_DEFAULT_TENANT_ID',
+          tenantId: null, // Global parametre
+        },
+      });
+
+      if (parameter && typeof parameter.value === 'string') {
+        this.cachedStagingDefaultTenantId = parameter.value;
+        return parameter.value;
+      }
+    } catch (error) {
+      // Hata durumunda fallback kullan
+      console.warn('[TenantMiddleware] SystemParameter okuma hatası, fallback kullanılıyor:', error);
+    }
+
+    // Fallback: .env dosyasından oku
+    const fallbackId = process.env.STAGING_DEFAULT_TENANT_ID || 'cmi5of04z0000ksb3g5eyu6ts';
+    this.cachedStagingDefaultTenantId = fallbackId || null;
+    return this.cachedStagingDefaultTenantId;
+  }
 
   async use(req: Request, res: Response, next: NextFunction) {
     try {
@@ -44,7 +80,7 @@ export class TenantMiddleware implements NestMiddleware {
       const isStaging = nodeEnv === 'staging' ||
                         nodeEnv === 'development' ||
                         process.env.STAGING_DISABLE_TENANT === 'true';
-      const stagingDefaultTenantId = process.env.STAGING_DEFAULT_TENANT_ID;
+      const stagingDefaultTenantId = await this.getStagingDefaultTenantId();
       
       console.log('🔍 [TenantMiddleware] Environment check:', { 
         NODE_ENV: nodeEnv, 
@@ -178,7 +214,7 @@ export class TenantMiddleware implements NestMiddleware {
       const isStaging = process.env.NODE_ENV === 'staging' ||
                         process.env.NODE_ENV === 'development' ||
                         process.env.STAGING_DISABLE_TENANT === 'true';
-      const stagingDefaultTenantId = process.env.STAGING_DEFAULT_TENANT_ID;
+      const stagingDefaultTenantId = await this.getStagingDefaultTenantId();
 
       if (isStaging && stagingDefaultTenantId) {
         // Staging'de default tenant ID kullan

@@ -1,12 +1,12 @@
 import { Module } from '@nestjs/common';
 import { VehicleController } from './vehicle.controller';
 import { VehicleService } from './vehicle.service';
-import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantContextModule } from '../../common/services/tenant-context.module';
 
 @Module({
+  imports: [TenantContextModule],
   controllers: [VehicleController],
-  providers: [VehicleService, PrismaService, TenantContextService],
+  providers: [VehicleService],
   exports: [VehicleService],
 })
 export class VehicleModule {}

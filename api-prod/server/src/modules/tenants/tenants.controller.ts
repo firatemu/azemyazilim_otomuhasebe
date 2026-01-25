@@ -1,7 +1,8 @@
-import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Patch, Param, Delete, UseGuards, Put, Req } from '@nestjs/common';
 import { TenantsService } from './tenants.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
@@ -17,6 +18,18 @@ export class TenantsController {
   @Get()
   findAll() {
     return this.tenantsService.findAll();
+  }
+
+  @Get('settings')
+  getSettings(@Req() req: any) {
+    const tenantId = req.user?.tenantId;
+    return this.tenantsService.getSettings(tenantId);
+  }
+
+  @Put('settings')
+  updateSettings(@Req() req: any, @Body() updateSettingsDto: UpdateTenantSettingsDto) {
+    const tenantId = req.user?.tenantId;
+    return this.tenantsService.updateSettings(tenantId, updateSettingsDto);
   }
 
   @Get(':id')

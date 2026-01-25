@@ -9,6 +9,7 @@ interface User {
   username: string;
   fullName: string;
   role: string;
+  tenantId?: string;
 }
 
 interface AuthState {
@@ -153,11 +154,16 @@ try {
         accessToken: null,
         refreshToken: null,
         setAuth: (user, accessToken, refreshToken) => {
-          // Save token directly to localStorage for axios interceptor
+          // Save token and tenantId directly to localStorage for axios interceptor
           if (typeof window !== 'undefined') {
             try {
               localStorage.setItem('accessToken', accessToken);
               localStorage.setItem('refreshToken', refreshToken || '');
+              if (user?.tenantId) {
+                localStorage.setItem('tenantId', user.tenantId);
+              } else {
+                localStorage.removeItem('tenantId');
+              }
             } catch (e) {
               console.warn('[AuthStore] Failed to save tokens to localStorage:', e);
             }
@@ -169,6 +175,7 @@ try {
             try {
               localStorage.removeItem('accessToken');
               localStorage.removeItem('refreshToken');
+              localStorage.removeItem('tenantId');
             } catch (e) {
               console.warn('[AuthStore] Failed to clear tokens from localStorage:', e);
             }
@@ -182,6 +189,7 @@ try {
               localStorage.removeItem('auth-storage');
               localStorage.removeItem('accessToken');
               localStorage.removeItem('refreshToken');
+              localStorage.removeItem('tenantId');
             } catch (e) {
               console.warn('[AuthStore] Failed to clear cache from localStorage:', e);
             }
@@ -221,6 +229,11 @@ try {
         try {
           localStorage.setItem('accessToken', accessToken);
           localStorage.setItem('refreshToken', refreshToken || '');
+          if (user?.tenantId) {
+            localStorage.setItem('tenantId', user.tenantId);
+          } else {
+            localStorage.removeItem('tenantId');
+          }
         } catch (e) {
           // Ignore
         }
@@ -232,6 +245,7 @@ try {
         try {
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
+          localStorage.removeItem('tenantId');
         } catch (e) {
           // Ignore
         }
@@ -245,6 +259,7 @@ try {
           localStorage.removeItem('auth-storage');
           localStorage.removeItem('accessToken');
           localStorage.removeItem('refreshToken');
+          localStorage.removeItem('tenantId');
         } catch (e) {
           // Ignore
         }

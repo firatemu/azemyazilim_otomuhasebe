@@ -39,7 +39,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
   };
 
   return (
-    <Box sx={{ display: 'flex', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', minHeight: '100vh', bgcolor: 'var(--background)' }}>
       <Sidebar
         open={sidebarPinned ? true : sidebarOpen}
         pinned={sidebarPinned}
@@ -51,7 +51,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         sx={{
           flexGrow: 1,
           width: '100%',
-          bgcolor: 'background.default',
+          bgcolor: 'var(--background)',
         }}
       >
         <Header
@@ -61,7 +61,7 @@ export default function MainLayout({ children }: MainLayoutProps) {
         />
         <Toolbar />
         <TabBar />
-        <Box sx={{ p: 3 }}>{children}</Box>
+        <Box sx={{ p: 3, bgcolor: 'var(--background)' }}>{children}</Box>
       </Box>
     </Box>
   );

@@ -6,41 +6,23 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CodeTemplateService } from '../code-template/code-template.service';
 import { SatınAlmaIrsaliyesiService } from '../satin-alma-irsaliyesi/satin-alma-irsaliyesi.service';
 import { CreateSatinAlmaSiparisDto } from './dto/create-satin-alma-siparis.dto';
 import { UpdateSatinAlmaSiparisDto } from './dto/update-satin-alma-siparis.dto';
 import { SatınAlmaSiparisDurum, Prisma, LogAction, IrsaliyeKaynakTip, IrsaliyeDurum } from '@prisma/client';
-import { isStagingEnvironment, buildTenantWhereClause } from '../../common/utils/staging.util';
 
 @Injectable()
 export class SatinAlmaSiparisiService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => SatınAlmaIrsaliyesiService))
     private satınAlmaIrsaliyesiService: SatınAlmaIrsaliyesiService,
     private codeTemplateService: CodeTemplateService,
   ) {}
-
-  /**
-   * Tenant ID'yi al - staging'de opsiyonel
-   */
-  private getTenantIdOrThrow(): string | undefined {
-    const tenantId = this.tenantContext.getTenantId();
-
-    // Staging ortamında tenant ID opsiyonel
-    if (isStagingEnvironment()) {
-      return tenantId; // undefined olabilir
-    }
-
-    // Production'da tenant ID zorunlu
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required in production environment');
-    }
-    return tenantId;
-  }
 
   private async createLog(
     siparisId: string,
@@ -72,12 +54,10 @@ export class SatinAlmaSiparisiService {
     cariId?: string,
   ) {
     const skip = (page - 1) * limit;
-
-    const tenantId = this.getTenantIdOrThrow();
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const where: Prisma.SatınAlmaSiparisiWhereInput = {
-      deletedAt: null, // Sadece silinmemiş kayıtlar
-      ...buildTenantWhereClause(tenantId), // Tenant filtreleme (staging'de opsiyonel)
+      deletedAt: null,
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
 
     if (durum) {
@@ -142,12 +122,11 @@ export class SatinAlmaSiparisiService {
   }
 
   async findOne(id: string) {
-    const tenantId = this.getTenantIdOrThrow();
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const siparis = await this.prisma.satınAlmaSiparisi.findFirst({
       where: {
         id,
-        ...buildTenantWhereClause(tenantId),
+        ...buildTenantWhereClause(tenantId ?? undefined),
         deletedAt: null,
       },
       include: {
@@ -203,13 +182,12 @@ export class SatinAlmaSiparisiService {
   ) {
     const { kalemler, ...siparisData } = createSiparisDto;
 
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
-    // Sipariş numarası kontrolü (tenant-aware)
     const existingSiparis = await this.prisma.satınAlmaSiparisi.findFirst({
       where: {
         siparisNo: siparisData.siparisNo,
-        ...buildTenantWhereClause(tenantId),
+        ...buildTenantWhereClause(tenantId ?? undefined),
       },
     });
 
@@ -265,7 +243,7 @@ export class SatinAlmaSiparisiService {
       const siparis = await prisma.satınAlmaSiparisi.create({
         data: {
           ...siparisData,
-          tenantId,
+          ...(tenantId != null && { tenantId }),
           durum: siparisData.durum || SatınAlmaSiparisDurum.BEKLEMEDE,
           toplamTutar,
           kdvTutar,
@@ -663,9 +641,6 @@ export class SatinAlmaSiparisiService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    // Siparişi bul
     const siparis = await this.prisma.satınAlmaSiparisi.findUnique({
       where: { id },
       include: {
@@ -685,7 +660,6 @@ export class SatinAlmaSiparisiService {
       throw new BadRequestException('Faturalandırılmış veya iptal edilmiş siparişler sevk edilemez');
     }
 
-    // Transaction ile sevk işlemini yap
     return this.prisma.$transaction(async (prisma) => {
       // Her kalem için sevk miktarını güncelle
       for (const sevkKalem of sevkKalemler) {
@@ -767,7 +741,7 @@ export class SatinAlmaSiparisiService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
     const siparis = await this.prisma.satınAlmaSiparisi.findUnique({
       where: { id },
@@ -831,7 +805,7 @@ export class SatinAlmaSiparisiService {
     } catch (error: any) {
       const year = new Date().getFullYear();
       const lastIrsaliye = await this.prisma.satınAlmaIrsaliyesi.findFirst({
-        where: { ...(tenantId && { tenantId }) },
+        where: { ...buildTenantWhereClause(tenantId ?? undefined) },
         orderBy: { createdAt: 'desc' },
       });
       const lastNoStr = lastIrsaliye?.irsaliyeNo || '';

@@ -5,80 +5,37 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { Prisma } from '@prisma/client';
 import { CreateVehicleDto, UpdateVehicleDto } from './dto';
-import { isStagingEnvironment, buildTenantWhereClause } from '../../common/utils/staging.util';
 
 @Injectable()
 export class VehicleService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
-  ) { }
+    private tenantResolver: TenantResolverService,
+  ) {}
 
-  /**
-   * Tenant ID'yi al - staging'de default tenant ID'yi kullan
-   */
-  private getTenantIdOrThrow(): string | undefined {
-    const tenantId = this.tenantContext.getTenantId();
-    const isStaging = isStagingEnvironment();
-
-    console.log('🔍 [VehicleService.getTenantIdOrThrow] tenantId:', tenantId, 'isStaging:', isStaging);
-
-    // Staging ortamında tenant ID yoksa, default tenant ID'yi kullan
-    if (isStaging && !tenantId) {
-      const stagingDefaultTenantId = process.env.STAGING_DEFAULT_TENANT_ID;
-      if (stagingDefaultTenantId) {
-        console.log('✅ [VehicleService.getTenantIdOrThrow] Using default staging tenant ID:', stagingDefaultTenantId);
-        return stagingDefaultTenantId;
-      }
-    }
-
-    // Production'da tenant ID zorunlu
-    if (!tenantId && !isStaging) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-    return tenantId;
-  }
-
-  // ============= CRUD OPERATIONS =============
-
-  /**
-   * Yeni araç oluştur
-   */
   async create(dto: CreateVehicleDto) {
-    console.log('🔍 [VehicleService.create] DTO:', JSON.stringify(dto, null, 2));
-    console.log('🔍 [VehicleService.create] Creating vehicle...');
-
-    const tenantId = this.getTenantIdOrThrow();
-    console.log('🔍 [VehicleService.create] tenantId:', tenantId);
-
-    // Müşteri kontrolü - staging'de tenantId opsiyonel
-    const customerWhere: any = { id: dto.customerId };
-    // Staging ortamında müşteri tenant kontrolünü kaldırıyoruz, çünkü bazı müşterilerin tenantId'si null olabilir
-    if (tenantId && !isStagingEnvironment()) {
-      customerWhere.tenantId = tenantId;
+    const tenantId = await this.tenantResolver.resolveForCreate({});
+    if (!tenantId) {
+      throw new BadRequestException('Tenant bulunamadı. Lütfen tekrar giriş yapın.');
     }
 
-    console.log('🔍 [VehicleService.create] CustomerWhere:', customerWhere);
-
+    const customerWhere: any = { id: dto.customerId };
+    if (tenantId) customerWhere.tenantId = tenantId;
     const customer = await this.prisma.cari.findFirst({
       where: customerWhere,
     });
-    console.log('🔍 [VehicleService.create] Customer found:', !!customer);
-
     if (!customer) {
-      console.log('❌ [VehicleService.create] Customer NOT found, throwing error');
       throw new NotFoundException('Müşteri bulunamadı');
     }
 
-    // Plaka benzersizlik kontrolü - staging'de tenantId opsiyonel
-    const vehicleWhere: any = { plateNumber: dto.plateNumber };
-    if (tenantId) {
-      vehicleWhere.tenantId = tenantId;
-    }
-
+    const vehicleWhere: any = {
+      plateNumber: dto.plateNumber,
+      ...buildTenantWhereClause(tenantId),
+    };
     const existingVehicle = await this.prisma.vehicle.findFirst({
       where: vehicleWhere,
     });
@@ -86,13 +43,11 @@ export class VehicleService {
       throw new ConflictException('Bu plaka numarası zaten kayıtlı');
     }
 
-    // VIN benzersizlik kontrolü (opsiyonel)
     if (dto.vin) {
-      const vinWhere: any = { vin: dto.vin };
-      if (tenantId) {
-        vinWhere.tenantId = tenantId;
-      }
-
+      const vinWhere: any = {
+        vin: dto.vin,
+        ...buildTenantWhereClause(tenantId),
+      };
       const existingVin = await this.prisma.vehicle.findFirst({
         where: vinWhere,
       });
@@ -106,8 +61,6 @@ export class VehicleService {
       ...dto,
       tenantId: tenantId,
     };
-
-    console.log('🔍 [VehicleService.create] Creating vehicle with tenantId:', tenantId);
 
     return this.prisma.vehicle.create({
       data: createData,
@@ -128,7 +81,7 @@ export class VehicleService {
    * Araç güncelle
    */
   async update(id: string, dto: UpdateVehicleDto) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     // Staging'de tenantId opsiyonel
     const vehicleWhere: any = { id };
@@ -178,7 +131,7 @@ export class VehicleService {
    * Araç sil
    */
   async delete(id: string) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     // Staging'de tenantId opsiyonel
     const vehicleWhere: any = { id };
@@ -210,7 +163,7 @@ export class VehicleService {
    * Araç detayını getir
    */
   async findOne(id: string) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     // Staging'de tenantId opsiyonel
     const vehicleWhere: any = { id };
@@ -251,7 +204,7 @@ export class VehicleService {
     customerId?: string,
     brand?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
 
     // Staging'de tenantId opsiyonel
@@ -322,11 +275,13 @@ export class VehicleService {
    * Tüm iş emirleri, işçilikler, kullanılan parçalar, teknisyenler ve faturalar
    */
   async getVehicleHistory(vehicleId: string) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
-    // Araç kontrolü
     const vehicle = await this.prisma.vehicle.findFirst({
-      where: { id: vehicleId, tenantId },
+      where: {
+        id: vehicleId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       include: {
         customer: {
           select: {
@@ -345,12 +300,13 @@ export class VehicleService {
       throw new NotFoundException('Araç bulunamadı');
     }
 
-    // Tüm iş emirlerini getir
     const workOrders = await this.prisma.workOrder.findMany({
-      where: { vehicleId, tenantId },
+      where: {
+        vehicleId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       orderBy: { acceptedAt: 'desc' },
       include: {
-        // Teknisyen bilgisi
         technician: {
           select: {
             id: true,
@@ -403,16 +359,10 @@ export class VehicleService {
     const laborOperations: any[] = [];
     const usedParts: any[] = [];
 
-    for (const wo of workOrders) {
-      // Toplam harcama
+    for (const wo of workOrders as any[]) {
       stats.totalSpent += Number(wo.grandTotal);
-
-      // Teknisyen takibi
-      if (wo.technicianId) {
-        stats.uniqueTechnicians.add(wo.technicianId);
-      }
-
-      for (const line of wo.lines) {
+      if (wo.technicianId) stats.uniqueTechnicians.add(wo.technicianId);
+      for (const line of (wo as any).lines ?? []) {
         if (line.lineType === 'LABOR') {
           stats.totalLaborHours += Number(line.laborHours || 0);
           laborOperations.push({
@@ -423,7 +373,7 @@ export class VehicleService {
             laborHours: Number(line.laborHours),
             hourlyRate: Number(line.hourlyRate),
             total: Number(line.lineTotal),
-            technician: wo.technician,
+            technician: (wo as any).technician,
           });
         } else if (line.lineType === 'PART' && line.isUsed) {
           stats.totalPartsUsed += line.quantity;
@@ -454,8 +404,7 @@ export class VehicleService {
       },
     });
 
-    // Faturalar
-    const invoices = workOrders
+    const invoices = (workOrders as any[])
       .filter((wo) => wo.invoice)
       .map((wo) => wo.invoice);
 
@@ -469,7 +418,7 @@ export class VehicleService {
         totalSpent: Math.round(stats.totalSpent * 100) / 100,
         uniqueTechniciansCount: stats.uniqueTechnicians.size,
       },
-      workOrders: workOrders.map((wo) => ({
+      workOrders: (workOrders as any[]).map((wo) => ({
         id: wo.id,
         workOrderNo: wo.workOrderNo,
         status: wo.status,
@@ -503,17 +452,18 @@ export class VehicleService {
     closedAt: Date,
     mileage?: number,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
-    // Araç kontrolü
     const vehicle = await this.prisma.vehicle.findFirst({
-      where: { id: vehicleId, tenantId },
+      where: {
+        id: vehicleId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
     });
     if (!vehicle) {
       throw new NotFoundException('Araç bulunamadı');
     }
 
-    // Sonraki hatırlatma tarihi = Kapatılma tarihi + 1 yıl
     const nextReminderDate = new Date(closedAt);
     nextReminderDate.setFullYear(nextReminderDate.getFullYear() + 1);
 
@@ -561,7 +511,7 @@ export class VehicleService {
    * Önümüzdeki X gün içinde bakıma gelecek araçlar
    */
   async getUpcomingReminders(daysAhead = 30) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     const now = new Date();
     const futureDate = new Date();
@@ -624,7 +574,7 @@ export class VehicleService {
    * Tarihi geçmiş ve gelmemiş araçlar
    */
   async getOverdueReminders() {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     const now = new Date();
 
@@ -684,7 +634,7 @@ export class VehicleService {
    * Hatırlatma gönderildi olarak işaretle
    */
   async markReminderAsSent(reminderId: string) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     // Staging'de tenantId opsiyonel
     const where: any = { id: reminderId };
@@ -717,7 +667,7 @@ export class VehicleService {
     limit = 50,
     filter?: 'upcoming' | 'overdue' | 'sent' | 'all',
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
     const now = new Date();
 

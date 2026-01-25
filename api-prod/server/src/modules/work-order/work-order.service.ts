@@ -5,7 +5,7 @@ import {
   ForbiddenException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
 import { isStagingEnvironment, buildTenantWhereClause } from '../../common/utils/staging.util';
 import {
   WorkOrderStatus,
@@ -101,44 +101,17 @@ const VALID_STATUS_TRANSITIONS: Record<WorkOrderStatus, WorkOrderStatus[]> = {
 export class WorkOrderService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
-  // ============= PRIVATE HELPER METHODS =============
-
-  /**
-   * Tenant ID'yi al - staging'de opsiyonel
-   */
-  private getTenantIdOrThrow(): string | undefined {
-    const tenantId = this.tenantContext.getTenantId();
-
-    // Staging ortamında tenant ID opsiyonel
-    if (isStagingEnvironment()) {
-      return tenantId; // undefined olabilir
-    }
-
-    // Production'da tenant ID zorunlu
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-    return tenantId;
-  }
-
-  /**
-   * İş emri bul veya hata fırlat
-   */
   private async findWorkOrderOrThrow(id: string, tx?: Prisma.TransactionClient) {
     const prisma = tx || this.prisma;
-    const tenantId = this.getTenantIdOrThrow();
-
-    // Staging'de tenantId opsiyonel
-    const where: any = { id };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const workOrder = await prisma.workOrder.findFirst({
-      where,
+      where: {
+        id,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       include: {
         vehicle: true,
         customer: true,
@@ -245,14 +218,13 @@ export class WorkOrderService {
    * İş emri numarası oluştur
    */
   private async generateWorkOrderNo(tx: Prisma.TransactionClient): Promise<string> {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const year = new Date().getFullYear();
     const prefix = `IE${year}`;
 
-    // Son iş emri numarasını bul
     const lastWorkOrder = await tx.workOrder.findFirst({
       where: {
-        tenantId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
         workOrderNo: { startsWith: prefix },
       },
       orderBy: { workOrderNo: 'desc' },
@@ -348,7 +320,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       // Araç kontrolü - staging'de tenantId opsiyonel
@@ -457,7 +429,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       const workOrder = await this.findWorkOrderOrThrow(workOrderId, tx);
@@ -465,9 +437,12 @@ export class WorkOrderService {
       // İmmutable durum kontrolü
       this.assertMutable(workOrder.status);
 
-      // Teknisyen kontrolü
       const technician = await tx.technician.findFirst({
-        where: { id: dto.technicianId, tenantId, isActive: true },
+        where: {
+          id: dto.technicianId,
+          isActive: true,
+          ...buildTenantWhereClause(tenantId ?? undefined),
+        },
       });
       if (!technician) {
         throw new NotFoundException('Teknisyen bulunamadı veya aktif değil');
@@ -700,7 +675,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       const workOrder = await this.findWorkOrderOrThrow(workOrderId, tx);
@@ -709,11 +684,11 @@ export class WorkOrderService {
       this.assertMutable(workOrder.status);
 
       // Ürün kontrolü - staging'de tenantId opsiyonel
-      const productWhere = isStagingEnvironment() && !tenantId
-        ? { id: dto.productId }
-        : { id: dto.productId, tenantId };
       const product = await tx.stok.findFirst({
-        where: productWhere,
+        where: {
+          id: dto.productId,
+          ...buildTenantWhereClause(tenantId ?? undefined),
+        },
       });
       if (!product) {
         throw new NotFoundException('Ürün bulunamadı');
@@ -811,7 +786,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       const workOrder = await this.findWorkOrderOrThrow(workOrderId, tx);
@@ -820,11 +795,11 @@ export class WorkOrderService {
       this.assertMutable(workOrder.status);
 
       // Ürün kontrolü - staging'de tenantId opsiyonel
-      const productWhere = isStagingEnvironment() && !tenantId
-        ? { id: dto.productId }
-        : { id: dto.productId, tenantId };
       const product = await tx.stok.findFirst({
-        where: productWhere,
+        where: {
+          id: dto.productId,
+          ...buildTenantWhereClause(tenantId ?? undefined),
+        },
       });
       if (!product) {
         throw new NotFoundException('Ürün bulunamadı');
@@ -917,7 +892,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       const workOrder = await this.findWorkOrderOrThrow(workOrderId, tx);
@@ -974,13 +949,12 @@ export class WorkOrderService {
    * 5c. getSupplyRequests - Bekleyen tedarik isteklerini listele (ADMIN)
    */
   async getSupplyRequests(workOrderId: string) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
-    // WorkOrder kontrolü
     const workOrder = await this.prisma.workOrder.findFirst({
       where: {
         id: workOrderId,
-        ...(isStagingEnvironment() ? {} : { tenantId }),
+        ...buildTenantWhereClause(tenantId ?? undefined),
       },
     });
 
@@ -1034,7 +1008,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       // WorkOrder kontrolü
@@ -1059,11 +1033,11 @@ export class WorkOrderService {
       }
 
       // Ürün kontrolü - staging'de tenantId opsiyonel
-      const productWhere = isStagingEnvironment() && !tenantId
-        ? { id: dto.productId }
-        : { id: dto.productId, tenantId };
       const product = await tx.stok.findFirst({
-        where: productWhere,
+        where: {
+          id: dto.productId,
+          ...buildTenantWhereClause(tenantId ?? undefined),
+        },
       });
       if (!product) {
         throw new NotFoundException('Ürün bulunamadı');
@@ -1134,7 +1108,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       // WorkOrder kontrolü
@@ -1327,7 +1301,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       const workOrder = await this.findWorkOrderOrThrow(workOrderId, tx);
@@ -1446,11 +1420,11 @@ export class WorkOrderService {
     startDate?: Date,
     endDate?: Date,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
 
     const where: Prisma.WorkOrderWhereInput = {
-      ...(isStagingEnvironment() && !tenantId ? {} : { tenantId }),
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
 
     if (status) where.status = status;
@@ -1518,7 +1492,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       // İş emri kontrolü
@@ -1556,9 +1530,12 @@ export class WorkOrderService {
         throw new BadRequestException('Parça satırında ürün bilgisi eksik');
       }
 
-      // Depo kontrolü
       const warehouse = await tx.warehouse.findFirst({
-        where: { id: warehouseId, tenantId, active: true },
+        where: {
+          id: warehouseId,
+          active: true,
+          ...buildTenantWhereClause(tenantId ?? undefined),
+        },
       });
       if (!warehouse) {
         throw new NotFoundException('Depo bulunamadı veya aktif değil');
@@ -1680,7 +1657,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       // İş emri kontrolü
@@ -1749,17 +1726,14 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
-      // İş emri kontrolü - staging'de tenantId opsiyonel
-      const where: any = { id: workOrderId };
-      if (tenantId) {
-        where.tenantId = tenantId;
-      }
-
       const workOrder = await tx.workOrder.findFirst({
-        where,
+        where: {
+          id: workOrderId,
+          ...buildTenantWhereClause(tenantId ?? undefined),
+        },
         include: {
           vehicle: true,
           customer: true,
@@ -1795,7 +1769,10 @@ export class WorkOrderService {
       // Fatura numarası oluştur
       const year = new Date().getFullYear();
       const lastFatura = await tx.fatura.findFirst({
-        where: { tenantId, faturaTipi: FaturaTipi.SATIS },
+        where: {
+          ...buildTenantWhereClause(tenantId ?? undefined),
+          faturaTipi: FaturaTipi.SATIS,
+        },
         orderBy: { createdAt: 'desc' },
         select: { faturaNo: true },
       });
@@ -1836,10 +1813,9 @@ export class WorkOrderService {
       const kdvTutar = Number(workOrder.taxAmount);
       const genelToplam = Number(workOrder.grandTotal);
 
-      // Fatura oluştur
       const fatura = await tx.fatura.create({
         data: {
-          tenantId,
+          ...(tenantId != null && { tenantId }),
           faturaNo,
           faturaTipi: FaturaTipi.SATIS,
           cariId: workOrder.customerId,
@@ -1963,7 +1939,7 @@ export class WorkOrderService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     return this.prisma.$transaction(async (tx) => {
       const workOrder = await this.findWorkOrderOrThrow(workOrderId, tx);

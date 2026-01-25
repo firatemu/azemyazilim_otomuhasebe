@@ -6,7 +6,8 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateWarehouseDto } from './dto/create-warehouse.dto';
 import { UpdateWarehouseDto } from './dto/update-warehouse.dto';
 import { CodeTemplateService } from '../code-template/code-template.service';
@@ -15,29 +16,17 @@ import { CodeTemplateService } from '../code-template/code-template.service';
 export class WarehouseService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => CodeTemplateService))
     private codeTemplateService: CodeTemplateService,
   ) {}
 
   async findAll(active?: boolean) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    const hasTenant = this.tenantContext.hasTenant();
-    
-    // SUPER_ADMIN ve staging için tenant kontrolünü atla
-    if (!hasTenant && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
-    const where: any = {};
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-    if (active !== undefined) {
-      where.active = active;
-    }
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    const where: any = {
+      ...buildTenantWhereClause(tenantId ?? undefined),
+    };
+    if (active !== undefined) where.active = active;
 
     return this.prisma.warehouse.findMany({
       where,
@@ -54,23 +43,12 @@ export class WarehouseService {
   }
 
   async findOne(id: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    const hasTenant = this.tenantContext.hasTenant();
-    
-    // SUPER_ADMIN ve staging için tenant kontrolünü atla
-    if (!hasTenant && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
-    const where: any = { id };
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const warehouse = await this.prisma.warehouse.findFirst({
-      where,
+      where: {
+        id,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       include: {
         locations: {
           where: { active: true },
@@ -93,23 +71,12 @@ export class WarehouseService {
   }
 
   async findByCode(code: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    const hasTenant = this.tenantContext.hasTenant();
-    
-    // SUPER_ADMIN ve staging için tenant kontrolünü atla
-    if (!hasTenant && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
-    const where: any = { code };
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const warehouse = await this.prisma.warehouse.findFirst({
-      where,
+      where: {
+        code,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       include: {
         locations: {
           where: { active: true },
@@ -126,17 +93,9 @@ export class WarehouseService {
   }
 
   async create(createDto: CreateWarehouseDto) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    const hasTenant = this.tenantContext.hasTenant();
-    
-    // SUPER_ADMIN ve staging için tenant kontrolünü atla
-    // create işleminde tenantId optional olabilir (staging için)
-    // Eğer tenantId yoksa null olarak kaydedilir
+    const tenantId = await this.tenantResolver.resolveForCreate({ allowNull: true });
 
     let code = createDto.code;
-
-    // Eğer kod girilmemişse, otomatik kod üret
     if (!code || code.trim() === '') {
       try {
         code = await this.codeTemplateService.getNextCode('WAREHOUSE');
@@ -147,28 +106,35 @@ export class WarehouseService {
       }
     }
 
-    // Kod benzersizliği kontrolü (tenant içinde veya global)
-    const existingWhere: any = { code };
-    if (tenantId) {
-      existingWhere.tenantId = tenantId;
-    } else {
-      // Tenant ID yoksa, tenantId null olan kayıtları kontrol et
-      existingWhere.tenantId = null;
-    }
-    
     const existing = await this.prisma.warehouse.findFirst({
-      where: existingWhere,
+      where: {
+        code,
+        ...(tenantId != null ? { tenantId } : { tenantId: null }),
+      },
     });
-
     if (existing) {
       throw new BadRequestException('Bu depo kodu zaten kullanılıyor');
+    }
+
+    // Eğer yeni ambar varsayılan olarak işaretleniyorsa, diğer varsayılan ambarları kaldır
+    if (createDto.isDefault === true) {
+      await this.prisma.warehouse.updateMany({
+        where: {
+          ...(tenantId != null ? { tenantId } : { tenantId: null }),
+          isDefault: true,
+        },
+        data: {
+          isDefault: false,
+        },
+      });
     }
 
     return this.prisma.warehouse.create({
       data: {
         code,
-        ...(tenantId && { tenantId }), // tenantId varsa ekle, yoksa ekleme
+        ...(tenantId != null && { tenantId }),
         name: createDto.name,
+        isDefault: createDto.isDefault ?? false,
         active: createDto.active ?? true,
         address: createDto.address,
         phone: createDto.phone,
@@ -178,47 +144,41 @@ export class WarehouseService {
   }
 
   async update(id: string, updateDto: UpdateWarehouseDto) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    const hasTenant = this.tenantContext.hasTenant();
-    
-    // SUPER_ADMIN ve staging için tenant kontrolünü atla
-    if (!hasTenant && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
-    const where: any = { id };
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    } else {
-      where.tenantId = null; // Tenant ID yoksa null olan kayıtları kontrol et
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const warehouse = await this.prisma.warehouse.findFirst({
-      where,
+      where: {
+        id,
+        ...(tenantId != null ? { tenantId } : { tenantId: null }),
+      },
     });
-
     if (!warehouse) {
       throw new NotFoundException('Depo bulunamadı');
     }
 
-    // Kod değiştiriliyorsa benzersizlik kontrolü (tenant içinde veya global)
     if (updateDto.code && updateDto.code !== warehouse.code) {
-      const existingWhere: any = { code: updateDto.code };
-      if (tenantId) {
-        existingWhere.tenantId = tenantId;
-      } else {
-        existingWhere.tenantId = null;
-      }
-      
       const existing = await this.prisma.warehouse.findFirst({
-        where: existingWhere,
+        where: {
+          code: updateDto.code,
+          ...(tenantId != null ? { tenantId } : { tenantId: null }),
+        },
       });
-
       if (existing) {
         throw new BadRequestException('Bu depo kodu zaten kullanılıyor');
       }
+    }
+
+    // Eğer bu ambar varsayılan yapılıyorsa, diğer varsayılan ambarları kaldır
+    if (updateDto.isDefault === true && !warehouse.isDefault) {
+      await this.prisma.warehouse.updateMany({
+        where: {
+          ...(tenantId != null ? { tenantId } : { tenantId: null }),
+          isDefault: true,
+          id: { not: id },
+        },
+        data: {
+          isDefault: false,
+        },
+      });
     }
 
     return this.prisma.warehouse.update({
@@ -228,25 +188,12 @@ export class WarehouseService {
   }
 
   async remove(id: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    const hasTenant = this.tenantContext.hasTenant();
-    
-    // SUPER_ADMIN ve staging için tenant kontrolünü atla
-    if (!hasTenant && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
-    const where: any = { id };
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    } else {
-      where.tenantId = null;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const warehouse = await this.prisma.warehouse.findFirst({
-      where,
+      where: {
+        id,
+        ...(tenantId != null ? { tenantId } : { tenantId: null }),
+      },
       include: {
         _count: {
           select: {
@@ -260,6 +207,13 @@ export class WarehouseService {
 
     if (!warehouse) {
       throw new NotFoundException('Depo bulunamadı');
+    }
+
+    // Varsayılan ambar silinemez
+    if (warehouse.isDefault) {
+      throw new BadRequestException(
+        'Varsayılan ambar silinemez. Önce başka bir ambarı varsayılan yapın.',
+      );
     }
 
     if (warehouse._count.locations > 0) {
@@ -277,5 +231,76 @@ export class WarehouseService {
     return this.prisma.warehouse.delete({
       where: { id },
     });
+  }
+
+  async getDefaultWarehouse() {
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    return this.prisma.warehouse.findFirst({
+      where: {
+        ...buildTenantWhereClause(tenantId ?? undefined),
+        active: true,
+        isDefault: true,
+      },
+    });
+  }
+
+  async createDefaultWarehouse(tenantId: string | null) {
+    let code: string;
+    try {
+      code = await this.codeTemplateService.getNextCode('WAREHOUSE');
+    } catch (error) {
+      code = 'MERKEZ-001';
+    }
+
+    return this.prisma.warehouse.create({
+      data: {
+        code,
+        name: 'Merkez Ambar',
+        active: true,
+        isDefault: true,
+        ...(tenantId && { tenantId }),
+      },
+    });
+  }
+
+  async getWarehouseStock(warehouseId: string) {
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    
+    const warehouse = await this.prisma.warehouse.findFirst({
+      where: {
+        id: warehouseId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
+    });
+
+    if (!warehouse) {
+      throw new NotFoundException('Depo bulunamadı');
+    }
+
+    const stocks = await this.prisma.productLocationStock.groupBy({
+      by: ['productId'],
+      where: { warehouseId },
+      _sum: { qtyOnHand: true },
+    });
+
+    const productsWithStock = await Promise.all(
+      stocks.map(async (stock) => {
+        const product = await this.prisma.stok.findUnique({
+          where: { id: stock.productId },
+          select: {
+            id: true,
+            stokKodu: true,
+            stokAdi: true,
+            birim: true,
+          },
+        });
+        return {
+          ...product,
+          qtyOnHand: stock._sum.qtyOnHand || 0,
+        };
+      }),
+    );
+
+    return productsWithStock;
   }
 }

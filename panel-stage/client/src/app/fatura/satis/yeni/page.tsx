@@ -74,6 +74,7 @@ function YeniSatisFaturasiPageContent() {
 
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSiparis, setLoadingSiparis] = useState(false);
 
@@ -81,6 +82,7 @@ function YeniSatisFaturasiPageContent() {
     faturaNo: '',
     faturaTipi: 'SATIS' as 'SATIS' | 'ALIS',
     cariId: '',
+    warehouseId: '',
     tarih: new Date().toISOString().split('T')[0],
     vade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     durum: 'ONAYLANDI' as 'ACIK' | 'ONAYLANDI',
@@ -105,6 +107,7 @@ function YeniSatisFaturasiPageContent() {
   useEffect(() => {
     fetchCariler();
     fetchStoklar();
+    fetchWarehouses();
 
     if (irsaliyeId) {
       fetchIrsaliyeBilgileri(irsaliyeId);
@@ -123,6 +126,19 @@ function YeniSatisFaturasiPageContent() {
       setCariler(response.data.data || []);
     } catch (error) {
       console.error('Cariler yüklenirken hata:', error);
+    }
+  };
+
+  const fetchWarehouses = async () => {
+    try {
+      const response = await axios.get('/warehouse?active=true');
+      setWarehouses(response.data);
+      const defaultWarehouse = response.data.find((w: any) => w.isDefault);
+      if (defaultWarehouse && !formData.warehouseId) {
+        setFormData(prev => ({ ...prev, warehouseId: defaultWarehouse.id }));
+      }
+    } catch (error) {
+      console.error('Ambar listesi alınamadı:', error);
     }
   };
 
@@ -882,6 +898,23 @@ function YeniSatisFaturasiPageContent() {
               onChange={(e) => setFormData(prev => ({ ...prev, vade: e.target.value }))}
               InputLabelProps={{ shrink: true }}
             />
+            
+            {/* Ambar Seçimi - Tarih ve Vade'den sonra */}
+            <FormControl sx={{ flex: '1 1 200px' }} className="form-control-select" required>
+              <InputLabel>Ambar</InputLabel>
+              <Select
+                value={formData.warehouseId}
+                onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                label="Ambar"
+              >
+                {warehouses.map((warehouse) => (
+                  <MenuItem key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name} {warehouse.isDefault && '(Varsayılan)'}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            
             <FormControl sx={{ flex: '1 1 200px' }} className="form-control-select" required>
               <InputLabel>Durum</InputLabel>
               <Select

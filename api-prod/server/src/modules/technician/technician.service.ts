@@ -5,8 +5,8 @@ import {
   ConflictException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
-import { isStagingEnvironment } from '../../common/utils/staging.util';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { Prisma } from '@prisma/client';
 import { CreateTechnicianDto, UpdateTechnicianDto } from './dto';
 
@@ -14,65 +14,37 @@ import { CreateTechnicianDto, UpdateTechnicianDto } from './dto';
 export class TechnicianService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
-  private getTenantIdOrThrow(): string | undefined {
-    const tenantId = this.tenantContext.getTenantId();
-
-    // Staging ortamında tenant ID opsiyonel
-    if (isStagingEnvironment()) {
-      return tenantId; // undefined olabilir
-    }
-
-    // Production'da tenant ID zorunlu
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-    return tenantId;
-  }
-
   async create(dto: CreateTechnicianDto) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    // Kod benzersizlik kontrolü - staging'de tenantId opsiyonel
-    const existingWhere: any = { code: dto.code };
-    if (tenantId) {
-      existingWhere.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const existing = await this.prisma.technician.findFirst({
-      where: existingWhere,
+      where: {
+        code: dto.code,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
     });
     if (existing) {
       throw new ConflictException('Bu teknisyen kodu zaten kullanılıyor');
     }
-
-    // Staging'de tenantId opsiyonel
     const createData: any = {
       ...dto,
       isActive: dto.isActive ?? true,
+      ...(tenantId != null && { tenantId }),
     };
-    if (tenantId) {
-      createData.tenantId = tenantId;
-    }
-
     return this.prisma.technician.create({
       data: createData,
     });
   }
 
   async update(id: string, dto: UpdateTechnicianDto) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    // Staging'de tenantId opsiyonel
-    const where: any = { id };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const technician = await this.prisma.technician.findFirst({
-      where,
+      where: {
+        id,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
     });
     if (!technician) {
       throw new NotFoundException('Teknisyen bulunamadı');
@@ -80,13 +52,12 @@ export class TechnicianService {
 
     // Kod benzersizlik kontrolü - staging'de tenantId opsiyonel
     if (dto.code && dto.code !== technician.code) {
-      const existingWhere: any = { code: dto.code, NOT: { id } };
-      if (tenantId) {
-        existingWhere.tenantId = tenantId;
-      }
-
       const existing = await this.prisma.technician.findFirst({
-        where: existingWhere,
+        where: {
+          code: dto.code,
+          NOT: { id },
+          ...buildTenantWhereClause(tenantId ?? undefined),
+        },
       });
       if (existing) {
         throw new ConflictException('Bu teknisyen kodu zaten kullanılıyor');
@@ -100,16 +71,12 @@ export class TechnicianService {
   }
 
   async delete(id: string) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    // Staging'de tenantId opsiyonel
-    const where: any = { id };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const technician = await this.prisma.technician.findFirst({
-      where,
+      where: {
+        id,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       include: { workOrders: { take: 1 } },
     });
     if (!technician) {
@@ -128,16 +95,12 @@ export class TechnicianService {
   }
 
   async findOne(id: string) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    // Staging'de tenantId opsiyonel
-    const where: any = { id };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const technician = await this.prisma.technician.findFirst({
-      where,
+      where: {
+        id,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       include: {
         _count: {
           select: { workOrders: true },
@@ -158,15 +121,11 @@ export class TechnicianService {
     search?: string,
     isActive?: boolean,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
-
-    // Staging'de tenantId opsiyonel
-    const where: Prisma.TechnicianWhereInput = {};
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const where: Prisma.TechnicianWhereInput = {
+      ...buildTenantWhereClause(tenantId ?? undefined),
+    };
     if (isActive !== undefined) where.isActive = isActive;
 
     if (search) {
@@ -208,31 +167,22 @@ export class TechnicianService {
    * Teknisyenin iş yükünü getir
    */
   async getWorkload(id: string) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    // Staging'de tenantId opsiyonel
-    const where: any = { id };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const technician = await this.prisma.technician.findFirst({
-      where,
+      where: {
+        id,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
     });
     if (!technician) {
       throw new NotFoundException('Teknisyen bulunamadı');
     }
 
-    // Aktif iş emirleri (CLOSED ve CANCELLED hariç) - staging'de tenantId opsiyonel
     const workOrderWhere: any = {
       technicianId: id,
-      status: {
-        notIn: ['CLOSED', 'CANCELLED'],
-      },
+      status: { notIn: ['CLOSED', 'CANCELLED'] },
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
-    if (tenantId) {
-      workOrderWhere.tenantId = tenantId;
-    }
 
     const activeWorkOrders = await this.prisma.workOrder.findMany({
       where: workOrderWhere,
@@ -255,12 +205,10 @@ export class TechnicianService {
       },
     });
 
-    // İstatistikler - staging'de tenantId opsiyonel
-    const statsWhere: any = { technicianId: id };
-    if (tenantId) {
-      statsWhere.tenantId = tenantId;
-    }
-
+    const statsWhere: any = {
+      technicianId: id,
+      ...buildTenantWhereClause(tenantId ?? undefined),
+    };
     const stats = await this.prisma.workOrder.groupBy({
       by: ['status'],
       where: statsWhere,

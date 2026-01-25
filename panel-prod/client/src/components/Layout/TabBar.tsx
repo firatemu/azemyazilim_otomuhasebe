@@ -41,13 +41,19 @@ export default function TabBar() {
     }
   };
 
+  if (tabs.length === 0) {
+    return null;
+  }
+
   return (
     <Box
       sx={{
-        borderBottom: 1,
-        borderColor: 'divider',
-        bgcolor: 'background.paper',
-        boxShadow: '0 2px 4px rgba(0,0,0,0.04)',
+        borderBottom: '1px solid var(--border)',
+        bgcolor: 'var(--card)',
+        boxShadow: 'var(--shadow-xs)',
+        position: 'sticky',
+        top: 64,
+        zIndex: 1100,
       }}
     >
       <Tabs
@@ -57,9 +63,19 @@ export default function TabBar() {
         scrollButtons="auto"
         aria-label="module tabs"
         sx={{
+          minHeight: 48,
+          '& .MuiTabs-scrollButtons': {
+            color: 'var(--muted-foreground)',
+            '&:hover': {
+              color: 'var(--foreground)',
+            },
+            '&.Mui-disabled': {
+              opacity: 0.3,
+            },
+          },
           '& .MuiTabs-indicator': {
             height: 3,
-            background: 'linear-gradient(90deg, #667eea 0%, #764ba2 100%)',
+            bgcolor: 'var(--primary)',
             borderRadius: '3px 3px 0 0',
           },
         }}
@@ -72,40 +88,68 @@ export default function TabBar() {
             <Tab
               key={tab.id}
               label={
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  {tab.label}
+                <Box 
+                  sx={{ 
+                    display: 'flex', 
+                    alignItems: 'center', 
+                    gap: 1,
+                    px: 0.5,
+                  }}
+                >
+                  <Box
+                    component="span"
+                    sx={{
+                      fontSize: '0.875rem',
+                      fontWeight: isActive ? 600 : 500,
+                      color: isActive ? 'var(--foreground)' : 'var(--muted-foreground)',
+                      transition: 'all 0.2s ease',
+                    }}
+                  >
+                    {tab.label}
+                  </Box>
                   {canCloseTab && (
                     <Box
                       component="span"
                       onClick={(e) => handleCloseTab(e, tab.id)}
-                      sx={{ 
-                        ml: 0.5, 
-                        p: 0.25,
+                      sx={{
+                        ml: 0.5,
+                        p: 0.5,
                         display: 'inline-flex',
                         alignItems: 'center',
-                        borderRadius: '50%',
+                        justifyContent: 'center',
+                        borderRadius: 'var(--radius-sm)',
                         cursor: 'pointer',
-                        transition: 'all 0.2s',
+                        color: 'var(--muted-foreground)',
+                        transition: 'all 0.2s ease',
                         '&:hover': {
-                          bgcolor: 'rgba(239, 68, 68, 0.1)',
-                          color: '#ef4444',
-                        }
+                          bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+                          color: 'var(--destructive)',
+                        },
                       }}
                     >
-                      <Close fontSize="small" />
+                      <Close sx={{ fontSize: 14 }} />
                     </Box>
                   )}
                 </Box>
               }
               value={tab.id}
-              sx={{ 
-                textTransform: 'none', 
+              sx={{
+                textTransform: 'none',
                 minHeight: 48,
-                fontWeight: 500,
+                px: 2,
+                py: 1.5,
+                fontSize: '0.875rem',
+                fontWeight: isActive ? 600 : 500,
+                color: isActive ? 'var(--foreground)' : 'var(--muted-foreground)',
+                transition: 'all 0.2s ease',
+                '&:hover': {
+                  color: 'var(--foreground)',
+                  bgcolor: 'var(--muted)',
+                },
                 '&.Mui-selected': {
-                  color: '#667eea',
+                  color: 'var(--foreground)',
                   fontWeight: 600,
-                }
+                },
               }}
             />
           );
@@ -114,4 +158,3 @@ export default function TabBar() {
     </Box>
   );
 }
-

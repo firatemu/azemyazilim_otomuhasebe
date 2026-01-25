@@ -5,6 +5,7 @@ import {
   IsBoolean,
   IsNumber,
   Min,
+  IsDateString,
 } from 'class-validator';
 import { Type, Transform } from 'class-transformer';
 
@@ -48,6 +49,14 @@ export class CreateFirmaKrediKartiDto {
     return value;
   })
   limit?: number; // Kart limiti (0 = limitsiz)
+
+  @IsDateString()
+  @IsOptional()
+  hesapKesimTarihi?: string; // ISO date string
+
+  @IsDateString()
+  @IsOptional()
+  sonOdemeTarihi?: string; // ISO date string
 
   @IsBoolean()
   @IsOptional()

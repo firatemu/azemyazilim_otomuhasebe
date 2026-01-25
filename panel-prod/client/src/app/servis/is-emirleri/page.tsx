@@ -113,7 +113,7 @@ export default function WorkOrderListPage() {
       headerName: 'İş Emri No',
       width: 130,
       renderCell: (params: GridRenderCellParams<WorkOrder>) => (
-        <Typography variant="body2" fontWeight={600} sx={{ color: '#1565c0' }}>
+        <Typography variant="body2" fontWeight={600} sx={{ color: 'var(--primary)' }}>
           {params.row.workOrderNo}
         </Typography>
       ),
@@ -124,12 +124,12 @@ export default function WorkOrderListPage() {
       width: 180,
       renderCell: (params: GridRenderCellParams<WorkOrder>) => (
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <DirectionsCar sx={{ fontSize: 18, color: '#666' }} />
+          <DirectionsCar sx={{ fontSize: 18, color: 'var(--muted-foreground)' }} />
           <Box>
-            <Typography variant="body2" fontWeight={500}>
+            <Typography variant="body2" fontWeight={500} sx={{ color: 'var(--foreground)' }}>
               {params.row.vehicle?.plateNumber || '-'}
             </Typography>
-            <Typography variant="caption" color="text.secondary">
+            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
               {params.row.vehicle?.brand} {params.row.vehicle?.model}
             </Typography>
           </Box>
@@ -145,8 +145,8 @@ export default function WorkOrderListPage() {
         const name = customer?.unvan || `${customer?.ad || ''} ${customer?.soyad || ''}`.trim() || '-';
         return (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Person sx={{ fontSize: 18, color: '#666' }} />
-            <Typography variant="body2">{name}</Typography>
+            <Person sx={{ fontSize: 18, color: 'var(--muted-foreground)' }} />
+            <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>{name}</Typography>
           </Box>
         );
       },
@@ -159,13 +159,13 @@ export default function WorkOrderListPage() {
         const tech = params.row.technician;
         return tech ? (
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Build sx={{ fontSize: 16, color: '#666' }} />
-            <Typography variant="body2">
+            <Build sx={{ fontSize: 16, color: 'var(--muted-foreground)' }} />
+            <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
               {tech.firstName} {tech.lastName}
             </Typography>
           </Box>
         ) : (
-          <Typography variant="body2" color="text.secondary">
+          <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
             Atanmadı
           </Typography>
         );
@@ -175,21 +175,38 @@ export default function WorkOrderListPage() {
       field: 'status',
       headerName: 'Durum',
       width: 160,
-      renderCell: (params: GridRenderCellParams<WorkOrder>) => (
-        <Chip
-          label={getStatusLabel(params.row.status)}
-          color={getStatusColor(params.row.status)}
-          size="small"
-          sx={{ fontWeight: 500 }}
-        />
-      ),
+      renderCell: (params: GridRenderCellParams<WorkOrder>) => {
+        const statusColor = getStatusColor(params.row.status);
+        const colorMap: Record<string, string> = {
+          primary: 'var(--primary)',
+          success: 'var(--chart-2)',
+          warning: 'var(--chart-3)',
+          error: 'var(--destructive)',
+          info: 'var(--chart-1)',
+        };
+        return (
+          <Chip
+            label={getStatusLabel(params.row.status)}
+            size="small"
+            sx={{
+              fontWeight: 500,
+              bgcolor: colorMap[statusColor] 
+                ? `color-mix(in srgb, ${colorMap[statusColor]} 15%, transparent)`
+                : 'var(--muted)',
+              color: colorMap[statusColor] || 'var(--foreground)',
+              borderColor: colorMap[statusColor] || 'var(--border)',
+            }}
+            variant="outlined"
+          />
+        );
+      },
     },
     {
       field: 'acceptedAt',
       headerName: 'Kabul Tarihi',
       width: 120,
       renderCell: (params: GridRenderCellParams<WorkOrder>) => (
-        <Typography variant="body2">
+        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
           {params.row.acceptedAt
             ? new Date(params.row.acceptedAt).toLocaleDateString('tr-TR')
             : '-'}
@@ -201,7 +218,7 @@ export default function WorkOrderListPage() {
       headerName: 'Toplam',
       width: 120,
       renderCell: (params: GridRenderCellParams<WorkOrder>) => (
-        <Typography variant="body2" fontWeight={500}>
+        <Typography variant="body2" fontWeight={500} sx={{ color: 'var(--foreground)' }}>
           {params.row.grandTotal
             ? new Intl.NumberFormat('tr-TR', {
                 style: 'currency',
@@ -250,14 +267,14 @@ export default function WorkOrderListPage() {
               variant="h4"
               fontWeight="bold"
               sx={{
-                background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
-                WebkitBackgroundClip: 'text',
-                WebkitTextFillColor: 'transparent',
+                color: 'var(--foreground)',
+                letterSpacing: '-0.02em',
+                mb: 0.5,
               }}
             >
               İş Emirleri
             </Typography>
-            <Typography variant="body2" color="text.secondary">
+            <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
               Servis iş emirlerini görüntüleyin ve yönetin
             </Typography>
           </Box>
@@ -266,6 +283,14 @@ export default function WorkOrderListPage() {
               variant="outlined"
               startIcon={<Refresh />}
               onClick={() => refetch()}
+              sx={{
+                borderColor: 'var(--border)',
+                color: 'var(--foreground)',
+                '&:hover': {
+                  borderColor: 'var(--primary)',
+                  bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                },
+              }}
             >
               Yenile
             </Button>
@@ -273,7 +298,11 @@ export default function WorkOrderListPage() {
               variant="contained"
               startIcon={<Add />}
               sx={{
-                background: 'linear-gradient(135deg, #1565c0 0%, #0d47a1 100%)',
+                bgcolor: 'var(--primary)',
+                color: 'var(--primary-foreground)',
+                '&:hover': {
+                  bgcolor: 'var(--primary-hover)',
+                },
               }}
               onClick={() => router.push('/servis/is-emirleri/yeni')}
             >
@@ -285,48 +314,48 @@ export default function WorkOrderListPage() {
         {/* Stats Cards */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Card elevation={2}>
+            <Card sx={{ bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" fontWeight="bold" color="primary">
+                <Typography variant="h4" fontWeight="bold" sx={{ color: 'var(--primary)' }}>
                   {stats.total}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
                   Toplam İş Emri
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Card elevation={2}>
+            <Card sx={{ bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" fontWeight="bold" color="info.main">
+                <Typography variant="h4" fontWeight="bold" sx={{ color: 'var(--chart-1)' }}>
                   {stats.inProgress}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
                   İşlemde
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Card elevation={2}>
+            <Card sx={{ bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" fontWeight="bold" color="warning.main">
+                <Typography variant="h4" fontWeight="bold" sx={{ color: 'var(--chart-3)' }}>
                   {stats.waitingApproval}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
                   Onay Bekliyor
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 6, md: 3 }}>
-            <Card elevation={2}>
+            <Card sx={{ bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
               <CardContent sx={{ textAlign: 'center', py: 2 }}>
-                <Typography variant="h4" fontWeight="bold" color="success.main">
+                <Typography variant="h4" fontWeight="bold" sx={{ color: 'var(--chart-2)' }}>
                   {stats.readyForDelivery}
                 </Typography>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
                   Teslime Hazır
                 </Typography>
               </CardContent>
@@ -335,10 +364,10 @@ export default function WorkOrderListPage() {
         </Grid>
 
         {/* Filters */}
-        <Paper sx={{ p: 2, mb: 2 }}>
+        <Paper sx={{ p: 2, mb: 2, bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-            <FilterList sx={{ color: 'text.secondary' }} />
-            <Typography variant="subtitle2" fontWeight="bold">
+            <FilterList sx={{ color: 'var(--muted-foreground)' }} />
+            <Typography variant="subtitle2" fontWeight="bold" sx={{ color: 'var(--foreground)' }}>
               Filtreler
             </Typography>
           </Box>
@@ -346,13 +375,14 @@ export default function WorkOrderListPage() {
             <Grid size={{ xs: 12, md: 3 }}>
               <TextField
                 fullWidth
+                className="form-control-textfield"
                 placeholder="İş emri no, plaka veya müşteri ara..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 InputProps={{
                   startAdornment: (
                     <InputAdornment position="start">
-                      <Search color="action" />
+                      <Search sx={{ color: 'var(--muted-foreground)' }} />
                     </InputAdornment>
                   ),
                 }}
@@ -360,7 +390,7 @@ export default function WorkOrderListPage() {
               />
             </Grid>
             <Grid size={{ xs: 12, md: 2 }}>
-              <FormControl fullWidth size="small">
+              <FormControl fullWidth size="small" className="form-control-select">
                 <InputLabel>Durum</InputLabel>
                 <Select
                   value={statusFilter}
@@ -380,7 +410,7 @@ export default function WorkOrderListPage() {
               </FormControl>
             </Grid>
             <Grid size={{ xs: 12, md: 2 }}>
-              <FormControl fullWidth size="small">
+              <FormControl fullWidth size="small" className="form-control-select">
                 <InputLabel>Teknisyen</InputLabel>
                 <Select
                   value={technicianFilter}
@@ -402,6 +432,7 @@ export default function WorkOrderListPage() {
             <Grid size={{ xs: 6, md: 2 }}>
               <TextField
                 fullWidth
+                className="form-control-textfield"
                 type="date"
                 label="Başlangıç Tarihi"
                 value={startDate}
@@ -416,6 +447,7 @@ export default function WorkOrderListPage() {
             <Grid size={{ xs: 6, md: 2 }}>
               <TextField
                 fullWidth
+                className="form-control-textfield"
                 type="date"
                 label="Bitiş Tarihi"
                 value={endDate}
@@ -433,6 +465,14 @@ export default function WorkOrderListPage() {
                 size="small"
                 onClick={handleClearFilters}
                 fullWidth
+                sx={{
+                  borderColor: 'var(--border)',
+                  color: 'var(--foreground)',
+                  '&:hover': {
+                    borderColor: 'var(--primary)',
+                    bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                  },
+                }}
               >
                 Temizle
               </Button>
@@ -448,7 +488,12 @@ export default function WorkOrderListPage() {
         )}
 
         {/* DataGrid */}
-        <Paper sx={{ height: 'calc(100vh - 520px)', minHeight: 400 }}>
+        <Paper sx={{ 
+          height: 'calc(100vh - 520px)', 
+          minHeight: 400,
+          bgcolor: 'var(--card)',
+          boxShadow: 'var(--shadow-sm)',
+        }}>
           <DataGrid
             rows={filteredWorkOrders}
             columns={columns}
@@ -459,14 +504,24 @@ export default function WorkOrderListPage() {
             sx={{
               border: 'none',
               '& .MuiDataGrid-cell': {
-                borderColor: '#f0f0f0',
+                borderColor: 'var(--border)',
+                color: 'var(--foreground)',
               },
               '& .MuiDataGrid-columnHeaders': {
-                backgroundColor: '#f5f5f5',
-                borderBottom: '2px solid #e0e0e0',
+                backgroundColor: 'var(--muted)',
+                borderBottom: `2px solid var(--border)`,
+                color: 'var(--foreground)',
+                fontWeight: 700,
               },
-              '& .MuiDataGrid-row:hover': {
-                backgroundColor: '#f8f9fa',
+              '& .MuiDataGrid-row': {
+                backgroundColor: 'var(--background)',
+                '&:hover': {
+                  backgroundColor: 'var(--muted) !important',
+                },
+              },
+              '& .MuiDataGrid-footerContainer': {
+                borderTop: `1px solid var(--border)`,
+                backgroundColor: 'var(--card)',
               },
             }}
           />

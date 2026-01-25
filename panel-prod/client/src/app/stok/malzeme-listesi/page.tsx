@@ -28,6 +28,7 @@ import {
   Divider,
   InputAdornment,
   FormHelperText,
+  CircularProgress,
 } from '@mui/material';
 import { Add, Edit, Delete, Search, FileDownload, History, CompareArrows } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
@@ -191,16 +192,28 @@ const MalzemeFormDialog = memo(({
       maxWidth="lg"
       fullWidth
       PaperProps={{
-        sx: { minHeight: '70vh' }
+        sx: { 
+          minHeight: '70vh',
+          bgcolor: 'var(--card)',
+          backgroundImage: 'none'
+        }
       }}
     >
-      <DialogTitle sx={{ bgcolor: '#191970', color: 'white', fontSize: '1.25rem', py: 2 }}>
+      <DialogTitle
+        sx={{
+          background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+          color: 'var(--primary-foreground)',
+          fontSize: '1.25rem',
+          py: 2,
+          borderBottom: '1px solid var(--border)',
+        }}
+      >
         {editingMalzeme ? '✏️ Malzeme Düzenle' : '➕ Yeni Malzeme Ekle'}
       </DialogTitle>
-      <DialogContent sx={{ mt: 3 }}>
+      <DialogContent sx={{ mt: 3, bgcolor: 'var(--background)', borderTop: '1px solid var(--border)', px: 3 }}>
         <Box sx={{ py: 1 }}>
           {/* Genel Bilgiler Bölümü */}
-          <Typography variant="h6" sx={{ mb: 2, color: '#191970', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>
             📋 Genel Bilgiler
           </Typography>
           <Grid container spacing={3}>
@@ -211,11 +224,12 @@ const MalzemeFormDialog = memo(({
                 value={localFormData.stokKodu}
                 onChange={(e) => handleLocalChange('stokKodu', e.target.value)}
                 size="medium"
+                className="form-control-textfield"
                 helperText={localFormData.stokKodu ? "Önerilen kod (değiştirilebilir)" : "Otomatik üretilecek"}
                 placeholder="Otomatik"
                 sx={{
                   '& .MuiInputBase-input': {
-                    color: localFormData.stokKodu && !editingMalzeme ? '#0066cc' : 'inherit',
+                    color: localFormData.stokKodu && !editingMalzeme ? 'var(--primary)' : 'var(--foreground)',
                     fontWeight: localFormData.stokKodu && !editingMalzeme ? 500 : 'normal'
                   }
                 }}
@@ -229,6 +243,7 @@ const MalzemeFormDialog = memo(({
                 onChange={(e) => handleLocalChange('stokAdi', e.target.value)}
                 required
                 size="medium"
+                className="form-control-textfield"
                 helperText="Detaylı ürün açıklaması giriniz"
                 inputProps={{ style: { fontSize: '1rem' } }}
               />
@@ -240,6 +255,7 @@ const MalzemeFormDialog = memo(({
                 value={localFormData.barkod}
                 onChange={(e) => handleLocalChange('barkod', e.target.value)}
                 size="medium"
+                className="form-control-textfield"
                 helperText="Ürün barkod numarası"
                 placeholder="Örn: 8690123456789"
                 sx={{
@@ -255,7 +271,7 @@ const MalzemeFormDialog = memo(({
           <Divider sx={{ my: 4 }} />
 
           {/* Kategori ve Ölçü Bilgileri */}
-          <Typography variant="h6" sx={{ mb: 2, color: '#191970', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>
             🏷️ Kategori ve Ölçü Bilgileri
           </Typography>
           <Grid container spacing={3}>
@@ -267,6 +283,7 @@ const MalzemeFormDialog = memo(({
                 onChange={(e) => handleLocalChange('tedarikciKodu', e.target.value)}
                 placeholder="Tedarikçinin ürün kodu"
                 size="medium"
+                className="form-control-textfield"
                 helperText="Tedarikçinin kullandığı ürün kodu"
               />
             </Grid>
@@ -279,12 +296,13 @@ const MalzemeFormDialog = memo(({
                 onChange={(e) => handleLocalChange('oem', e.target.value)}
                 placeholder="Orijinal parça numarası"
                 size="medium"
+                className="form-control-textfield"
                 helperText="Orjinal ekipman üreticisi kodu"
               />
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth size="medium">
+              <FormControl fullWidth size="medium" className="form-control-select">
                 <InputLabel shrink>Marka</InputLabel>
                 <Select
                   value={localFormData.marka}
@@ -305,7 +323,7 @@ const MalzemeFormDialog = memo(({
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth size="medium">
+              <FormControl fullWidth size="medium" className="form-control-select">
                 <InputLabel shrink>Ana Kategori *</InputLabel>
                 <Select
                   value={localFormData.anaKategori}
@@ -329,6 +347,7 @@ const MalzemeFormDialog = memo(({
               <FormControl 
                 fullWidth 
                 size="medium" 
+                className="form-control-select"
                 disabled={!localFormData.anaKategori}
                 error={Boolean(localFormData.altKategori && altKategoriOptions.length > 0 && !altKategoriOptions.includes(localFormData.altKategori))}
               >
@@ -378,6 +397,7 @@ const MalzemeFormDialog = memo(({
                 onChange={(e) => handleLocalChange('olcu', e.target.value)}
                 placeholder="Örn: 12x1.5, 195/65R15, M14x1.5, 180x20mm"
                 size="medium"
+                className="form-control-textfield"
                 helperText="Ürünün ölçü veya teknik özelliklerini giriniz"
               />
             </Grid>
@@ -401,6 +421,7 @@ const MalzemeFormDialog = memo(({
                     label="Raf Adresi"
                     placeholder="Seçiniz veya yazınız"
                     size="medium"
+                    className="form-control-textfield"
                     helperText="Depo raf konumu"
                   />
                 )}
@@ -414,7 +435,7 @@ const MalzemeFormDialog = memo(({
             </Grid>
 
             <Grid size={{ xs: 12, md: 2 }}>
-              <FormControl fullWidth size="medium">
+              <FormControl fullWidth size="medium" className="form-control-select">
                 <InputLabel shrink>Birim *</InputLabel>
                 <Select
                   value={localFormData.birim}
@@ -436,7 +457,7 @@ const MalzemeFormDialog = memo(({
           <Divider sx={{ my: 4 }} />
 
           {/* Fiyat Bilgileri */}
-          <Typography variant="h6" sx={{ mb: 2, color: '#191970', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>
             💰 Fiyat Bilgileri
           </Typography>
           <Grid container spacing={3}>
@@ -448,6 +469,7 @@ const MalzemeFormDialog = memo(({
                 value={localFormData.alisFiyati}
                 onChange={(e) => handleLocalChange('alisFiyati', parseFloat(e.target.value) || 0)}
                 size="medium"
+                className="form-control-textfield"
                 InputProps={{
                   startAdornment: <InputAdornment position="start">₺</InputAdornment>,
                   readOnly: Boolean(editingMalzeme),
@@ -465,6 +487,7 @@ const MalzemeFormDialog = memo(({
                 value={localFormData.satisFiyati}
                 onChange={(e) => handleLocalChange('satisFiyati', parseFloat(e.target.value) || 0)}
                 size="medium"
+                className="form-control-textfield"
                 InputProps={{
                   startAdornment: <InputAdornment position="start">₺</InputAdornment>,
                   readOnly: Boolean(editingMalzeme),
@@ -476,23 +499,23 @@ const MalzemeFormDialog = memo(({
           </Grid>
 
           {localFormData.alisFiyati > 0 && localFormData.satisFiyati > 0 && (
-            <Box sx={{ mt: 2, p: 2, bgcolor: '#f0f4ff', borderRadius: 1 }}>
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ mt: 2, p: 2, bgcolor: 'color-mix(in srgb, var(--primary) 5%, transparent)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
                 <strong>Kâr Marjı:</strong> ₺{(localFormData.satisFiyati - localFormData.alisFiyati).toFixed(2)}
                 ({localFormData.alisFiyati > 0 ? ((localFormData.satisFiyati - localFormData.alisFiyati) / localFormData.alisFiyati * 100).toFixed(1) : 0}%)
               </Typography>
             </Box>
           )}
 
-          <Divider sx={{ my: 4 }} />
+          <Divider sx={{ my: 4, borderColor: 'var(--border)' }} />
 
           {/* Araç Bilgileri Bölümü */}
-          <Typography variant="h6" sx={{ mb: 2, color: '#191970', fontWeight: 600 }}>
+          <Typography variant="h6" sx={{ mb: 2, color: 'var(--foreground)', fontWeight: 700, letterSpacing: '-0.01em' }}>
             🚗 Araç Bilgileri
           </Typography>
           <Grid container spacing={3}>
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth size="medium">
+              <FormControl fullWidth size="medium" className="form-control-select">
                 <InputLabel shrink>Araç Markası</InputLabel>
                 <Select
                   value={localFormData.aracMarka || ''}
@@ -580,11 +603,19 @@ const MalzemeFormDialog = memo(({
 
         </Box>
       </DialogContent>
-      <DialogActions sx={{ px: 3, py: 2, bgcolor: '#f5f5f5' }}>
+      <DialogActions sx={{ px: 3, py: 2, bgcolor: 'var(--muted)', borderTop: '1px solid var(--border)' }}>
         <Button
           onClick={onClose}
           size="large"
-          sx={{ minWidth: 100 }}
+          sx={{
+            minWidth: 100,
+            borderRadius: '999px',
+            px: 2.4,
+            border: '1px solid var(--border)',
+            color: 'var(--muted-foreground)',
+            textTransform: 'none',
+            '&:hover': { bgcolor: 'var(--card)' },
+          }}
         >
           İptal
         </Button>
@@ -594,9 +625,19 @@ const MalzemeFormDialog = memo(({
           size="large"
           disabled={!localFormData.stokAdi}
           sx={{
-            bgcolor: '#191970',
-            '&:hover': { bgcolor: '#0f0f40' },
-            minWidth: 120
+            background: '#527575',
+            color: '#0b0b0b',
+            minWidth: 140,
+            borderRadius: '999px',
+            px: 2.8,
+            fontWeight: 700,
+            letterSpacing: '-0.01em',
+            boxShadow: '0 10px 24px color-mix(in srgb, #527575 30%, transparent)',
+            textTransform: 'none',
+            '&:hover': {
+              background: 'color-mix(in srgb, #527575 90%, #000 10%)',
+              transform: 'translateY(-1px)',
+            },
           }}
         >
           {editingMalzeme ? '💾 Güncelle' : '➕ Ekle'}
@@ -1280,7 +1321,7 @@ export default function MalzemeListesiPage() {
   return (
     <MainLayout>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" fontWeight="bold">
+        <Typography variant="h4" fontWeight="bold" sx={{ color: 'var(--foreground)' }}>
           Malzeme Listesi
         </Typography>
         <Box sx={{ display: 'flex', gap: 1 }}>
@@ -1289,9 +1330,12 @@ export default function MalzemeListesiPage() {
             startIcon={<FileDownload />}
             onClick={handleExportExcel}
             sx={{
-              color: '#191970',
-              borderColor: '#191970',
-              '&:hover': { borderColor: '#0f0f40', color: '#0f0f40' }
+              color: 'var(--primary)',
+              borderColor: 'var(--primary)',
+              borderRadius: '999px',
+              px: 2.4,
+              fontWeight: 600,
+              '&:hover': { borderColor: 'color-mix(in srgb, var(--primary) 80%, var(--secondary) 20%)', color: 'color-mix(in srgb, var(--primary) 80%, var(--secondary) 20%)' }
             }}
           >
             Excel'e Aktar
@@ -1301,8 +1345,19 @@ export default function MalzemeListesiPage() {
             startIcon={<Add />}
             onClick={() => handleOpenDialog()}
             sx={{
-              bgcolor: '#191970',
-              '&:hover': { bgcolor: '#0f0f40' }
+              background: '#527575',
+              color: '#0b0b0b',
+              borderRadius: '999px',
+              px: 2.8,
+              py: 1.2,
+              fontWeight: 700,
+              letterSpacing: '-0.01em',
+              boxShadow: '0 10px 20px color-mix(in srgb, #527575 35%, transparent)',
+              '&:hover': {
+                background: 'color-mix(in srgb, #527575 90%, #000 10%)',
+                transform: 'translateY(-1px)',
+              },
+              transition: 'all 0.2s ease',
             }}
           >
             Yeni Malzeme Ekle
@@ -1310,12 +1365,13 @@ export default function MalzemeListesiPage() {
         </Box>
       </Box>
 
-      <Paper sx={{ p: 2.5, mb: 3 }}>
+      <Paper sx={{ p: 2.5, mb: 3, bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)' }}>
         <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
           <TextField
             fullWidth
             size="small"
             placeholder="Stok kodu, adı, barkod veya OEM kodu ile ara..."
+            className="form-control-textfield"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             onKeyPress={(e) => {
@@ -1335,8 +1391,13 @@ export default function MalzemeListesiPage() {
             variant="contained"
             onClick={() => fetchStoklar()}
             sx={{
-              bgcolor: '#191970',
-              '&:hover': { bgcolor: '#0f0f40' }
+            background: '#527575',
+            color: '#0b0b0b',
+            fontWeight: 700,
+            borderRadius: '999px',
+            px: 2.6,
+            boxShadow: '0 8px 18px color-mix(in srgb, #527575 30%, transparent)',
+            '&:hover': { background: 'color-mix(in srgb, #527575 90%, #000 10%)' }
             }}
           >
             Ara
@@ -1345,7 +1406,7 @@ export default function MalzemeListesiPage() {
 
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small">
+            <FormControl fullWidth size="small" className="form-control-select">
               <InputLabel>Kategori</InputLabel>
               <Select
                 label="Kategori"
@@ -1364,7 +1425,7 @@ export default function MalzemeListesiPage() {
             </FormControl>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small" disabled={!selectedKategori}>
+            <FormControl fullWidth size="small" disabled={!selectedKategori} className="form-control-select">
               <InputLabel>Alt Kategori</InputLabel>
               <Select
                 label="Alt Kategori"
@@ -1383,7 +1444,7 @@ export default function MalzemeListesiPage() {
             </FormControl>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small">
+            <FormControl fullWidth size="small" className="form-control-select">
               <InputLabel>Marka</InputLabel>
               <Select
                 label="Marka"
@@ -1402,7 +1463,7 @@ export default function MalzemeListesiPage() {
             </FormControl>
           </Grid>
           <Grid size={{ xs: 12, md: 3 }}>
-            <FormControl fullWidth size="small">
+            <FormControl fullWidth size="small" className="form-control-select">
               <InputLabel>Stok Durumu</InputLabel>
               <Select
                 label="Stok Durumu"
@@ -1418,22 +1479,22 @@ export default function MalzemeListesiPage() {
         </Grid>
       </Paper>
 
-      <TableContainer component={Paper}>
+      <TableContainer component={Paper} sx={{ bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)' }}>
         <Table>
-          <TableHead sx={{ bgcolor: '#f5f5f5' }}>
+          <TableHead sx={{ bgcolor: 'var(--muted)' }}>
             <TableRow>
-              <TableCell><strong>Stok Kodu</strong></TableCell>
-              <TableCell><strong>Stok Adı</strong></TableCell>
-              <TableCell><strong>Marka</strong></TableCell>
-              <TableCell><strong>Raf Adresi</strong></TableCell>
-              <TableCell><strong>Ölçü</strong></TableCell>
-              <TableCell><strong>OEM</strong></TableCell>
-              <TableCell><strong>Araç Bilgileri</strong></TableCell>
-              <TableCell align="center"><strong>Miktar</strong></TableCell>
-              <TableCell><strong>Birim</strong></TableCell>
-              <TableCell align="right"><strong>Alış Fiyatı</strong></TableCell>
-              <TableCell align="right"><strong>Satış Fiyatı</strong></TableCell>
-              <TableCell align="center"><strong>İşlemler</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Stok Kodu</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Stok Adı</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Marka</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Raf Adresi</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Ölçü</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>OEM</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Araç Bilgileri</strong></TableCell>
+              <TableCell align="center" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Miktar</strong></TableCell>
+              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Birim</strong></TableCell>
+              <TableCell align="right" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Alış Fiyatı</strong></TableCell>
+              <TableCell align="right" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Satış Fiyatı</strong></TableCell>
+              <TableCell align="center" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>İşlemler</strong></TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -1442,7 +1503,7 @@ export default function MalzemeListesiPage() {
             ) : filteredStoklar.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={12} align="center">
-                  <Typography variant="body2" color="text.secondary" sx={{ py: 3 }}>
+                  <Typography variant="body2" sx={{ py: 3, color: 'var(--muted-foreground)' }}>
                     Stok bulunamadı
                   </Typography>
                 </TableCell>
@@ -1453,12 +1514,13 @@ export default function MalzemeListesiPage() {
                   key={stok.id} 
                   hover 
                   sx={{ 
-                    '&:hover': { bgcolor: '#f9f9f9' },
+                    '&:hover': { bgcolor: 'var(--muted)' },
+                    borderBottom: '1px solid var(--border)',
                   }}
                 >
-                  <TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>
                     <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="body2" fontWeight="600" color="#191970">
+                      <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--primary)' }}>
                         {stok.stokKodu}
                       </Typography>
                       <IconButton
@@ -1466,56 +1528,61 @@ export default function MalzemeListesiPage() {
                         onClick={() => handleOpenEsdegerDialog(stok)}
                         sx={{ 
                           padding: '4px',
+                          color: 'var(--primary)',
                           '&:hover': { 
-                            bgcolor: '#e3f2fd',
+                            bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
                           },
                         }}
                         title="Eşdeğer ürünleri göster"
                       >
-                        <CompareArrows fontSize="small" color="primary" />
+                        <CompareArrows fontSize="small" />
                       </IconButton>
                     </Box>
                   </TableCell>
-                  <TableCell>{stok.stokAdi}</TableCell>
-                  <TableCell>{stok.marka || '-'}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.stokAdi}</TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.marka || '-'}</TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>
                     {stok.raf && stok.raf.trim() !== '' ? (
                       <Chip
                         label={stok.raf}
                         size="small"
-                        color="primary"
                         variant="outlined"
-                        sx={{ fontSize: '0.75rem' }}
+                        sx={{ 
+                          fontSize: '0.75rem',
+                          borderColor: 'var(--primary)',
+                          color: 'var(--primary)',
+                          bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                        }}
                       />
                     ) : (
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
                         Raf atanmamış
                       </Typography>
                     )}
                   </TableCell>
-                  <TableCell>{stok.olcu || '-'}</TableCell>
-                  <TableCell>{stok.oem || '-'}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.olcu || '-'}</TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.oem || '-'}</TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>
                     {stok.aracMarka || stok.aracModel || stok.aracMotorHacmi || stok.aracYakitTipi ? (
                       <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
                         {stok.aracMarka && (
-                          <Typography variant="caption" fontWeight="600" color="#1976d2">
+                          <Typography variant="caption" fontWeight="600" sx={{ color: 'var(--chart-1)' }}>
                             {stok.aracMarka}
                           </Typography>
                         )}
                         {stok.aracModel && (
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
                             {stok.aracModel}
                           </Typography>
                         )}
                         {(stok.aracMotorHacmi || stok.aracYakitTipi) && (
-                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: '0.7rem' }}>
+                          <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontSize: '0.7rem' }}>
                             {[stok.aracMotorHacmi, stok.aracYakitTipi].filter(Boolean).join(' / ')}
                           </Typography>
                         )}
                       </Box>
                     ) : (
-                      <Typography variant="caption" color="text.secondary">
+                      <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
                         -
                       </Typography>
                     )}
@@ -1524,12 +1591,18 @@ export default function MalzemeListesiPage() {
                     <Chip
                       label={stok.miktar || 0}
                       size="small"
-                      color={stok.miktar > 0 ? 'success' : 'error'}
+                      sx={{
+                        bgcolor: stok.miktar > 0 
+                          ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)' 
+                          : 'color-mix(in srgb, var(--destructive) 15%, transparent)',
+                        color: stok.miktar > 0 ? 'var(--chart-2)' : 'var(--destructive)',
+                        fontWeight: 600,
+                      }}
                     />
                   </TableCell>
-                  <TableCell>{stok.birim}</TableCell>
+                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.birim}</TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" fontWeight="600">
+                    <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--foreground)' }}>
                       ₺{Number(stok.alisFiyati ?? 0).toLocaleString('tr-TR', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -1537,7 +1610,7 @@ export default function MalzemeListesiPage() {
                     </Typography>
                   </TableCell>
                   <TableCell align="right">
-                    <Typography variant="body2" fontWeight="600">
+                    <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--primary)' }}>
                       ₺{Number(stok.satisFiyati ?? 0).toLocaleString('tr-TR', {
                         minimumFractionDigits: 2,
                         maximumFractionDigits: 2,
@@ -1580,7 +1653,7 @@ export default function MalzemeListesiPage() {
       </TableContainer>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-        <Typography variant="body2" color="text.secondary">
+        <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
           Toplam {filteredStoklar.length} malzeme gösteriliyor
         </Typography>
       </Box>
@@ -1738,75 +1811,104 @@ export default function MalzemeListesiPage() {
         onClose={handleCloseEsdegerDialog}
         maxWidth="md"
         fullWidth
+        PaperProps={{
+          sx: {
+            bgcolor: 'var(--card)',
+            backgroundImage: 'none',
+          },
+        }}
       >
-        <DialogTitle sx={{ bgcolor: '#191970', color: 'white', py: 2 }}>
+        <DialogTitle sx={{ 
+          bgcolor: 'var(--secondary)', 
+          color: 'var(--secondary-foreground)', 
+          py: 2,
+          borderBottom: '1px solid var(--border)',
+        }}>
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <CompareArrows />
-            <Typography variant="h6" fontWeight={600}>
+            <CompareArrows sx={{ color: 'var(--secondary-foreground)' }} />
+            <Typography variant="h6" fontWeight={700}>
               Eşdeğer Ürünler
             </Typography>
           </Box>
         </DialogTitle>
-        <DialogContent sx={{ mt: 2 }}>
+        <DialogContent sx={{ mt: 2, bgcolor: 'var(--background)' }}>
           {esdegerMalzeme && (
-            <Box sx={{ mb: 3 }}>
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ mb: 3, p: 2, bgcolor: 'color-mix(in srgb, var(--primary) 5%, transparent)', borderRadius: 'var(--radius)', border: '1px solid var(--border)' }}>
+              <Typography variant="body2" sx={{ color: 'var(--muted-foreground)', mb: 0.5 }}>
                 Ürün:
               </Typography>
-              <Typography variant="h6" fontWeight={600} color="#191970">
+              <Typography variant="h6" fontWeight={700} sx={{ color: 'var(--primary)' }}>
                 {esdegerMalzeme.stokKodu} - {esdegerMalzeme.stokAdi}
               </Typography>
             </Box>
           )}
 
           {esdegerLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
-              <Typography variant="body2" color="text.secondary">
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', py: 4 }}>
+              <CircularProgress size={24} sx={{ mr: 2 }} />
+              <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
                 Yükleniyor...
               </Typography>
             </Box>
           ) : esdegerUrunler.length === 0 ? (
             <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', py: 4 }}>
-              <CompareArrows sx={{ fontSize: 48, color: 'text.secondary', mb: 2 }} />
-              <Typography variant="body1" color="text.secondary" fontWeight={500}>
+              <CompareArrows sx={{ fontSize: 48, color: 'var(--muted-foreground)', mb: 2 }} />
+              <Typography variant="body1" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>
                 Bu ürünün eşdeğeri bulunmamaktadır
               </Typography>
-              <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
+              <Typography variant="body2" sx={{ color: 'var(--muted-foreground)', mt: 1 }}>
                 Eşdeğer ürünleri eklemek için eşleştirme yapabilirsiniz
               </Typography>
             </Box>
           ) : (
-            <TableContainer>
+            <TableContainer component={Paper} sx={{ bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
               <Table size="small">
-                <TableHead sx={{ bgcolor: '#f5f5f5' }}>
-                  <TableRow>
-                    <TableCell><strong>Stok Kodu</strong></TableCell>
-                    <TableCell><strong>Stok Adı</strong></TableCell>
-                    <TableCell><strong>Marka</strong></TableCell>
-                    <TableCell align="center"><strong>Miktar</strong></TableCell>
-                    <TableCell align="right"><strong>Alış Fiyatı</strong></TableCell>
-                    <TableCell align="right"><strong>Satış Fiyatı</strong></TableCell>
+                <TableHead>
+                  <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                    <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}><strong>Stok Kodu</strong></TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}><strong>Stok Adı</strong></TableCell>
+                    <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}><strong>Marka</strong></TableCell>
+                    <TableCell align="center" sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}><strong>Miktar</strong></TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}><strong>Alış Fiyatı</strong></TableCell>
+                    <TableCell align="right" sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}><strong>Satış Fiyatı</strong></TableCell>
                   </TableRow>
                 </TableHead>
                 <TableBody>
                   {esdegerUrunler.map((urun: any) => (
-                    <TableRow key={urun.id} hover>
+                    <TableRow 
+                      key={urun.id} 
+                      hover
+                      sx={{
+                        bgcolor: 'var(--background)',
+                        '&:hover': {
+                          bgcolor: 'var(--muted) !important',
+                        },
+                        borderBottom: '1px solid var(--border)',
+                      }}
+                    >
                       <TableCell>
-                        <Typography variant="body2" fontWeight={600} color="#191970">
+                        <Typography variant="body2" fontWeight={600} sx={{ color: 'var(--primary)' }}>
                           {urun.stokKodu}
                         </Typography>
                       </TableCell>
-                      <TableCell>{urun.stokAdi}</TableCell>
-                      <TableCell>{urun.marka || '-'}</TableCell>
+                      <TableCell sx={{ color: 'var(--foreground)' }}>{urun.stokAdi}</TableCell>
+                      <TableCell sx={{ color: 'var(--muted-foreground)' }}>{urun.marka || '-'}</TableCell>
                       <TableCell align="center">
                         <Chip
                           label={urun.miktar ?? 0}
                           size="small"
-                          color={urun.miktar > 0 ? 'success' : 'error'}
+                          sx={{
+                            bgcolor: urun.miktar > 0 
+                              ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)' 
+                              : 'color-mix(in srgb, var(--destructive) 15%, transparent)',
+                            color: urun.miktar > 0 ? 'var(--chart-2)' : 'var(--destructive)',
+                            borderColor: urun.miktar > 0 ? 'var(--chart-2)' : 'var(--destructive)',
+                          }}
+                          variant="outlined"
                         />
                       </TableCell>
                       <TableCell align="right">
-                        <Typography variant="body2">
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
                           ₺{Number(urun.alisFiyati ?? 0).toLocaleString('tr-TR', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
@@ -1814,7 +1916,7 @@ export default function MalzemeListesiPage() {
                         </Typography>
                       </TableCell>
                       <TableCell align="right">
-                        <Typography variant="body2" fontWeight={600}>
+                        <Typography variant="body2" fontWeight={600} sx={{ color: 'var(--primary)' }}>
                           ₺{Number(urun.satisFiyati ?? 0).toLocaleString('tr-TR', {
                             minimumFractionDigits: 2,
                             maximumFractionDigits: 2,
@@ -1828,8 +1930,19 @@ export default function MalzemeListesiPage() {
             </TableContainer>
           )}
         </DialogContent>
-        <DialogActions sx={{ px: 3, pb: 2 }}>
-          <Button onClick={handleCloseEsdegerDialog} variant="outlined">
+        <DialogActions sx={{ px: 3, pb: 2, bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
+          <Button 
+            onClick={handleCloseEsdegerDialog} 
+            variant="outlined"
+            sx={{
+              borderColor: 'var(--border)',
+              color: 'var(--foreground)',
+              '&:hover': {
+                borderColor: 'var(--primary)',
+                bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+              },
+            }}
+          >
             Kapat
           </Button>
         </DialogActions>

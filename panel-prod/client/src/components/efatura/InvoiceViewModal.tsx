@@ -83,16 +83,31 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
   const { data, isLoading, error } = useQuery({
     queryKey: ['invoice-content', document?.uuid || document?.ettn],
     queryFn: async () => {
+      // #region agent log
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:88',message:'queryFn called',data:{uuid:document?.uuid,ettn:document?.ettn,open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       if (!document?.uuid && !document?.ettn) {
+        // #region agent log
+        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:91',message:'UUID/ETTN missing',data:{uuid:document?.uuid,ettn:document?.ettn},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         throw new Error('UUID veya ETTN gerekli');
       }
       const uuid = document?.uuid || document?.ettn;
       // HTML formatında al (XSLT ile oluşturulmuş orijinal görüntü)
       const url = `/hizli/document-content?uuid=${uuid}&type=HTML`;
+      // #region agent log
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:96',message:'Making axios request',data:{url,uuid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      // #endregion
       try {
         const response = await axios.get(url);
+        // #region agent log
+        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:101',message:'Axios response received',data:{status:response.status,hasData:!!response.data,contentLength:response.data?.content?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         return response.data;
       } catch (err: any) {
+        // #region agent log
+        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:106',message:'Axios error',data:{status:err?.response?.status,statusText:err?.response?.statusText,url:err?.config?.url,message:err?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        // #endregion
         throw err;
       }
     },

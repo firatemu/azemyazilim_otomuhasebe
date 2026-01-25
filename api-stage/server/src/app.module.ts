@@ -55,6 +55,7 @@ import { TeklifModule } from './modules/teklif/teklif.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { UsersModule } from './modules/users/users.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
+import { PostalCodeModule } from './modules/postal-code/postal-code.module';
 import { HizliModule } from './modules/hizli/hizli.module';
 import { TechnicianModule } from './modules/technician/technician.module';
 import { VehicleModule } from './modules/vehicle/vehicle.module';
@@ -107,6 +108,7 @@ import { ServiceWorkflowModule } from './modules/service-workflow/service-workfl
     CekSenetModule,
     PersonelModule,
     WarehouseModule,
+    PostalCodeModule,
     LocationModule,
     ProductBarcodeModule,
     StockMoveModule,

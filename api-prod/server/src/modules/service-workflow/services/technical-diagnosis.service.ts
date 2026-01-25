@@ -12,6 +12,7 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma.service';
 import { TenantContextService } from '../../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../../common/services/tenant-resolver.service';
 import { buildTenantWhereClause, isStagingEnvironment } from '../../../common/utils/staging.util';
 import {
   CreateDiagnosticNoteDto,
@@ -24,29 +25,9 @@ export class TechnicalDiagnosisService {
   constructor(
     private prisma: PrismaService,
     private tenantContext: TenantContextService,
-  ) { }
+    private tenantResolver: TenantResolverService,
+  ) {}
 
-  /**
-   * Tenant ID'yi al - staging'de opsiyonel
-   */
-  private getTenantIdOrThrow(): string | undefined {
-    const tenantId = this.tenantContext.getTenantId();
-
-    // Staging ortamında tenant ID opsiyonel
-    if (isStagingEnvironment()) {
-      return tenantId; // undefined olabilir
-    }
-
-    // Production'da tenant ID zorunlu
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-    return tenantId;
-  }
-
-  /**
-   * User ID'yi al
-   */
   private getUserIdOrThrow(): string {
     const userId = this.tenantContext.getUserId();
     if (!userId) {
@@ -62,16 +43,12 @@ export class TechnicalDiagnosisService {
     workOrderId: string,
     tx: Prisma.TransactionClient,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    // Staging'de tenantId opsiyonel
-    const where: any = { id: workOrderId };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const workOrder = await tx.workOrder.findFirst({
-      where,
+      where: {
+        id: workOrderId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
     });
 
     if (!workOrder) {

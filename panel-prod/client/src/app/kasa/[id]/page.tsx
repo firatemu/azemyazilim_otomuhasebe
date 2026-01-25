@@ -86,6 +86,8 @@ interface FirmaKrediKarti {
   sonDortHane?: string;
   limit?: number;
   bakiye: number;
+  hesapKesimTarihi?: string;
+  sonOdemeTarihi?: string;
   aktif: boolean;
 }
 
@@ -751,6 +753,8 @@ export default function KasaDetayPage() {
     kartTipi: '',
     sonDortHane: '',
     limit: 0,
+    hesapKesimTarihi: '',
+    sonOdemeTarihi: '',
     aktif: true,
   });
 
@@ -787,9 +791,9 @@ export default function KasaDetayPage() {
     if (hesap) {
       setEditingItem(hesap);
       setBankaHesapForm({
-        hesapKodu: hesap.hesapKodu,
-        hesapAdi: hesap.hesapAdi,
-        bankaAdi: hesap.bankaAdi,
+        hesapKodu: hesap.hesapKodu || '',
+        hesapAdi: hesap.hesapAdi || '',
+        bankaAdi: hesap.bankaAdi || '',
         subeKodu: hesap.subeKodu || '',
         subeAdi: hesap.subeAdi || '',
         hesapNo: hesap.hesapNo || '',
@@ -816,16 +820,21 @@ export default function KasaDetayPage() {
 
   const handleSaveBankaHesap = async () => {
     try {
-      const dataToSend = {
-        ...bankaHesapForm,
-        kasaId: kasaId,
-        hesapKodu: bankaHesapForm.hesapKodu.trim() || undefined,
-      };
-
       if (editingItem) {
+        // Update: kasaId gönderilmez
+        const dataToSend = {
+          ...bankaHesapForm,
+          hesapKodu: bankaHesapForm.hesapKodu.trim() || undefined,
+        };
         await axios.put(`/banka-hesap/${editingItem.id}`, dataToSend);
         showSnackbar('Banka hesabı güncellendi', 'success');
       } else {
+        // Create: kasaId gönderilir
+        const dataToSend = {
+          ...bankaHesapForm,
+          kasaId: kasaId,
+          hesapKodu: bankaHesapForm.hesapKodu.trim() || undefined,
+        };
         await axios.post('/banka-hesap', dataToSend);
         showSnackbar('Banka hesabı eklendi', 'success');
       }
@@ -856,12 +865,14 @@ export default function KasaDetayPage() {
     if (kart) {
       setEditingItem(kart);
       setFirmaKartForm({
-        kartKodu: kart.kartKodu,
-        kartAdi: kart.kartAdi,
-        bankaAdi: kart.bankaAdi,
+        kartKodu: kart.kartKodu || '',
+        kartAdi: kart.kartAdi || '',
+        bankaAdi: kart.bankaAdi || '',
         kartTipi: kart.kartTipi || '',
         sonDortHane: kart.sonDortHane || '',
         limit: kart.limit || 0,
+        hesapKesimTarihi: kart.hesapKesimTarihi ? new Date(kart.hesapKesimTarihi).toISOString().split('T')[0] : '',
+        sonOdemeTarihi: kart.sonOdemeTarihi ? new Date(kart.sonOdemeTarihi).toISOString().split('T')[0] : '',
         aktif: kart.aktif,
       });
     } else {
@@ -873,6 +884,8 @@ export default function KasaDetayPage() {
         kartTipi: '',
         sonDortHane: '',
         limit: 0,
+        hesapKesimTarihi: '',
+        sonOdemeTarihi: '',
         aktif: true,
       });
     }
@@ -890,6 +903,8 @@ export default function KasaDetayPage() {
           kartTipi: firmaKartForm.kartTipi || undefined,
           sonDortHane: firmaKartForm.sonDortHane || undefined,
           limit: firmaKartForm.limit || 0,
+          hesapKesimTarihi: firmaKartForm.hesapKesimTarihi || undefined,
+          sonOdemeTarihi: firmaKartForm.sonOdemeTarihi || undefined,
           aktif: firmaKartForm.aktif,
         };
         await axios.put(`/firma-kredi-karti/${editingItem.id}`, dataToSend);
@@ -900,6 +915,8 @@ export default function KasaDetayPage() {
           ...firmaKartForm,
           kasaId: kasaId,
           kartKodu: firmaKartForm.kartKodu.trim() || undefined,
+          hesapKesimTarihi: firmaKartForm.hesapKesimTarihi || undefined,
+          sonOdemeTarihi: firmaKartForm.sonOdemeTarihi || undefined,
         };
         await axios.post('/firma-kredi-karti', dataToSend);
         showSnackbar('Firma kredi kartı eklendi', 'success');
@@ -1248,7 +1265,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="Hesap Kodu"
-                  value={bankaHesapForm.hesapKodu}
+                  value={bankaHesapForm.hesapKodu || ''}
                   onChange={(e) => setBankaHesapForm({ ...bankaHesapForm, hesapKodu: e.target.value })}
                   placeholder="Otomatik"
                   helperText="Boş bırakılırsa otomatik"
@@ -1259,7 +1276,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="Hesap Adı"
-                  value={bankaHesapForm.hesapAdi}
+                  value={bankaHesapForm.hesapAdi || ''}
                   onChange={(e) => setBankaHesapForm({ ...bankaHesapForm, hesapAdi: e.target.value })}
                   placeholder="Hesap adı (opsiyonel)"
                 />
@@ -1269,7 +1286,7 @@ export default function KasaDetayPage() {
                 <Autocomplete
                   freeSolo
                   options={turkiyeBankalari}
-                  value={bankaHesapForm.bankaAdi}
+                  value={bankaHesapForm.bankaAdi || ''}
                   onChange={(e, value) => setBankaHesapForm({ ...bankaHesapForm, bankaAdi: value || '' })}
                   renderInput={(params) => (
                     <TextField
@@ -1314,7 +1331,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="Şube Kodu"
-                  value={bankaHesapForm.subeKodu}
+                  value={bankaHesapForm.subeKodu || ''}
                   onChange={(e) => setBankaHesapForm({ ...bankaHesapForm, subeKodu: e.target.value })}
                 />
               </Grid>
@@ -1323,7 +1340,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="Şube Adı"
-                  value={bankaHesapForm.subeAdi}
+                  value={bankaHesapForm.subeAdi || ''}
                   onChange={(e) => setBankaHesapForm({ ...bankaHesapForm, subeAdi: e.target.value })}
                 />
               </Grid>
@@ -1332,7 +1349,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="Hesap No"
-                  value={bankaHesapForm.hesapNo}
+                  value={bankaHesapForm.hesapNo || ''}
                   onChange={(e) => setBankaHesapForm({ ...bankaHesapForm, hesapNo: e.target.value })}
                 />
               </Grid>
@@ -1341,7 +1358,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="IBAN"
-                  value={bankaHesapForm.iban}
+                  value={bankaHesapForm.iban || ''}
                   onChange={(e) => setBankaHesapForm({ ...bankaHesapForm, iban: e.target.value })}
                   placeholder="TR..."
                 />
@@ -1370,7 +1387,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="Kart Kodu"
-                  value={firmaKartForm.kartKodu}
+                  value={firmaKartForm.kartKodu || ''}
                   onChange={(e) => setFirmaKartForm({ ...firmaKartForm, kartKodu: e.target.value })}
                   placeholder="Otomatik"
                   helperText={editingItem ? "Kart kodu değiştirilemez" : "Boş bırakılırsa otomatik oluşturulur"}
@@ -1397,7 +1414,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="Kart Adı"
-                  value={firmaKartForm.kartAdi}
+                  value={firmaKartForm.kartAdi || ''}
                   onChange={(e) => setFirmaKartForm({ ...firmaKartForm, kartAdi: e.target.value })}
                   placeholder="Örn: Ziraat Visa - Ahmet Bey"
                   required
@@ -1429,7 +1446,7 @@ export default function KasaDetayPage() {
                 <Autocomplete
                   freeSolo
                   options={turkiyeBankalari}
-                  value={firmaKartForm.bankaAdi}
+                  value={firmaKartForm.bankaAdi || ''}
                   onChange={(e, value) => setFirmaKartForm({ ...firmaKartForm, bankaAdi: value || '' })}
                   renderInput={(params) => (
                     <TextField
@@ -1465,7 +1482,7 @@ export default function KasaDetayPage() {
                 <Autocomplete
                   freeSolo
                   options={kartTipleri}
-                  value={firmaKartForm.kartTipi}
+                  value={firmaKartForm.kartTipi || ''}
                   onChange={(e, value) => setFirmaKartForm({ ...firmaKartForm, kartTipi: value || '' })}
                   renderInput={(params) => (
                     <TextField
@@ -1496,7 +1513,7 @@ export default function KasaDetayPage() {
                 <TextField
                   fullWidth
                   label="Son 4 Hane"
-                  value={firmaKartForm.sonDortHane}
+                  value={firmaKartForm.sonDortHane || ''}
                   onChange={(e) => setFirmaKartForm({ ...firmaKartForm, sonDortHane: e.target.value.replace(/\D/g, '').slice(0, 4) })}
                   inputProps={{ maxLength: 4 }}
                   placeholder="1234"
@@ -1551,6 +1568,58 @@ export default function KasaDetayPage() {
                     },
                   }}
                   helperText={firmaKartForm.limit === 0 ? "0 = Limitsiz (limitsiz harcama)" : "Kartın maksimum harcama limiti"}
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Hesap Kesim Tarihi"
+                  value={firmaKartForm.hesapKesimTarihi || ''}
+                  onChange={(e) => setFirmaKartForm({ ...firmaKartForm, hesapKesimTarihi: e.target.value })}
+                  InputLabelProps={{
+                    shrink: true,
+                    sx: {
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      color: 'text.primary',
+                      whiteSpace: 'nowrap',
+                      overflow: 'visible',
+                      textOverflow: 'clip',
+                      maxWidth: '100%',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      },
+                    },
+                  }}
+                  helperText="Kredi kartı hesap kesim tarihi"
+                />
+              </Grid>
+
+              <Grid size={{ xs: 12, md: 6 }}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Son Ödeme Tarihi"
+                  value={firmaKartForm.sonOdemeTarihi || ''}
+                  onChange={(e) => setFirmaKartForm({ ...firmaKartForm, sonOdemeTarihi: e.target.value })}
+                  InputLabelProps={{
+                    shrink: true,
+                    sx: {
+                      fontSize: '1rem',
+                      fontWeight: 500,
+                      color: 'text.primary',
+                      whiteSpace: 'nowrap',
+                      overflow: 'visible',
+                      textOverflow: 'clip',
+                      maxWidth: '100%',
+                      '&.Mui-focused': {
+                        color: 'primary.main',
+                      },
+                    },
+                  }}
+                  helperText="Son ödeme tarihi"
                 />
               </Grid>
             </Grid>

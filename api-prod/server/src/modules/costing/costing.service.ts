@@ -1,5 +1,5 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, FaturaDurum, FaturaTipi } from '@prisma/client';
+import { Prisma, FaturaDurum, FaturaTipi, HareketTipi } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { GetCostingQueryDto } from './dto/get-costing-query.dto';
 
@@ -151,12 +151,15 @@ export class CostingService {
       throw new NotFoundException('Stok bulunamadı.');
     }
 
+    // Tüm geçmiş hareketleri al (sadece ONAYLANDI değil, tüm durumlar)
+    // Ancak silinmemiş faturaları al (deletedAt null olanlar)
     const purchaseLines = await this.prisma.faturaKalemi.findMany({
       where: {
         stokId,
         fatura: {
           faturaTipi: FaturaTipi.ALIS,
           durum: FaturaDurum.ONAYLANDI,
+          deletedAt: null, // Silinmemiş faturalar
         },
       },
       select: {
@@ -164,7 +167,15 @@ export class CostingService {
         birimFiyat: true,
         tutar: true,
         fatura: {
-          select: { tarih: true },
+          select: { 
+            tarih: true,
+            faturaNo: true,
+          },
+        },
+      },
+      orderBy: {
+        fatura: {
+          tarih: 'asc', // Tarih sırasına göre sırala
         },
       },
     });
@@ -175,12 +186,21 @@ export class CostingService {
         fatura: {
           faturaTipi: { in: [FaturaTipi.SATIS, FaturaTipi.ALIS_IADE] },
           durum: FaturaDurum.ONAYLANDI,
+          deletedAt: null, // Silinmemiş faturalar
         },
       },
       select: {
         miktar: true,
         fatura: {
-          select: { tarih: true },
+          select: { 
+            tarih: true,
+            faturaNo: true,
+          },
+        },
+      },
+      orderBy: {
+        fatura: {
+          tarih: 'asc', // Tarih sırasına göre sırala
         },
       },
     });
@@ -191,6 +211,7 @@ export class CostingService {
         fatura: {
           faturaTipi: FaturaTipi.SATIS_IADE,
           durum: FaturaDurum.ONAYLANDI,
+          deletedAt: null, // Silinmemiş faturalar
         },
       },
       select: {
@@ -198,8 +219,35 @@ export class CostingService {
         birimFiyat: true,
         tutar: true,
         fatura: {
-          select: { tarih: true },
+          select: { 
+            tarih: true,
+            faturaNo: true,
+          },
         },
+      },
+      orderBy: {
+        fatura: {
+          tarih: 'asc', // Tarih sırasına göre sırala
+        },
+      },
+    });
+
+    // Tüm geçmiş stok hareketlerini al (onaylanmış tüm hareketler)
+    // Stok hareketleri genellikle faturalardan otomatik oluşturulur,
+    // ancak manuel girişler, sayımlar vb. de olabilir
+    const stockMovements = await this.prisma.stokHareket.findMany({
+      where: {
+        stokId,
+      },
+      select: {
+        hareketTipi: true,
+        miktar: true,
+        birimFiyat: true,
+        createdAt: true,
+        aciklama: true,
+      },
+      orderBy: {
+        createdAt: 'asc', // Tarih sırasına göre sırala
       },
     });
 
@@ -243,6 +291,68 @@ export class CostingService {
         quantity: qty,
         unitCost,
       });
+    }
+
+    // Stok hareketlerini timeline'a ekle
+    // Not: Stok hareketleri genellikle faturalardan otomatik oluşturulur
+    // Bu yüzden sadece faturadan bağımsız hareketleri ekliyoruz
+    // (aciklama'da "Fatura" kelimesi geçmeyenler veya manuel girişler)
+    for (const movement of stockMovements) {
+      const qty = Number(movement.miktar);
+      if (!qty || qty <= 0) continue;
+
+      // Eğer hareket bir faturadan kaynaklanıyorsa (aciklama'da "Fatura" geçiyorsa),
+      // bu hareket zaten fatura kalemlerinde dahil edilmiştir, bu yüzden atlıyoruz
+      const aciklama = movement.aciklama?.toLowerCase() || '';
+      if (aciklama.includes('fatura') || aciklama.includes('fatura:')) {
+        continue; // Fatura kaynaklı hareketleri atla, zaten fatura kalemlerinde var
+      }
+
+      const unitCost = Number(movement.birimFiyat) || 0;
+      const date = movement.createdAt;
+
+      // Hareket tipine göre increase veya decrease olarak ekle
+      switch (movement.hareketTipi) {
+        case HareketTipi.GIRIS:
+        case HareketTipi.IADE:
+        case HareketTipi.SAYIM_FAZLA:
+          // Stok artışı - birim fiyatı ile birlikte maliyete dahil et
+          if (unitCost > 0) {
+            timeline.push({
+              type: 'increase',
+              date,
+              quantity: qty,
+              unitCost,
+            });
+          }
+          break;
+
+        case HareketTipi.CIKIS:
+        case HareketTipi.SATIS:
+        case HareketTipi.SAYIM_EKSIK:
+          // Stok azalışı - maliyetten çıkar
+          timeline.push({
+            type: 'decrease',
+            date,
+            quantity: qty,
+          });
+          break;
+
+        case HareketTipi.SAYIM:
+          // Sayım hareketleri genellikle miktar düzeltmesi için kullanılır
+          // Birim fiyatı varsa artış, yoksa azalış olarak değerlendirilebilir
+          // Ancak sayım hareketleri genellikle maliyet hesaplamasına dahil edilmez
+          // Bu yüzden atlıyoruz veya birim fiyatı varsa artış olarak ekliyoruz
+          if (unitCost > 0) {
+            timeline.push({
+              type: 'increase',
+              date,
+              quantity: qty,
+              unitCost,
+            });
+          }
+          break;
+      }
     }
 
     if (timeline.length === 0) {

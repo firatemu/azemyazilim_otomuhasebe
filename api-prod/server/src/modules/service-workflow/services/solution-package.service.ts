@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../../../common/prisma.service';
 import { TenantContextService } from '../../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../../common/services/tenant-resolver.service';
 import { isStagingEnvironment, buildTenantWhereClause } from '../../../common/utils/staging.util';
 import {
   WorkOrderStatus,
@@ -26,49 +27,23 @@ export class SolutionPackageService {
   constructor(
     private prisma: PrismaService,
     private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
-  /**
-   * Tenant ID'yi al - staging'de gereksiz
-   */
-  private getTenantIdOrThrow(): string | undefined {
-    const tenantId = this.tenantContext.getTenantId();
-
-    // Staging ortamında tenant ID gereksiz
-    if (isStagingEnvironment()) {
-      return undefined;
-    }
-
-    // Production'da tenant ID zorunlu
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required in production environment');
-    }
-    return tenantId;
-  }
-
-  /**
-   * WorkOrder bul ve doğrula
-   */
   private async findWorkOrderOrThrow(
     workOrderId: string,
     tx: Prisma.TransactionClient,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    const where: any = { id: workOrderId };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const workOrder = await tx.workOrder.findFirst({
-      where,
+      where: {
+        id: workOrderId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
     });
-
     if (!workOrder) {
       throw new NotFoundException('WorkOrder not found or tenant mismatch');
     }
-
-    // CLOSED veya CANCELLED durumunda değişiklik yapılamaz
     if (
       workOrder.status === WorkOrderStatus.CLOSED ||
       workOrder.status === WorkOrderStatus.CANCELLED
@@ -77,13 +52,9 @@ export class SolutionPackageService {
         `WorkOrder is ${workOrder.status === WorkOrderStatus.CLOSED ? 'CLOSED' : 'CANCELLED'}. Cannot modify.`,
       );
     }
-
     return workOrder;
   }
 
-  /**
-   * Product (Stok) doğrula
-   */
   private async validateProduct(
     productId: string,
     tenantId: string | undefined,
@@ -115,17 +86,12 @@ export class SolutionPackageService {
     reason: string = 'Solution package created/updated',
   ) {
     const workOrder = await this.findWorkOrderOrThrow(workOrderId, tx);
-    // TenantId'yi belirle - staging'de workOrder'dan al
-    let tenantId: string;
-    if (isStagingEnvironment()) {
-      tenantId = workOrder.tenantId || '';
-    } else {
-      const contextTenantId = this.getTenantIdOrThrow();
-      tenantId = contextTenantId || workOrder.tenantId;
-      if (!tenantId) {
-        throw new BadRequestException('Tenant ID is required in production environment');
-      }
+    let tenantId: string =
+      (await this.tenantResolver.resolveForQuery()) || workOrder.tenantId || '';
+    if (!tenantId && !isStagingEnvironment()) {
+      throw new BadRequestException('Tenant ID is required in production environment');
     }
+    if (!tenantId) tenantId = workOrder.tenantId || '';
 
     // Eğer zaten SOLUTION_PROPOSED durumundaysa veya daha ileri bir durumdaysa
     // ve APPROVED veya sonrasındaysa, durumu SOLUTION_PROPOSED'e geri al

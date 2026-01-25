@@ -143,11 +143,11 @@ const PersonelOdemeDialog = memo(({
 
   const getTipColor = (tip: string) => {
     switch (tip) {
-      case 'HAK_EDIS': return '#8b5cf6';
-      case 'MAAS': return '#10b981';
-      case 'AVANS': return '#3b82f6';
-      case 'PRIM': return '#f59e0b';
-      case 'KESINTI': return '#ef4444';
+      case 'HAK_EDIS': return 'var(--secondary)';
+      case 'MAAS': return 'var(--chart-2)';
+      case 'AVANS': return 'var(--chart-1)';
+      case 'PRIM': return 'var(--primary)';
+      case 'KESINTI': return 'var(--destructive)';
       default: return '#6b7280';
     }
   };
@@ -286,8 +286,21 @@ const PersonelOdemeDialog = memo(({
 
             {/* Ödeme Özeti */}
             <Grid size={{ xs: 12 }}>
-              <Paper sx={{ p: 2, bgcolor: '#f9fafb', border: '1px solid #e5e7eb' }}>
-                <Typography variant="subtitle2" gutterBottom color="text.secondary">
+              <Paper sx={{ 
+                p: 2, 
+                bgcolor: 'var(--muted)', 
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+              }}>
+                <Typography 
+                  variant="subtitle2" 
+                  gutterBottom 
+                  sx={{
+                    color: 'var(--muted-foreground)',
+                    fontSize: '0.875rem',
+                    fontWeight: 600,
+                  }}
+                >
                   Ödeme Özeti
                 </Typography>
                 <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
@@ -495,8 +508,8 @@ const PersonelDialog = memo(({
                 helperText={formData.personelKodu ? "Önerilen kod (değiştirilebilir veya silinebilir)" : "Otomatik üretilecek"}
                 sx={{
                   '& .MuiInputBase-input': {
-                    color: formData.personelKodu && !isEdit ? '#0066cc' : 'inherit',
-                    fontWeight: formData.personelKodu && !isEdit ? 500 : 'normal'
+                    color: formData.personelKodu && !isEdit ? 'var(--chart-1)' : 'inherit',
+                    fontWeight: formData.personelKodu && !isEdit ? 600 : 'normal'
                   }
                 }}
               />
@@ -962,11 +975,29 @@ export default function PersonelPage() {
       <Box sx={{ p: 3 }}>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" gutterBottom sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Badge color="primary" />
+          <Typography 
+            variant="h4" 
+            sx={{ 
+              fontWeight: 700,
+              fontSize: '1.875rem',
+              color: 'var(--foreground)',
+              letterSpacing: '-0.02em',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1.5,
+              mb: 0.5,
+            }}
+          >
+            <Badge sx={{ color: 'var(--secondary)' }} />
             Personel Yönetimi
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography 
+            variant="body2" 
+            sx={{
+              color: 'var(--muted-foreground)',
+              fontSize: '0.875rem',
+            }}
+          >
             Personel bilgileri, maaş ve ödeme takibi
           </Typography>
         </Box>
@@ -975,6 +1006,15 @@ export default function PersonelPage() {
           startIcon={<Add />}
           onClick={() => handleOpenDialog()}
           size="large"
+          sx={{
+            bgcolor: 'var(--secondary)',
+            color: 'var(--secondary-foreground)',
+            textTransform: 'none',
+            fontWeight: 600,
+            '&:hover': {
+              bgcolor: 'var(--secondary-hover)',
+            },
+          }}
         >
           Yeni Personel
         </Button>
@@ -984,36 +1024,89 @@ export default function PersonelPage() {
       {stats && (
         <Grid container spacing={3} sx={{ mb: 3 }}>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card>
+            <Card sx={{
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              bgcolor: 'var(--card)',
+              boxShadow: 'var(--shadow-sm)',
+            }}>
               <CardContent>
-                <Typography color="text.secondary" gutterBottom variant="body2">
+                <Typography 
+                  sx={{
+                    color: 'var(--muted-foreground)',
+                    fontSize: '0.875rem',
+                    mb: 1,
+                  }}
+                >
                   Toplam Personel
                 </Typography>
-                <Typography variant="h4">{stats.toplamPersonel}</Typography>
+                <Typography 
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '1.5rem',
+                    color: 'var(--chart-1)',
+                  }}
+                >
+                  {stats.toplamPersonel}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card>
+            <Card sx={{
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              bgcolor: 'var(--card)',
+              boxShadow: 'var(--shadow-sm)',
+            }}>
               <CardContent>
-                <Typography color="text.secondary" gutterBottom variant="body2">
+                <Typography 
+                  sx={{
+                    color: 'var(--muted-foreground)',
+                    fontSize: '0.875rem',
+                    mb: 1,
+                  }}
+                >
                   Aylık Maaş Bordrosu
                 </Typography>
-                <Typography variant="h4">
+                <Typography 
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '1.5rem',
+                    color: 'var(--secondary)',
+                  }}
+                >
                   ₺{Number(stats.toplamMaasBordro).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </Typography>
               </CardContent>
             </Card>
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card>
+            <Card sx={{
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              bgcolor: 'var(--card)',
+              boxShadow: 'var(--shadow-sm)',
+            }}>
               <CardContent>
-                <Typography color="text.secondary" gutterBottom variant="body2">
+                <Typography 
+                  sx={{
+                    color: 'var(--muted-foreground)',
+                    fontSize: '0.875rem',
+                    mb: 1,
+                  }}
+                >
                   Toplam Bakiye
                 </Typography>
                 <Typography 
                   variant="h4"
-                  color={Number(stats.toplamBakiye) >= 0 ? 'success.main' : 'error.main'}
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '1.5rem',
+                    color: Number(stats.toplamBakiye) >= 0 ? 'var(--chart-2)' : 'var(--destructive)',
+                  }}
                 >
                   ₺{Number(stats.toplamBakiye).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
                 </Typography>
@@ -1021,12 +1114,32 @@ export default function PersonelPage() {
             </Card>
           </Grid>
           <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-            <Card>
+            <Card sx={{
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              bgcolor: 'var(--card)',
+              boxShadow: 'var(--shadow-sm)',
+            }}>
               <CardContent>
-                <Typography color="text.secondary" gutterBottom variant="body2">
+                <Typography 
+                  sx={{
+                    color: 'var(--muted-foreground)',
+                    fontSize: '0.875rem',
+                    mb: 1,
+                  }}
+                >
                   Departman Sayısı
                 </Typography>
-                <Typography variant="h4">{stats.departmanlar.length}</Typography>
+                <Typography 
+                  variant="h4"
+                  sx={{
+                    fontWeight: 700,
+                    fontSize: '1.5rem',
+                    color: 'var(--primary)',
+                  }}
+                >
+                  {stats.departmanlar.length}
+                </Typography>
               </CardContent>
             </Card>
           </Grid>
@@ -1080,20 +1193,27 @@ export default function PersonelPage() {
       </Paper>
 
       {/* Table */}
-      <TableContainer component={Paper}>
+      <TableContainer 
+        component={Paper}
+        sx={{
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
         <Table>
           <TableHead>
-            <TableRow sx={{ backgroundColor: '#f5f5f5' }}>
-              <TableCell><strong>Personel Kodu</strong></TableCell>
-              <TableCell><strong>Ad Soyad</strong></TableCell>
-              <TableCell><strong>TC Kimlik No</strong></TableCell>
-              <TableCell><strong>Pozisyon</strong></TableCell>
-              <TableCell><strong>Departman</strong></TableCell>
-              <TableCell><strong>Telefon</strong></TableCell>
-              <TableCell align="right"><strong>Maaş</strong></TableCell>
-              <TableCell align="right"><strong>Bakiye</strong></TableCell>
-              <TableCell><strong>Durum</strong></TableCell>
-              <TableCell align="center"><strong>İşlemler</strong></TableCell>
+            <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Personel Kodu</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Ad Soyad</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>TC Kimlik No</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Pozisyon</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Departman</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Telefon</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Maaş</TableCell>
+              <TableCell align="right" sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Bakiye</TableCell>
+              <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Durum</TableCell>
+              <TableCell align="center" sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>İşlemler</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>

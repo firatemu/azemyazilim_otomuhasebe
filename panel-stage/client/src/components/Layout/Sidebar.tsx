@@ -238,10 +238,12 @@ const menuItems = [
     bgColor: '#eff6ff',
     subItems: [
       { id: 'depo-depolar', label: 'Depo Yönetimi', icon: Warehouse, path: '/depo/depolar', color: '#6366f1' },
+      { id: 'depo-transfer-fisi', label: 'Ambar Transfer Fişi', icon: LocalShipping, path: '/depo/transfer-fisi', color: '#f59e0b' },
       { id: 'depo-put-away', label: 'Put-Away İşlemi', icon: TrendingUp, path: '/depo/islemler/put-away', color: '#10b981' },
       { id: 'depo-transfer', label: 'Transfer İşlemi', icon: TrendingDown, path: '/depo/islemler/transfer', color: '#f59e0b' },
       { id: 'depo-siparis-hazirlama', label: 'Sipariş Hazırlama', icon: Assignment, path: '/siparis/hazirlama-listesi', color: '#f59e0b' },
       { id: 'depo-sayim', label: 'Stok Sayım', icon: Inventory, path: '/sayim', color: '#14b8a6' },
+      { id: 'depo-stok-raporu', label: 'Ambar Stok Raporu', icon: Assessment, path: '/depo/stok-raporu', color: '#14b8a6' },
       { id: 'depo-raporlar', label: 'Depo Raporları', icon: Assessment, path: '/depo/raporlar', color: '#14b8a6' },
     ],
   },
@@ -269,6 +271,7 @@ const menuItems = [
     subItems: [
       { id: 'ayarlar-numara-sablonlari', label: 'Numara Şablonları', icon: Settings, path: '/ayarlar/numara-sablonlari', color: '#6b7280' },
       { id: 'ayarlar-parametreler', label: 'Parametreler', icon: Settings, path: '/ayarlar/parametreler', color: '#6b7280' },
+      { id: 'ayarlar-firma', label: 'Firma Ayarları', icon: Settings, path: '/ayarlar/firma-ayarlari', color: '#6b7280' },
     ],
   },
 ];

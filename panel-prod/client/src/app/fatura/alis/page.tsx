@@ -24,12 +24,13 @@ import {
   Alert,
   CircularProgress,
   Select,
+  Menu,
   MenuItem,
   FormControl,
   InputLabel,
   Autocomplete,
 } from '@mui/material';
-import { Add, Search, Visibility, Edit, Delete, Close, Cancel, Print, Undo } from '@mui/icons-material';
+import { Add, Search, Visibility, Edit, Delete, Close, Cancel, Print, Undo, MoreVert } from '@mui/icons-material';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
 import { useRouter } from 'next/navigation';
@@ -115,6 +116,11 @@ export default function AlisFaturalariPage() {
   const [faturaDurumlari, setFaturaDurumlari] = useState<Record<string, string>>({});
   const [irsaliyeIptal, setIrsaliyeIptal] = useState(false);
 
+  // Açılır menü state
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [menuFaturaId, setMenuFaturaId] = useState<string | null>(null);
+
+
   // Form data
   const [formData, setFormData] = useState({
     faturaNo: '',
@@ -185,6 +191,17 @@ export default function AlisFaturalariPage() {
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'info') => {
     setSnackbar({ open: true, message, severity });
   };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, faturaId: string) => {
+    setAnchorEl(event.currentTarget);
+    setMenuFaturaId(faturaId);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setMenuFaturaId(null);
+  };
+
 
   const resetForm = () => {
     setFormData({
@@ -818,90 +835,158 @@ export default function AlisFaturalariPage() {
                   <TableCell align="center">
                     <IconButton
                       size="small"
-                      onClick={() => openViewDialog(fatura)}
+                      onClick={(e) => handleMenuOpen(e, fatura.id)}
                       sx={{
-                        color: '#3b82f6',
-                        '&:hover': { bgcolor: '#eff6ff' }
+                        color: '#6b7280',
+                        '&:hover': {
+                          bgcolor: '#f3f4f6',
+                          color: '#f59e0b'
+                        }
                       }}
-                      title="Görüntüle"
                     >
-                      <Visibility fontSize="small" />
+                      <MoreVert fontSize="small" />
                     </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => router.push(`/fatura/alis/duzenle/${fatura.id}`)}
-                      sx={{
-                        color: '#f59e0b',
-                        '&:hover': { bgcolor: '#fffbeb' }
+
+                    <Menu
+                      anchorEl={anchorEl}
+                      open={Boolean(anchorEl) && menuFaturaId === fatura.id}
+                      onClose={handleMenuClose}
+                      PaperProps={{
+                        sx: {
+                          mt: 1,
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                          borderRadius: 2,
+                          minWidth: 200,
+                        }
                       }}
-                      title="Düzenle"
                     >
-                      <Edit fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => router.push(`/fatura/alis/print/${fatura.id}`)}
-                      sx={{
-                        color: '#10b981',
-                        '&:hover': { bgcolor: '#ecfdf5' }
-                      }}
-                      title="Yazdır"
-                    >
-                      <Print fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => router.push(`/fatura/iade/alis/yeni?originalId=${fatura.id}`)}
-                      sx={{
-                        color: '#06b6d4',
-                        '&:hover': { bgcolor: '#ecfeff' }
-                      }}
-                      title="İade Oluştur"
-                    >
-                      <Undo fontSize="small" />
-                    </IconButton>
-                    <FormControl size="small" sx={{ minWidth: 120 }}>
-                      <Select
-                        value={faturaDurumlari[fatura.id] || fatura.durum}
-                        onChange={(e) => handleDurumChangeRequest(fatura.id, fatura.durum, e.target.value)}
-                        size="small"
+                      <MenuItem
+                        onClick={() => {
+                          openViewDialog(fatura);
+                          handleMenuClose();
+                        }}
                         sx={{
-                          fontSize: '0.75rem',
-                          '& .MuiSelect-select': {
-                            py: 0.5,
-                          }
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#eff6ff' }
                         }}
                       >
-                        <MenuItem value="ACIK">Beklemede</MenuItem>
-                        <MenuItem value="ONAYLANDI">Onaylandı</MenuItem>
-                        <MenuItem value="IPTAL">İptal</MenuItem>
-                      </Select>
-                    </FormControl>
-                    <IconButton
-                      size="small"
-                      onClick={() => openIptalDialog(fatura)}
-                      disabled={fatura.durum === 'IPTAL'}
-                      sx={{
-                        color: fatura.durum === 'IPTAL' ? '#9ca3af' : '#ef4444',
-                        '&:hover': { bgcolor: '#fef2f2' },
-                        '&:disabled': { opacity: 0.5 }
-                      }}
-                      title="İptal Et"
-                    >
-                      <Cancel fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => openDeleteDialog(fatura)}
-                      sx={{
-                        color: '#ef4444',
-                        '&:hover': { bgcolor: '#fef2f2' }
-                      }}
-                      title="Sil"
-                      disabled={fatura.durum === 'ONAYLANDI' || fatura.durum === 'IPTAL'}
-                    >
-                      <Delete fontSize="small" />
-                    </IconButton>
+                        <Visibility fontSize="small" sx={{ color: '#3b82f6' }} />
+                        <Typography variant="body2">Görüntüle</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          router.push(`/fatura/alis/duzenle/${fatura.id}`);
+                          handleMenuClose();
+                        }}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#fffbeb' }
+                        }}
+                      >
+                        <Edit fontSize="small" sx={{ color: '#f59e0b' }} />
+                        <Typography variant="body2">Düzenle</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          router.push(`/fatura/alis/print/${fatura.id}`);
+                          handleMenuClose();
+                        }}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#ecfdf5' }
+                        }}
+                      >
+                        <Print fontSize="small" sx={{ color: '#10b981' }} />
+                        <Typography variant="body2">Yazdır</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          router.push(`/fatura/iade/alis/yeni?originalId=${fatura.id}`);
+                          handleMenuClose();
+                        }}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#ecfeff' }
+                        }}
+                      >
+                        <Undo fontSize="small" sx={{ color: '#06b6d4' }} />
+                        <Typography variant="body2">İade Oluştur</Typography>
+                      </MenuItem>
+
+                      {fatura.durum === 'ACIK' && (
+                        <MenuItem
+                          onClick={() => {
+                            handleDurumChangeRequest(fatura.id, fatura.durum, 'ONAYLANDI');
+                            handleMenuClose();
+                          }}
+                          sx={{
+                            gap: 1.5,
+                            py: 1,
+                            '&:hover': { bgcolor: '#ecfdf5' }
+                          }}
+                        >
+                          <Print fontSize="small" sx={{ color: '#10b981', display: 'none' }} /> {/* icon placeholder */}
+                          <Typography variant="body2" sx={{ color: '#10b981', fontWeight: 600 }}>Onayla</Typography>
+                        </MenuItem>
+                      )}
+
+                      {fatura.durum !== 'ACIK' && (
+                        <MenuItem
+                          onClick={() => {
+                            handleDurumChangeRequest(fatura.id, fatura.durum, 'ACIK');
+                            handleMenuClose();
+                          }}
+                          sx={{
+                            gap: 1.5,
+                            py: 1,
+                            '&:hover': { bgcolor: '#f3f4f6' }
+                          }}
+                        >
+                          <Typography variant="body2">Beklemeye Al</Typography>
+                        </MenuItem>
+                      )}
+
+                      <MenuItem
+                        onClick={() => {
+                          openIptalDialog(fatura);
+                          handleMenuClose();
+                        }}
+                        disabled={fatura.durum === 'IPTAL'}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#fef2f2' },
+                          '&.Mui-disabled': { opacity: 0.5 }
+                        }}
+                      >
+                        <Cancel fontSize="small" sx={{ color: fatura.durum === 'IPTAL' ? '#9ca3af' : '#ef4444' }} />
+                        <Typography variant="body2">İptal Et</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          openDeleteDialog(fatura);
+                          handleMenuClose();
+                        }}
+                        disabled={fatura.durum === 'ONAYLANDI' || fatura.durum === 'IPTAL'}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#fef2f2' },
+                          '&.Mui-disabled': { opacity: 0.5 }
+                        }}
+                      >
+                        <Delete fontSize="small" sx={{ color: '#ef4444' }} />
+                        <Typography variant="body2">Sil</Typography>
+                      </MenuItem>
+                    </Menu>
                   </TableCell>
                 </TableRow>
               ))
@@ -966,108 +1051,115 @@ export default function AlisFaturalariPage() {
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {selectedFatura.kalemler.map((kalem, index) => (
-                          <TableRow key={index}>
-                            <TableCell>{kalem.stok?.stokAdi || '-'}</TableCell>
-                            <TableCell>{kalem.miktar}</TableCell>
-                            <TableCell>{formatCurrency(kalem.birimFiyat)}</TableCell>
-                            <TableCell>%{kalem.kdvOrani}</TableCell>
-                            <TableCell align="right">
-                              {formatCurrency((kalem.tutar || 0) + (kalem.kdvTutar || 0))}
-                            </TableCell>
-                          </TableRow>
-                        ))}
+                        {selectedFatura.kalemler.map((kalem, index) => {
+                          // Tutar hesaplaması: (miktar * birimFiyat) + KDV
+                          const araToplam = kalem.miktar * kalem.birimFiyat;
+                          const kdvTutar = (araToplam * kalem.kdvOrani) / 100;
+                          const toplamTutar = araToplam + kdvTutar;
+                          
+                          return (
+                            <TableRow key={index}>
+                              <TableCell>{kalem.stok?.stokAdi || '-'}</TableCell>
+                              <TableCell>{kalem.miktar}</TableCell>
+                              <TableCell>{formatCurrency(kalem.birimFiyat)}</TableCell>
+                              <TableCell>%{kalem.kdvOrani}</TableCell>
+                              <TableCell align="right">
+                                {formatCurrency(toplamTutar)}
+                              </TableCell>
+                            </TableRow>
+                          );
+                        })}
                       </TableBody>
                     </Table>
                   </TableContainer>
                 </Box>
               )}
 
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f9fafb', mb: 2 }}>
-                  <Typography variant="h6" fontWeight="bold" sx={{ color: '#f59e0b' }}>
-                    Genel Toplam: {formatCurrency(selectedFatura.genelToplam)}
-                  </Typography>
-                </Paper>
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f9fafb', mb: 2 }}>
+                <Typography variant="h6" fontWeight="bold" sx={{ color: '#f59e0b' }}>
+                  Genel Toplam: {formatCurrency(selectedFatura.genelToplam)}
+                </Typography>
+              </Paper>
 
-                {/* Audit Bilgileri */}
-                <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f0f9ff' }}>
-                  <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#0369a1' }}>
-                    📋 Denetim Bilgileri
-                  </Typography>
-                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+              {/* Audit Bilgileri */}
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f0f9ff' }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600, color: '#0369a1' }}>
+                  📋 Denetim Bilgileri
+                </Typography>
+                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                  <Box sx={{ display: 'flex', gap: 2 }}>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Oluşturan:
+                      </Typography>
+                      <Typography variant="body2" fontWeight="500">
+                        {selectedFatura.createdByUser?.fullName || 'Sistem'}
+                        <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                          ({selectedFatura.createdByUser?.username || '-'})
+                        </Typography>
+                      </Typography>
+                    </Box>
+                    <Box sx={{ flex: 1 }}>
+                      <Typography variant="caption" color="text.secondary">
+                        Oluşturma Tarihi:
+                      </Typography>
+                      <Typography variant="body2" fontWeight="500">
+                        {selectedFatura.createdAt
+                          ? new Date(selectedFatura.createdAt).toLocaleString('tr-TR')
+                          : '-'}
+                      </Typography>
+                    </Box>
+                  </Box>
+
+                  {selectedFatura.updatedByUser && (
                     <Box sx={{ display: 'flex', gap: 2 }}>
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="caption" color="text.secondary">
-                          Oluşturan:
+                          Son Güncelleyen:
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {selectedFatura.createdByUser?.fullName || 'Sistem'}
+                          {selectedFatura.updatedByUser.fullName}
                           <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                            ({selectedFatura.createdByUser?.username || '-'})
+                            ({selectedFatura.updatedByUser.username})
                           </Typography>
                         </Typography>
                       </Box>
                       <Box sx={{ flex: 1 }}>
                         <Typography variant="caption" color="text.secondary">
-                          Oluşturma Tarihi:
+                          Son Güncelleme:
                         </Typography>
                         <Typography variant="body2" fontWeight="500">
-                          {selectedFatura.createdAt
-                            ? new Date(selectedFatura.createdAt).toLocaleString('tr-TR')
+                          {selectedFatura.updatedAt
+                            ? new Date(selectedFatura.updatedAt).toLocaleString('tr-TR')
                             : '-'}
                         </Typography>
                       </Box>
                     </Box>
+                  )}
 
-                    {selectedFatura.updatedByUser && (
-                      <Box sx={{ display: 'flex', gap: 2 }}>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Son Güncelleyen:
-                          </Typography>
-                          <Typography variant="body2" fontWeight="500">
-                            {selectedFatura.updatedByUser.fullName}
-                            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
-                              ({selectedFatura.updatedByUser.username})
-                            </Typography>
-                          </Typography>
-                        </Box>
-                        <Box sx={{ flex: 1 }}>
-                          <Typography variant="caption" color="text.secondary">
-                            Son Güncelleme:
-                          </Typography>
-                          <Typography variant="body2" fontWeight="500">
-                            {selectedFatura.updatedAt
-                              ? new Date(selectedFatura.updatedAt).toLocaleString('tr-TR')
-                              : '-'}
-                          </Typography>
-                        </Box>
-                      </Box>
-                    )}
-
-                    {selectedFatura.logs && selectedFatura.logs.length > 0 && (
-                      <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid #e0e0e0' }}>
-                        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
-                          Son İşlemler:
+                  {selectedFatura.logs && selectedFatura.logs.length > 0 && (
+                    <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid #e0e0e0' }}>
+                      <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                        Son İşlemler:
+                      </Typography>
+                      {selectedFatura.logs.slice(0, 3).map((log: any, index: number) => (
+                        <Typography key={index} variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                          • {new Date(log.createdAt).toLocaleString('tr-TR', {
+                            day: '2-digit',
+                            month: '2-digit',
+                            hour: '2-digit',
+                            minute: '2-digit'
+                          })} - {log.actionType}
+                          {log.user && ` (${log.user.fullName})`}
                         </Typography>
-                        {selectedFatura.logs.slice(0, 3).map((log: any, index: number) => (
-                          <Typography key={index} variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
-                            • {new Date(log.createdAt).toLocaleString('tr-TR', {
-                              day: '2-digit',
-                              month: '2-digit',
-                              hour: '2-digit',
-                              minute: '2-digit'
-                            })} - {log.actionType}
-                            {log.user && ` (${log.user.fullName})`}
-                          </Typography>
-                        ))}
-                      </Box>
-                    )}
-                  </Box>
-                </Paper>
-              </Box>
-            )}
-          </DialogContent>
+                      ))}
+                    </Box>
+                  )}
+                </Box>
+              </Paper>
+            </Box>
+          )}
+        </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenView(false)}>Kapat</Button>
         </DialogActions>

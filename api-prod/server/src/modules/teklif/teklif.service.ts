@@ -4,7 +4,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateTeklifDto } from './dto/create-teklif.dto';
 import { UpdateTeklifDto } from './dto/update-teklif.dto';
 import { TeklifTipi, TeklifDurum, Prisma, LogAction } from '@prisma/client';
@@ -13,7 +14,7 @@ import { TeklifTipi, TeklifDurum, Prisma, LogAction } from '@prisma/client';
 export class TeklifService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
   private async createLog(
@@ -91,25 +92,13 @@ export class TeklifService {
     search?: string,
     cariId?: string,
   ) {
-    const tenantId = this.tenantContext.getTenantId();
-    
-    console.log('🔍 [TeklifService.findAll] CALLED');
-    console.log('🔍 [TeklifService.findAll] tenantId:', tenantId);
-    console.log('🔍 [TeklifService.findAll] NODE_ENV:', process.env.NODE_ENV);
-
-    // Staging/development ortamında tenant ID gerekmiyor - tamamen atla
-    // Sadece production'de tenant ID zorunlu
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
 
     const where: Prisma.TeklifWhereInput = {
       deletedAt: null,
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
-
-    // Tenant ID varsa ekle (staging'de undefined gelebilir)
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
 
     if (teklifTipi) {
       where.teklifTipi = teklifTipi;
@@ -235,15 +224,12 @@ export class TeklifService {
   ) {
     const { kalemler, ...teklifData } = createTeklifDto;
 
-    const tenantId = this.tenantContext.getTenantId();
-    
-    console.log('🔍 [TeklifService.create] tenantId:', tenantId);
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
-    // Teklif numarası kontrolü (tenant-aware)
     const existingTeklif = await this.prisma.teklif.findFirst({
       where: {
         teklifNo: teklifData.teklifNo,
-        tenantId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
       },
     });
 
@@ -300,7 +286,7 @@ export class TeklifService {
       const teklif = await prisma.teklif.create({
         data: {
           ...teklifData,
-          tenantId,
+          ...(tenantId != null && { tenantId }),
           gecerlilikTarihi: teklifData.gecerlilikTarihi
             ? new Date(teklifData.gecerlilikTarihi)
             : null,

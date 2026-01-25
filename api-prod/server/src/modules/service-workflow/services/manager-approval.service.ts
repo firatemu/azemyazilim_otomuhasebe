@@ -13,7 +13,8 @@ import {
 } from '@prisma/client';
 import { PrismaService } from '../../../common/prisma.service';
 import { TenantContextService } from '../../../common/services/tenant-context.service';
-import { isStagingEnvironment } from '../../../common/utils/staging.util';
+import { TenantResolverService } from '../../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause, isStagingEnvironment } from '../../../common/utils/staging.util';
 import {
   ApprovalStatusResponse,
   ApproveWorkOrderDto,
@@ -25,27 +26,9 @@ export class ManagerApprovalService {
   constructor(
     private prisma: PrismaService,
     private tenantContext: TenantContextService,
-  ) { }
+    private tenantResolver: TenantResolverService,
+  ) {}
 
-  /**
-   * Tenant ID'yi al - staging'de opsiyonel
-   */
-  private getTenantIdOrThrow(): string | undefined {
-    const tenantId = this.tenantContext.getTenantId();
-
-    if (isStagingEnvironment()) {
-      return tenantId;
-    }
-
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-    return tenantId;
-  }
-
-  /**
-   * User ID'yi al
-   */
   private getUserIdOrThrow(): string {
     const userId = this.tenantContext.getUserId();
     if (!userId) {
@@ -61,15 +44,12 @@ export class ManagerApprovalService {
     workOrderId: string,
     tx: Prisma.TransactionClient,
   ) {
-    const tenantId = this.getTenantIdOrThrow();
-
-    const where: any = { id: workOrderId };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const workOrder = await tx.workOrder.findFirst({
-      where,
+      where: {
+        id: workOrderId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       include: {
         technicalFindings: {
           take: 1,

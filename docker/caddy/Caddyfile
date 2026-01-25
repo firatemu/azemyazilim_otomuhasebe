@@ -66,8 +66,9 @@ staging-api.otomuhasebe.com {
   @root path /
   redir @root /api/health temporary
   
-  # API routes
-  reverse_proxy backend-staging:3020
+  # API routes - Backend runs on host via PM2 on port 3020
+  # Use host.docker.internal to reach host from Docker container
+  reverse_proxy host.docker.internal:3020
 }
 
 admin-staging.otomuhasebe.com {

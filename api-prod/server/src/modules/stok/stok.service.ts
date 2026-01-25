@@ -6,7 +6,8 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateStokDto, UpdateStokDto } from './dto';
 import { CodeTemplateService } from '../code-template/code-template.service';
 import { HareketTipi } from '@prisma/client';
@@ -15,19 +16,13 @@ import { HareketTipi } from '@prisma/client';
 export class StokService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => CodeTemplateService))
     private codeTemplateService: CodeTemplateService,
   ) {}
 
   async create(dto: CreateStokDto) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-
-    // SUPER_ADMIN için tenant kontrolünü atla
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
+    const tenantId = await this.tenantResolver.resolveForCreate({ allowNull: true });
 
     // Eğer stokKodu girilmemişse otomatik üret
     let stokKodu = dto.stokKodu;
@@ -42,122 +37,42 @@ export class StokService {
       }
     }
 
-    // Check uniqueness within tenant (sadece tenantId varsa)
-    // SUPER_ADMIN için tenant kontrolünü atla
-    if (tenantId) {
-      const existing = await this.prisma.stok.findFirst({
-        where: {
-          stokKodu,
-          tenantId,
-        },
-      });
-
-      if (existing) {
-        throw new BadRequestException('Bu stok kodu zaten kullanılıyor');
-      }
-    } else if (isSuperAdmin) {
-      // SUPER_ADMIN için tenant olmadan kontrol et
-      const existing = await this.prisma.stok.findFirst({
-        where: {
-          stokKodu,
-        },
-      });
-
-      if (existing) {
-        throw new BadRequestException('Bu stok kodu zaten kullanılıyor');
-      }
-    }
-
-    // SUPER_ADMIN için dto'dan tenantId alınabilir, yoksa mevcut tenantId kullan
-    const finalTenantId = (dto as any).tenantId || tenantId || undefined;
-
-    // #region agent log
-    console.log('[DEBUG stok.service.create] Tenant bilgileri:', {
-      tenantId,
-      isSuperAdmin,
-      finalTenantId,
-      dtoTenantId: (dto as any).tenantId,
-      stokKodu,
-      stokAdi: dto.stokAdi,
+    const finalTenantId = (dto as any).tenantId ?? tenantId ?? undefined;
+    const existingWhere: any = { stokKodu };
+    if (finalTenantId) existingWhere.tenantId = finalTenantId;
+    const existing = await this.prisma.stok.findFirst({
+      where: existingWhere,
     });
-    // #endregion
+    if (existing) {
+      throw new BadRequestException('Bu stok kodu zaten kullanılıyor');
+    }
 
     try {
       const createData: any = {
         ...dto,
         stokKodu,
+        ...(finalTenantId != null && { tenantId: finalTenantId }),
       };
-
-      // Staging'de tenantId undefined olabilir, bu durumda null gönder (schema nullable ise)
-      // veya hiç gönderme (schema optional ise)
-      if (finalTenantId !== undefined) {
-        createData.tenantId = finalTenantId;
-      }
-
-      // #region agent log
-      console.log('[DEBUG stok.service.create] Prisma create data:', {
-        ...createData,
-        aciklama: createData.aciklama?.substring(0, 50), // Truncate for logging
-      });
-      // #endregion
-
       return await this.prisma.stok.create({
         data: createData,
       });
     } catch (error: any) {
-      // #region agent log
-      console.error('[DEBUG stok.service.create] ERROR caught:', {
-        message: error?.message,
-        code: error?.code,
-        meta: error?.meta,
-        name: error?.name,
-        stack: error?.stack?.split('\n').slice(0, 5).join('\n'), // First 5 lines of stack
-      });
-      // #endregion
-
-      console.error('❌ [Stok Service] create hatası:', error);
-      console.error('❌ [Stok Service] Hata detayları:', {
-        message: error?.message,
-        code: error?.code,
-        meta: error?.meta,
-        stack: error?.stack,
-      });
-
-      // Prisma error'ları için daha açıklayıcı mesaj
       if (error?.code === 'P2002') {
-        // Unique constraint violation
         const field = error?.meta?.target?.[0] || 'alan';
         throw new BadRequestException(`${field} zaten kullanılıyor`);
       }
-
       throw new BadRequestException(
-        error?.message || 'Stok kaydedilirken hata oluştu'
+        error?.message || 'Stok kaydedilirken hata oluştu',
       );
     }
   }
 
   async findAll(page = 1, limit = 50, search?: string) {
-    console.log('🔍 [Stok Service] findAll başlatıldı', { page, limit, search });
-
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-
-    console.log('🔍 [Stok Service] Tenant bilgileri', { tenantId, isSuperAdmin });
-
-    // SUPER_ADMIN için tenant kontrolünü atla
-    if (!tenantId && !isSuperAdmin) {
-      console.log('❌ [Stok Service] Tenant ID gerekli ama yok');
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
-
-    const where: any = {};
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const where: any = {
+      ...buildTenantWhereClause(tenantId ?? undefined),
+    };
     if (search) {
       where.OR = [
         { stokKodu: { contains: search, mode: 'insensitive' as const } },

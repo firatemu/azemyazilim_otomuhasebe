@@ -11,6 +11,10 @@ export class CreateWarehouseDto {
 
   @IsBoolean()
   @IsOptional()
+  isDefault?: boolean; // Varsayılan ambar mı?
+
+  @IsBoolean()
+  @IsOptional()
   active?: boolean;
 
   @IsString()

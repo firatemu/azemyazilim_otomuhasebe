@@ -1,0 +1,297 @@
+/* Malzeme Form Dialog - Modern Tasarım */
+
+.dialogContainer {
+  background: white;
+  border-radius: 12px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+}
+
+.dialogHeader {
+  background: linear-gradient(135deg, #191970 0%, #2c3e50 100%);
+  color: white;
+  padding: 24px 32px;
+  border-radius: 12px 12px 0 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(25, 25, 112, 0.3);
+}
+
+.dialogHeader h2 {
+  margin: 0;
+  font-size: 1.5rem;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.dialogContent {
+  padding: 32px;
+  background: #fafafa;
+  max-height: 75vh;
+  overflow-y: auto;
+}
+
+.sectionContainer {
+  background: white;
+  border-radius: 8px;
+  padding: 24px;
+  margin-bottom: 24px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+  border: 1px solid #e0e0e0;
+  transition: all 0.3s ease;
+}
+
+.sectionContainer:hover {
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  border-color: #191970;
+}
+
+.sectionTitle {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: #191970;
+  margin-bottom: 20px;
+  padding-bottom: 12px;
+  border-bottom: 2px solid #e0e0e0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.sectionTitle::before {
+  content: '';
+  width: 4px;
+  height: 24px;
+  background: linear-gradient(135deg, #191970 0%, #2c3e50 100%);
+  border-radius: 2px;
+  display: inline-block;
+}
+
+.formGrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 20px;
+}
+
+.formField {
+  position: relative;
+}
+
+.formField label {
+  font-weight: 500;
+  color: #333;
+  margin-bottom: 8px;
+  display: block;
+  font-size: 0.875rem;
+}
+
+.formField input,
+.formField select {
+  width: 100%;
+  padding: 12px 16px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  transition: all 0.3s ease;
+  background: white;
+}
+
+.formField input:focus,
+.formField select:focus {
+  outline: none;
+  border-color: #191970;
+  box-shadow: 0 0 0 3px rgba(25, 25, 112, 0.1);
+}
+
+.formField input:hover,
+.formField select:hover {
+  border-color: #b0b0b0;
+}
+
+.helperText {
+  font-size: 0.75rem;
+  color: #666;
+  margin-top: 6px;
+  display: block;
+}
+
+.divider {
+  margin: 32px 0;
+  border: none;
+  border-top: 2px solid #e0e0e0;
+}
+
+.priceSection {
+  background: linear-gradient(135deg, #f0f4ff 0%, #e8f0fe 100%);
+  border-radius: 8px;
+  padding: 20px;
+  margin-top: 16px;
+  border: 1px solid #c5d9f0;
+}
+
+.priceInfo {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.95rem;
+}
+
+.priceInfo strong {
+  color: #191970;
+  font-weight: 600;
+}
+
+.priceValue {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #2c3e50;
+}
+
+.dialogActions {
+  padding: 20px 32px;
+  background: #f5f5f5;
+  border-top: 1px solid #e0e0e0;
+  display: flex;
+  justify-content: flex-end;
+  gap: 12px;
+  border-radius: 0 0 12px 12px;
+}
+
+.btnCancel {
+  padding: 12px 24px;
+  border: 2px solid #e0e0e0;
+  border-radius: 8px;
+  background: white;
+  color: #666;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+}
+
+.btnCancel:hover {
+  background: #f5f5f5;
+  border-color: #b0b0b0;
+  color: #333;
+}
+
+.btnSubmit {
+  padding: 12px 32px;
+  border: none;
+  border-radius: 8px;
+  background: linear-gradient(135deg, #191970 0%, #2c3e50 100%);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  font-size: 0.95rem;
+  box-shadow: 0 4px 12px rgba(25, 25, 112, 0.3);
+}
+
+.btnSubmit:hover:not(:disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 16px rgba(25, 25, 112, 0.4);
+}
+
+.btnSubmit:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.requiredField {
+  color: #d32f2f;
+}
+
+.fieldGroup {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.errorMessage {
+  color: #d32f2f;
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+
+.successMessage {
+  color: #2e7d32;
+  font-size: 0.75rem;
+  margin-top: 4px;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .dialogContent {
+    padding: 20px;
+  }
+
+  .sectionContainer {
+    padding: 16px;
+  }
+
+  .formGrid {
+    grid-template-columns: 1fr;
+    gap: 16px;
+  }
+
+  .dialogHeader {
+    padding: 20px 24px;
+  }
+
+  .dialogHeader h2 {
+    font-size: 1.25rem;
+  }
+
+  .dialogActions {
+    padding: 16px 20px;
+    flex-direction: column;
+  }
+
+  .btnCancel,
+  .btnSubmit {
+    width: 100%;
+  }
+}
+
+/* Scrollbar Styling */
+.dialogContent::-webkit-scrollbar {
+  width: 8px;
+}
+
+.dialogContent::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 4px;
+}
+
+.dialogContent::-webkit-scrollbar-thumb {
+  background: #191970;
+  border-radius: 4px;
+}
+
+.dialogContent::-webkit-scrollbar-thumb:hover {
+  background: #0f0f40;
+}
+
+/* Animation */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.sectionContainer {
+  animation: slideIn 0.3s ease-out;
+}
+
+/* Focus States */
+.formField input:focus-visible,
+.formField select:focus-visible {
+  outline: 2px solid #191970;
+  outline-offset: 2px;
+}

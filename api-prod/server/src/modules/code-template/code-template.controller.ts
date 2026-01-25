@@ -13,11 +13,11 @@ import { CodeTemplateService } from './code-template.service';
 import { CreateCodeTemplateDto } from './dto/create-code-template.dto';
 import { UpdateCodeTemplateDto } from './dto/update-code-template.dto';
 import { GetNextCodeDto } from './dto/get-next-code.dto';
-import { AuthGuard } from '@nestjs/passport';
+import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { ModuleType } from '@prisma/client';
 
 @Controller('code-template')
-@UseGuards(AuthGuard('jwt'))
+@UseGuards(JwtAuthGuard)
 export class CodeTemplateController {
   constructor(private readonly codeTemplateService: CodeTemplateService) {}
 

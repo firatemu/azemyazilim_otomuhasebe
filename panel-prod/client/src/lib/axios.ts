@@ -57,6 +57,10 @@ const TENANT_HEADER_NAME = 'x-tenant-id';
 axiosInstance.interceptors.request.use(
   (config) => {
     if (typeof window !== 'undefined') {
+      // #region agent log
+      // Debug logging removed - was causing CORS errors in production
+      // fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'panel-stage/client/src/lib/axios.ts:58',message:'Axios request interceptor',data:{url:config.url,fullURL:config.baseURL + config.url,method:config.method},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+      // #endregion
       const token = safeLocalStorage.getItem('accessToken');
       if (token) {
         config.headers = config.headers || {};
@@ -68,29 +72,15 @@ axiosInstance.interceptors.request.use(
       const isAuthEndpoint = config.url?.includes('/auth/login') || config.url?.includes('/auth/refresh');
 
       if (!isAuthEndpoint) {
-        // Staging/development ortamı kontrolü
-        const hostname = window.location.hostname.toLowerCase();
-        const href = window.location.href.toLowerCase();
-        const isStagingOrDev =
-          hostname.includes('staging') ||
-          hostname.includes('localhost') ||
-          hostname.includes('127.0.0.1') ||
-          href.includes('staging') ||
-          process.env.NODE_ENV === 'development';
+        // Sadece production ortamında değil, her zaman tenant ID header'ı ekle
+        const tenantIdToUse = safeLocalStorage.getItem('tenantId');
 
-        // STAGING ORTAMINDA: Tenant ID header'ı EKLEME (backend otomatik handle ediyor)
-        if (!isStagingOrDev) {
-          // Sadece production ortamında tenant ID header'ı ekle
-          const tenantIdToUse = safeLocalStorage.getItem('tenantId');
-
-          if (tenantIdToUse) {
-            if (!config.headers) {
-              config.headers = {} as any;
-            }
-            (config.headers as any)[TENANT_HEADER_NAME] = tenantIdToUse;
+        if (tenantIdToUse) {
+          if (!config.headers) {
+            config.headers = {} as any;
           }
+          (config.headers as any)[TENANT_HEADER_NAME] = tenantIdToUse;
         }
-        // Staging'de tenant ID header'ı göndermiyoruz - backend otomatik handle ediyor
       }
     }
     return config;
@@ -143,28 +133,16 @@ axiosInstance.interceptors.response.use(
             withCredentials: true, // CORS with credentials
           });
 
-          // Staging ortamı için default tenant ID ekle (refresh için de gerekli)
-          const isStagingOrDev =
-            window.location.hostname.includes('staging') ||
-            window.location.hostname.includes('localhost') ||
-            window.location.hostname.includes('127.0.0.1') ||
-            baseURL.includes('staging') ||
-            baseURL.includes('localhost') ||
-            process.env.NODE_ENV === 'development';
-
+          // Sadece production ortamında değil, her zaman tenant ID header'ı ekle
+          const tenantId = safeLocalStorage.getItem('tenantId');
           const refreshHeaders: any = {
             Authorization: `Bearer ${refreshToken}`,
           };
 
-          // STAGING ORTAMINDA: Tenant ID header'ı EKLEME (backend otomatik handle ediyor)
-          // Sadece production ortamında tenant ID header'ı ekle
-          if (!isStagingOrDev) {
-            const tenantId = safeLocalStorage.getItem('tenantId');
-            if (tenantId) {
-              refreshHeaders[TENANT_HEADER_NAME] = tenantId;
-            }
+          // Tenant ID varsa header'a ekle (tüm ortamlar için)
+          if (tenantId) {
+            refreshHeaders[TENANT_HEADER_NAME] = tenantId;
           }
-          // Staging'de tenant ID header'ı göndermiyoruz - backend otomatik handle ediyor
 
           try {
             const response = await refreshAxios.post(

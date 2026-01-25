@@ -43,7 +43,7 @@ function PaymentPageContent() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<'credit_card' | 'bank_transfer'>('credit_card');
   const [showBankDetails, setShowBankDetails] = useState(false);
-  
+
   const planName = searchParams.get('plan') || 'PROFESSIONAL';
   const billingType = searchParams.get('type') || 'annual'; // annual (1 yıllık)
   const plan = plans[planName] || plans.PROFESSIONAL;
@@ -80,7 +80,7 @@ function PaymentPageContent() {
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'https://api.otomuhasebe.com';
       const accessToken = localStorage.getItem('accessToken');
-      
+
       if (!accessToken) {
         throw new Error('Oturum süreniz dolmuş. Lütfen tekrar giriş yapın.');
       }
@@ -98,7 +98,7 @@ function PaymentPageContent() {
         // Response'u güvenli şekilde parse et
         let data: any = {};
         const responseText = await response.text();
-        
+
         if (responseText) {
           try {
             data = JSON.parse(responseText);
@@ -123,7 +123,7 @@ function PaymentPageContent() {
 
         // Başarılı - başvuru mesajı göster
         setShowSuccessModal(true);
-        
+
         // 3 saniye sonra panel'e yönlendir
         setTimeout(() => {
           window.location.href = 'https://panel.otomuhasebe.com';
@@ -137,7 +137,7 @@ function PaymentPageContent() {
             'Content-Type': 'application/json',
           },
         });
-        
+
         // Unauthorized hatası durumunda login sayfasına yönlendir
         if (currentSubResponse.status === 401 || currentSubResponse.status === 403) {
           localStorage.removeItem('accessToken');
@@ -161,7 +161,7 @@ function PaymentPageContent() {
               currentSub = {};
             }
           }
-          
+
           // Eğer deneme aboneliği varsa yükselt
           if (currentSub && currentSub.status === 'TRIAL') {
             response = await fetch(`${apiUrl}/api/subscriptions/upgrade`, {
@@ -211,7 +211,7 @@ function PaymentPageContent() {
         // Response'u güvenli şekilde parse et
         let data: any = {};
         const responseText = await response.text();
-        
+
         if (responseText) {
           try {
             data = JSON.parse(responseText);
@@ -318,7 +318,7 @@ function PaymentPageContent() {
             />
           ))}
         </div>
-        
+
         <div className="container mx-auto px-4 text-center relative z-10">
           <Link href="/" className="inline-block mb-4 group">
             <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-white to-blue-100 bg-clip-text text-transparent group-hover:scale-105 transition-transform duration-300">
@@ -333,7 +333,7 @@ function PaymentPageContent() {
             {isTrial ? 'Deneme Sürümünü Başlat' : 'Ödeme'}
           </h2>
           <p className="text-xl md:text-2xl text-blue-100 max-w-2xl mx-auto animate-slide-up-delay">
-            {isTrial 
+            {isTrial
               ? '14 gün ücretsiz deneme sürümünü başlatın'
               : 'Paket seçiminizi tamamlayın'
             }
@@ -344,363 +344,344 @@ function PaymentPageContent() {
       <div className="relative z-10 py-12 px-4">
         <div className="max-w-4xl mx-auto">
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Paket Özeti */}
-          <div className="lg:col-span-2">
-            <div className="bg-white rounded-xl shadow-xl p-8 mb-6 border border-gray-100">
-              <h3 className="text-xl font-bold text-gray-900 mb-6">Seçilen Paket</h3>
-              
-              <div className="border-2 border-blue-600 rounded-lg p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h4 className="text-2xl font-bold text-gray-900">{plan.name}</h4>
-                  {planName === 'PROFESSIONAL' && (
-                    <span className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full">
-                      En Popüler
-                    </span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Paket Özeti */}
+            <div className="lg:col-span-2">
+              <div className="bg-white rounded-xl shadow-xl p-8 mb-6 border border-gray-100">
+                <h3 className="text-xl font-bold text-gray-900 mb-6">Seçilen Paket</h3>
+
+                <div className="border-2 border-blue-600 rounded-lg p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <h4 className="text-2xl font-bold text-gray-900">{plan.name}</h4>
+                    {planName === 'PROFESSIONAL' && (
+                      <span className="bg-blue-600 text-white text-sm px-3 py-1 rounded-full">
+                        En Popüler
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="mb-6">
+                    {isTrial ? (
+                      <div className="text-3xl font-bold text-green-600">14 Gün Ücretsiz</div>
+                    ) : (
+                      <>
+                        <div className="flex items-baseline gap-2">
+                          <span className="text-4xl font-bold text-gray-900">
+                            {plan.annualPrice}
+                          </span>
+                          {plan.annualPrice !== 'Özel Fiyat' && (
+                            <span className="text-gray-600">/yıl</span>
+                          )}
+                        </div>
+                        {plan.annualPrice !== 'Özel Fiyat' && (
+                          <div className="mt-2 text-sm text-gray-500">
+                            1 kullanıcı için
+                          </div>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  <ul className="space-y-3">
+                    {plan.features.map((feature, idx) => (
+                      <li key={idx} className="flex items-center gap-2">
+                        <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
+                        <span className="text-gray-700">{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+
+                {/* Ek Kullanıcı ve Modüller */}
+                {!isTrial && (
+                  <div className="mt-6 border-t pt-6">
+                    <h4 className="text-lg font-semibold text-gray-900 mb-4">Eklentiler</h4>
+
+                    {/* Ek Kullanıcı */}
+                    <div className="bg-gray-50 rounded-lg p-4 mb-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <h5 className="font-semibold text-gray-900">Ek Kullanıcı</h5>
+                          <p className="text-sm text-gray-600">Her ek kullanıcı için yıllık</p>
+                        </div>
+                        <div className="text-right">
+                          <div className="text-lg font-bold text-gray-900">₺{additionalUserPrice.toLocaleString('tr-TR')}</div>
+                          <div className="text-xs text-gray-500">/kullanıcı/yıl</div>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-3">
+                        <button
+                          onClick={() => setAdditionalUsers(Math.max(0, additionalUsers - 1))}
+                          disabled={additionalUsers === 0}
+                          className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-600"
+                        >
+                          -
+                        </button>
+                        <span className="text-lg font-semibold w-12 text-center">{additionalUsers}</span>
+                        <button
+                          onClick={() => setAdditionalUsers(additionalUsers + 1)}
+                          className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-blue-600"
+                        >
+                          +
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Ödeme Bilgileri - Sadece deneme değilse */}
+              {!isTrial && (
+                <div className="bg-white rounded-lg shadow-xl p-8">
+                  <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
+                    <CreditCard className="w-6 h-6 text-blue-600" />
+                    Ödeme Yöntemi
+                  </h3>
+
+                  {/* Ödeme Yöntemi Seçimi */}
+                  <div className="grid grid-cols-2 gap-4 mb-6">
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('credit_card');
+                        setShowBankDetails(false);
+                      }}
+                      className={`p-4 rounded-lg border-2 transition-all ${paymentMethod === 'credit_card'
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <CreditCard className={`w-6 h-6 ${paymentMethod === 'credit_card' ? 'text-blue-600' : 'text-gray-400'}`} />
+                        <div className="text-left">
+                          <div className={`font-semibold ${paymentMethod === 'credit_card' ? 'text-blue-600' : 'text-gray-700'}`}>
+                            Kredi Kartı
+                          </div>
+                          <div className="text-xs text-gray-500">Güvenli ödeme</div>
+                        </div>
+                      </div>
+                    </button>
+
+                    <button
+                      onClick={() => {
+                        setPaymentMethod('bank_transfer');
+                        setShowBankDetails(true);
+                      }}
+                      className={`p-4 rounded-lg border-2 transition-all ${paymentMethod === 'bank_transfer'
+                          ? 'border-blue-600 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300'
+                        }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Building2 className={`w-6 h-6 ${paymentMethod === 'bank_transfer' ? 'text-blue-600' : 'text-gray-400'}`} />
+                        <div className="text-left">
+                          <div className={`font-semibold ${paymentMethod === 'bank_transfer' ? 'text-blue-600' : 'text-gray-700'}`}>
+                            Banka Havalesi
+                          </div>
+                          <div className="text-xs text-gray-500">Manuel onay</div>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+
+                  {/* Banka Havalesi Bilgileri */}
+                  {paymentMethod === 'bank_transfer' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-4">
+                      <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+                        <Banknote className="w-5 h-5 text-blue-600" />
+                        Banka Hesap Bilgileri
+                      </h4>
+                      <div className="space-y-2 text-sm">
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Banka:</span>
+                          <span className="font-semibold">Ziraat Bankası</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Hesap Adı:</span>
+                          <span className="font-semibold">Azem Yazılım Ltd. Şti.</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">IBAN:</span>
+                          <span className="font-semibold font-mono">TR00 0000 0000 0000 0000 0000 00</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Şube:</span>
+                          <span className="font-semibold">000</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-gray-600">Hesap No:</span>
+                          <span className="font-semibold">0000000000</span>
+                        </div>
+                      </div>
+                      <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+                        <p className="text-xs text-yellow-800">
+                          ⚠️ <strong>Önemli:</strong> Havale yaptıktan sonra aboneliğiniz admin onayı bekleyecektir.
+                          Ödeme kontrol edildikten sonra hesabınız aktif hale gelecektir.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Kredi Kartı Bilgisi */}
+                  {paymentMethod === 'credit_card' && (
+                    <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+                      <p className="text-sm text-blue-800">
+                        💳 <strong>Güvenli Ödeme:</strong> Kredi kartı ile ödeme iyzico üzerinden güvenli şekilde işlenir.
+                      </p>
+                    </div>
                   )}
                 </div>
-                
-                <div className="mb-6">
-                  {isTrial ? (
-                    <div className="text-3xl font-bold text-green-600">14 Gün Ücretsiz</div>
+              )}
+            </div>
+
+            {/* Özet ve Ödeme */}
+            <div className="lg:col-span-1">
+              <div className="bg-white rounded-lg shadow-xl p-6 sticky top-4">
+                <h3 className="text-lg font-bold text-gray-900 mb-4">Özet</h3>
+
+                <div className="space-y-3 mb-6">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Paket</span>
+                    <span className="font-semibold">{plan.name}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Faturalama</span>
+                    <span className="font-semibold">
+                      {isTrial ? 'Deneme' : 'Yıllık'}
+                    </span>
+                  </div>
+                  {!isTrial && additionalUsers > 0 && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Ek Kullanıcı ({additionalUsers})</span>
+                      <span className="font-semibold">
+                        ₺{(additionalUserPrice * additionalUsers).toLocaleString('tr-TR')}
+                      </span>
+                    </div>
+                  )}
+                  <div className="border-t pt-3">
+                    <div className="flex justify-between items-center">
+                      <span className="text-lg font-bold text-gray-900">Toplam</span>
+                      <span className="text-2xl font-bold text-blue-600">
+                        {isTrial ? 'Ücretsiz' : (() => {
+                          if (plan.annualPrice === 'Özel Fiyat') return 'Özel Fiyat';
+                          const basePrice = parseInt(plan.annualPrice.replace(/[^\d]/g, ''));
+                          const total = basePrice + (additionalUsers * additionalUserPrice);
+                          return `₺${total.toLocaleString('tr-TR')}`;
+                        })()}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                    <p className="text-sm text-red-600 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4" />
+                      {error}
+                    </p>
+                  </div>
+                )}
+
+                <button
+                  onClick={handlePayment}
+                  disabled={loading}
+                  className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${isTrial
+                      ? 'bg-green-600 text-white hover:bg-green-700'
+                      : 'bg-blue-600 text-white hover:bg-blue-700'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                >
+                  {loading ? (
+                    <>
+                      <Loader className="w-5 h-5 animate-spin" />
+                      İşleniyor...
+                    </>
+                  ) : isTrial ? (
+                    <>
+                      <Calendar className="w-5 h-5" />
+                      Denemeyi Başlat
+                    </>
                   ) : (
                     <>
-                      <div className="flex items-baseline gap-2">
-                        <span className="text-4xl font-bold text-gray-900">
-                          {plan.annualPrice}
-                        </span>
-                        {plan.annualPrice !== 'Özel Fiyat' && (
-                          <span className="text-gray-600">/yıl</span>
-                        )}
-                      </div>
-                      {plan.annualPrice !== 'Özel Fiyat' && (
-                        <div className="mt-2 text-sm text-gray-500">
-                          1 kullanıcı için
-                        </div>
-                      )}
+                      <CreditCard className="w-5 h-5" />
+                      Ödemeyi Tamamla
                     </>
                   )}
-                </div>
+                </button>
 
-                <ul className="space-y-3">
-                  {plan.features.map((feature, idx) => (
-                    <li key={idx} className="flex items-center gap-2">
-                      <Check className="w-5 h-5 text-green-500 flex-shrink-0" />
-                      <span className="text-gray-700">{feature}</span>
-                    </li>
-                  ))}
-                </ul>
+                <Link
+                  href="/fiyatlandirma"
+                  className="block text-center text-sm text-gray-600 hover:text-gray-900 mt-4"
+                >
+                  Paketi Değiştir
+                </Link>
+
+                {isTrial && (
+                  <div className="mt-6 pt-6 border-t">
+                    <p className="text-xs text-gray-500 text-center">
+                      Deneme süresi sonunda otomatik olarak iptal edilir.
+                      İstediğiniz zaman paket satın alabilirsiniz.
+                    </p>
+                  </div>
+                )}
               </div>
+            </div>
+          </div>
+        </div>
 
-              {/* Ek Kullanıcı ve Modüller */}
-              {!isTrial && (
-                <div className="mt-6 border-t pt-6">
-                  <h4 className="text-lg font-semibold text-gray-900 mb-4">Eklentiler</h4>
-                  
-                  {/* Ek Kullanıcı */}
-                  <div className="bg-gray-50 rounded-lg p-4 mb-4">
-                    <div className="flex items-center justify-between mb-3">
-                      <div>
-                        <h5 className="font-semibold text-gray-900">Ek Kullanıcı</h5>
-                        <p className="text-sm text-gray-600">Her ek kullanıcı için yıllık</p>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-lg font-bold text-gray-900">₺{additionalUserPrice.toLocaleString('tr-TR')}</div>
-                        <div className="text-xs text-gray-500">/kullanıcı/yıl</div>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <button
-                        onClick={() => setAdditionalUsers(Math.max(0, additionalUsers - 1))}
-                        disabled={additionalUsers === 0}
-                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center disabled:opacity-50 disabled:cursor-not-allowed hover:border-blue-600"
-                      >
-                        -
-                      </button>
-                      <span className="text-lg font-semibold w-12 text-center">{additionalUsers}</span>
-                      <button
-                        onClick={() => setAdditionalUsers(additionalUsers + 1)}
-                        className="w-8 h-8 rounded-full border-2 border-gray-300 flex items-center justify-center hover:border-blue-600"
-                      >
-                        +
-                      </button>
-                    </div>
+        {/* Başvuru Başarılı Modal */}
+        {showSuccessModal && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full mx-4">
+              <div className="text-center">
+                <div className="flex justify-center mb-4">
+                  <div className="rounded-full bg-green-100 p-3">
+                    <CheckCircle className="w-12 h-12 text-green-600" />
                   </div>
                 </div>
-              )}
-            </div>
-
-            {/* Ödeme Bilgileri - Sadece deneme değilse */}
-            {!isTrial && (
-              <div className="bg-white rounded-lg shadow-xl p-8">
-                <h3 className="text-xl font-bold text-gray-900 mb-6 flex items-center gap-2">
-                  <CreditCard className="w-6 h-6 text-blue-600" />
-                  Ödeme Yöntemi
+                <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                  {paymentMethod === 'bank_transfer' ? 'Abonelik Talebiniz Alındı!' : 'Başvurunuz Alındı!'}
                 </h3>
-                
-                {/* Ödeme Yöntemi Seçimi */}
-                <div className="grid grid-cols-2 gap-4 mb-6">
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('credit_card');
-                      setShowBankDetails(false);
-                    }}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      paymentMethod === 'credit_card'
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <CreditCard className={`w-6 h-6 ${paymentMethod === 'credit_card' ? 'text-blue-600' : 'text-gray-400'}`} />
-                      <div className="text-left">
-                        <div className={`font-semibold ${paymentMethod === 'credit_card' ? 'text-blue-600' : 'text-gray-700'}`}>
-                          Kredi Kartı
-                        </div>
-                        <div className="text-xs text-gray-500">Güvenli ödeme</div>
-                      </div>
-                    </div>
-                  </button>
-                  
-                  <button
-                    onClick={() => {
-                      setPaymentMethod('bank_transfer');
-                      setShowBankDetails(true);
-                    }}
-                    className={`p-4 rounded-lg border-2 transition-all ${
-                      paymentMethod === 'bank_transfer'
-                        ? 'border-blue-600 bg-blue-50'
-                        : 'border-gray-200 hover:border-gray-300'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <Building2 className={`w-6 h-6 ${paymentMethod === 'bank_transfer' ? 'text-blue-600' : 'text-gray-400'}`} />
-                      <div className="text-left">
-                        <div className={`font-semibold ${paymentMethod === 'bank_transfer' ? 'text-blue-600' : 'text-gray-700'}`}>
-                          Banka Havalesi
-                        </div>
-                        <div className="text-xs text-gray-500">Manuel onay</div>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-
-                {/* Banka Havalesi Bilgileri */}
-                {paymentMethod === 'bank_transfer' && (
-                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-4">
-                    <h4 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
-                      <Banknote className="w-5 h-5 text-blue-600" />
-                      Banka Hesap Bilgileri
-                    </h4>
-                    <div className="space-y-2 text-sm">
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Banka:</span>
-                        <span className="font-semibold">Ziraat Bankası</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Hesap Adı:</span>
-                        <span className="font-semibold">Azem Yazılım Ltd. Şti.</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">IBAN:</span>
-                        <span className="font-semibold font-mono">TR00 0000 0000 0000 0000 0000 00</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Şube:</span>
-                        <span className="font-semibold">000</span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Hesap No:</span>
-                        <span className="font-semibold">0000000000</span>
-                      </div>
-                    </div>
-                    <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
-                      <p className="text-xs text-yellow-800">
-                        ⚠️ <strong>Önemli:</strong> Havale yaptıktan sonra aboneliğiniz admin onayı bekleyecektir. 
-                        Ödeme kontrol edildikten sonra hesabınız aktif hale gelecektir.
+                <p className="text-gray-600 mb-6">
+                  {paymentMethod === 'bank_transfer'
+                    ? 'Banka havalesi ile ödeme seçtiniz. Ödeme kontrol edildikten sonra hesabınız aktif hale gelecektir. Lütfen yukarıdaki banka bilgileri ile havale yapın.'
+                    : 'Başvurunuz alınmıştır. En kısa sürede demo hesabınız aktifleşecektir.'
+                  }
                 </p>
+                {paymentMethod === 'bank_transfer' && (
+                  <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-left">
+                    <h4 className="font-semibold text-gray-900 mb-2">Banka Bilgileri:</h4>
+                    <div className="text-sm space-y-1">
+                      <div><span className="text-gray-600">Banka:</span> <span className="font-semibold">Ziraat Bankası</span></div>
+                      <div><span className="text-gray-600">IBAN:</span> <span className="font-semibold font-mono">TR00 0000 0000 0000 0000 0000 00</span></div>
+                      <div><span className="text-gray-600">Hesap Adı:</span> <span className="font-semibold">Azem Yazılım Ltd. Şti.</span></div>
                     </div>
                   </div>
                 )}
-
-                {/* Kredi Kartı Bilgisi */}
-                {paymentMethod === 'credit_card' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-                  <p className="text-sm text-blue-800">
-                      💳 <strong>Güvenli Ödeme:</strong> Kredi kartı ile ödeme iyzico üzerinden güvenli şekilde işlenir.
-                  </p>
-                </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Özet ve Ödeme */}
-          <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-xl p-6 sticky top-4">
-              <h3 className="text-lg font-bold text-gray-900 mb-4">Özet</h3>
-              
-              <div className="space-y-3 mb-6">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Paket</span>
-                  <span className="font-semibold">{plan.name}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Faturalama</span>
-                  <span className="font-semibold">
-                    {isTrial ? 'Deneme' : 'Yıllık'}
-                  </span>
-                </div>
-                {!isTrial && additionalUsers > 0 && (
-                  <div className="flex justify-between">
-                    <span className="text-gray-600">Ek Kullanıcı ({additionalUsers})</span>
-                    <span className="font-semibold">
-                      ₺{(additionalUserPrice * additionalUsers).toLocaleString('tr-TR')}
-                    </span>
-                  </div>
-                )}
-                <div className="border-t pt-3">
-                  <div className="flex justify-between items-center">
-                    <span className="text-lg font-bold text-gray-900">Toplam</span>
-                    <span className="text-2xl font-bold text-blue-600">
-                      {isTrial ? 'Ücretsiz' : (() => {
-                        if (plan.annualPrice === 'Özel Fiyat') return 'Özel Fiyat';
-                        const basePrice = parseInt(plan.annualPrice.replace(/[^\d]/g, ''));
-                        const total = basePrice + (additionalUsers * additionalUserPrice);
-                        return `₺${total.toLocaleString('tr-TR')}`;
-                      })()}
-                    </span>
-                  </div>
+                <div className="flex justify-center">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                  <span className="ml-2 text-sm text-gray-500">Yönlendiriliyor...</span>
                 </div>
               </div>
-
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
-                  <p className="text-sm text-red-600 flex items-center gap-2">
-                    <AlertCircle className="w-4 h-4" />
-                    {error}
-                  </p>
-                </div>
-              )}
-
-              <button
-                onClick={handlePayment}
-                disabled={loading}
-                className={`w-full py-3 rounded-lg font-semibold transition-colors flex items-center justify-center gap-2 ${
-                  isTrial
-                    ? 'bg-green-600 text-white hover:bg-green-700'
-                    : 'bg-blue-600 text-white hover:bg-blue-700'
-                } disabled:opacity-50 disabled:cursor-not-allowed`}
-              >
-                {loading ? (
-                  <>
-                    <Loader className="w-5 h-5 animate-spin" />
-                    İşleniyor...
-                  </>
-                ) : isTrial ? (
-                  <>
-                    <Calendar className="w-5 h-5" />
-                    Denemeyi Başlat
-                  </>
-                ) : (
-                  <>
-                    <CreditCard className="w-5 h-5" />
-                    Ödemeyi Tamamla
-                  </>
-                )}
-              </button>
-
-              <Link
-                href="/fiyatlandirma"
-                className="block text-center text-sm text-gray-600 hover:text-gray-900 mt-4"
-              >
-                Paketi Değiştir
-              </Link>
-
-              {isTrial && (
-                <div className="mt-6 pt-6 border-t">
-                  <p className="text-xs text-gray-500 text-center">
-                    Deneme süresi sonunda otomatik olarak iptal edilir. 
-                    İstediğiniz zaman paket satın alabilirsiniz.
-                  </p>
-                </div>
-              )}
             </div>
           </div>
-        </div>
+        )}
+
+
       </div>
-
-      {/* Başvuru Başarılı Modal */}
-      {showSuccessModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-2xl p-8 max-w-md w-full mx-4">
-            <div className="text-center">
-              <div className="flex justify-center mb-4">
-                <div className="rounded-full bg-green-100 p-3">
-                  <CheckCircle className="w-12 h-12 text-green-600" />
-                </div>
-              </div>
-              <h3 className="text-2xl font-bold text-gray-900 mb-4">
-                {paymentMethod === 'bank_transfer' ? 'Abonelik Talebiniz Alındı!' : 'Başvurunuz Alındı!'}
-              </h3>
-              <p className="text-gray-600 mb-6">
-                {paymentMethod === 'bank_transfer' 
-                  ? 'Banka havalesi ile ödeme seçtiniz. Ödeme kontrol edildikten sonra hesabınız aktif hale gelecektir. Lütfen yukarıdaki banka bilgileri ile havale yapın.'
-                  : 'Başvurunuz alınmıştır. En kısa sürede demo hesabınız aktifleşecektir.'
-                }
-              </p>
-              {paymentMethod === 'bank_transfer' && (
-                <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4 text-left">
-                  <h4 className="font-semibold text-gray-900 mb-2">Banka Bilgileri:</h4>
-                  <div className="text-sm space-y-1">
-                    <div><span className="text-gray-600">Banka:</span> <span className="font-semibold">Ziraat Bankası</span></div>
-                    <div><span className="text-gray-600">IBAN:</span> <span className="font-semibold font-mono">TR00 0000 0000 0000 0000 0000 00</span></div>
-                    <div><span className="text-gray-600">Hesap Adı:</span> <span className="font-semibold">Azem Yazılım Ltd. Şti.</span></div>
-                  </div>
-                </div>
-              )}
-              <div className="flex justify-center">
-                <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
-                <span className="ml-2 text-sm text-gray-500">Yönlendiriliyor...</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      <style jsx global>{`
-        .animate-float {
-          animation: float 6s ease-in-out infinite;
-        }
-        
-        .animate-fade-in {
-          animation: fade-in 1s ease-out;
-        }
-        
-        .animate-slide-up {
-          animation: slide-up 1s ease-out;
-        }
-        
-        .animate-slide-up-delay {
-          animation: slide-up 1s ease-out 0.2s both;
-        }
-      `}</style>
-    </div>
-  );
+      );
 }
 
-export default function PaymentPage() {
+      export default function PaymentPage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
-        <div className="text-center">
-          <Loader className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
-          <p className="text-gray-600">Yükleniyor...</p>
+      <Suspense fallback={
+        <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center">
+          <div className="text-center">
+            <Loader className="w-16 h-16 text-blue-600 animate-spin mx-auto mb-4" />
+            <p className="text-gray-600">Yükleniyor...</p>
+          </div>
         </div>
-      </div>
-    }>
-      <PaymentPageContent />
-    </Suspense>
-  );
+      }>
+        <PaymentPageContent />
+      </Suspense>
+      );
 }
 

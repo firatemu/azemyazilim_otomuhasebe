@@ -5,16 +5,34 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateCodeTemplateDto } from './dto/create-code-template.dto';
 import { UpdateCodeTemplateDto } from './dto/update-code-template.dto';
 import { ModuleType } from '@prisma/client';
+
+const DEFAULT_TEMPLATES: Partial<Record<ModuleType, { name: string; prefix: string; digitCount: number }>> = {
+  [ModuleType.WAREHOUSE]: { name: 'Depo Kodu', prefix: 'D', digitCount: 3 },
+  [ModuleType.WAREHOUSE_TRANSFER]: { name: 'Transfer Fiş No', prefix: 'TF', digitCount: 5 },
+  [ModuleType.CASHBOX]: { name: 'Kasa Kodu', prefix: 'K', digitCount: 3 },
+  [ModuleType.PERSONNEL]: { name: 'Personel Kodu', prefix: 'P', digitCount: 4 },
+  [ModuleType.PRODUCT]: { name: 'Ürün Kodu', prefix: 'ST', digitCount: 4 },
+  [ModuleType.CUSTOMER]: { name: 'Cari Kodu', prefix: 'C', digitCount: 4 },
+  [ModuleType.INVOICE_SALES]: { name: 'Satış Faturası No', prefix: 'SF', digitCount: 5 },
+  [ModuleType.INVOICE_PURCHASE]: { name: 'Alış Faturası No', prefix: 'AF', digitCount: 5 },
+  [ModuleType.ORDER_SALES]: { name: 'Satış Siparişi No', prefix: 'SS', digitCount: 5 },
+  [ModuleType.ORDER_PURCHASE]: { name: 'Satın Alma Siparişi No', prefix: 'SA', digitCount: 5 },
+  [ModuleType.INVENTORY_COUNT]: { name: 'Sayım No', prefix: 'SY', digitCount: 5 },
+  [ModuleType.TEKLIF]: { name: 'Teklif No', prefix: 'TK', digitCount: 5 },
+  [ModuleType.DELIVERY_NOTE_SALES]: { name: 'Satış İrsaliyesi No', prefix: 'Sİ', digitCount: 5 },
+  [ModuleType.DELIVERY_NOTE_PURCHASE]: { name: 'Alış İrsaliyesi No', prefix: 'Aİ', digitCount: 5 },
+};
 
 @Injectable()
 export class CodeTemplateService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
   async create(createDto: CreateCodeTemplateDto) {
@@ -92,17 +110,33 @@ export class CodeTemplateService {
   /**
    * Verilen modül için bir sonraki kodu üretir ve sayacı artırır
    * Örnek: module=WAREHOUSE, prefix="D", digitCount=3, currentValue=5 → "D006"
+   * Şablon yoksa varsayılan oluşturulur (seed çalışmamış ortamlar için).
    */
   async getNextCode(module: ModuleType): Promise<string> {
     try {
-      const template = await this.prisma.codeTemplate.findUnique({
+      let template = await this.prisma.codeTemplate.findUnique({
         where: { module },
       });
 
       if (!template) {
-        throw new NotFoundException(
-          `Bu modül için şablon tanımlanmamış: ${module}`,
-        );
+        const defaults = DEFAULT_TEMPLATES[module];
+        if (defaults) {
+          template = await this.prisma.codeTemplate.create({
+            data: {
+              module,
+              name: defaults.name,
+              prefix: defaults.prefix,
+              digitCount: defaults.digitCount,
+              currentValue: 0,
+              includeYear: false,
+              isActive: true,
+            },
+          });
+        } else {
+          throw new NotFoundException(
+            `Bu modül için şablon tanımlanmamış: ${module}`,
+          );
+        }
       }
 
       if (!template.isActive) {
@@ -169,158 +203,69 @@ export class CodeTemplateService {
    * Örneğin warehouse create'te kullanıcı kod girerse, önce bu metotla kontrol edilir
    */
   async isCodeUnique(module: ModuleType, code: string): Promise<boolean> {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    if (!tenantId) return true;
 
-    // SUPER_ADMIN veya tenant yoksa (seed script gibi durumlarda) true döndür
-    if (!tenantId && !isSuperAdmin) {
-      return true;
-    }
-
-    // SUPER_ADMIN için tenant kontrolünü atla - kod uniqueness kontrolü
-    const whereClause: any = {};
-    if (tenantId) {
-      // SUPER_ADMIN için tenantId filtresi ekleme (tenantId varsa ekle)
-      switch (module) {
-        case 'WAREHOUSE':
-          whereClause.code = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const warehouse = await this.prisma.warehouse.findFirst({
-            where: whereClause,
-          });
-          return !warehouse;
-
-        case 'CASHBOX':
-          whereClause.kasaKodu = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const cashbox = await this.prisma.kasa.findFirst({
-            where: whereClause,
-          });
-          return !cashbox;
-
-        case 'PERSONNEL':
-          whereClause.personelKodu = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const personnel = await this.prisma.personel.findFirst({
-            where: whereClause,
-          });
-          return !personnel;
-
-        case 'PRODUCT':
-          whereClause.stokKodu = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const product = await this.prisma.stok.findFirst({
-            where: whereClause,
-          });
-          return !product;
-
-        case 'CUSTOMER':
-          whereClause.cariKodu = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const customer = await this.prisma.cari.findFirst({
-            where: whereClause,
-          });
-          return !customer;
-
-        case 'INVOICE_SALES':
-        case 'INVOICE_PURCHASE':
-          whereClause.faturaNo = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const invoice = await this.prisma.fatura.findFirst({
-            where: whereClause,
-          });
-          return !invoice;
-
-        case 'ORDER_SALES':
-        case 'ORDER_PURCHASE':
-          whereClause.siparisNo = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const order = await this.prisma.siparis.findFirst({
-            where: whereClause,
-          });
-          return !order;
-
-        case 'INVENTORY_COUNT':
-          whereClause.sayimNo = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const sayim = await this.prisma.sayim.findFirst({
-            where: whereClause,
-          });
-          return !sayim;
-
-        case 'TEKLIF':
-          whereClause.teklifNo = code;
-          if (tenantId) whereClause.tenantId = tenantId;
-          const teklif = await this.prisma.teklif.findFirst({
-            where: whereClause,
-          });
-          return !teklif;
-
-        default:
-          return true; // Diğer modüller için şimdilik true döndür
+    const tenantWhere = buildTenantWhereClause(tenantId);
+    switch (module) {
+      case 'WAREHOUSE': {
+        const w = await this.prisma.warehouse.findFirst({
+          where: { code, ...tenantWhere },
+        });
+        return !w;
       }
-    } else {
-      // SUPER_ADMIN için tenant olmadan kontrol et
-      switch (module) {
-        case 'WAREHOUSE':
-          const warehouse = await this.prisma.warehouse.findFirst({
-            where: { code },
-          });
-          return !warehouse;
-
-        case 'CASHBOX':
-          const cashbox = await this.prisma.kasa.findFirst({
-            where: { kasaKodu: code },
-          });
-          return !cashbox;
-
-        case 'PERSONNEL':
-          const personnel = await this.prisma.personel.findFirst({
-            where: { personelKodu: code },
-          });
-          return !personnel;
-
-        case 'PRODUCT':
-          const product = await this.prisma.stok.findFirst({
-            where: { stokKodu: code },
-          });
-          return !product;
-
-        case 'CUSTOMER':
-          const customer = await this.prisma.cari.findFirst({
-            where: { cariKodu: code },
-          });
-          return !customer;
-
-        case 'INVOICE_SALES':
-        case 'INVOICE_PURCHASE':
-          const invoice = await this.prisma.fatura.findFirst({
-            where: { faturaNo: code },
-          });
-          return !invoice;
-
-        case 'ORDER_SALES':
-        case 'ORDER_PURCHASE':
-          const order = await this.prisma.siparis.findFirst({
-            where: { siparisNo: code },
-          });
-          return !order;
-
-        case 'INVENTORY_COUNT':
-          const sayim = await this.prisma.sayim.findFirst({
-            where: { sayimNo: code },
-          });
-          return !sayim;
-
-        case 'TEKLIF':
-          const teklif = await this.prisma.teklif.findFirst({
-            where: { teklifNo: code },
-          });
-          return !teklif;
-
-        default:
-          return true; // Diğer modüller için şimdilik true döndür
+      case 'CASHBOX': {
+        const k = await this.prisma.kasa.findFirst({
+          where: { kasaKodu: code, ...tenantWhere },
+        });
+        return !k;
       }
+      case 'PERSONNEL': {
+        const p = await this.prisma.personel.findFirst({
+          where: { personelKodu: code, ...tenantWhere },
+        });
+        return !p;
+      }
+      case 'PRODUCT': {
+        const s = await this.prisma.stok.findFirst({
+          where: { stokKodu: code, ...tenantWhere },
+        });
+        return !s;
+      }
+      case 'CUSTOMER': {
+        const c = await this.prisma.cari.findFirst({
+          where: { cariKodu: code, ...tenantWhere },
+        });
+        return !c;
+      }
+      case 'INVOICE_SALES':
+      case 'INVOICE_PURCHASE': {
+        const i = await this.prisma.fatura.findFirst({
+          where: { faturaNo: code, ...tenantWhere },
+        });
+        return !i;
+      }
+      case 'ORDER_SALES':
+      case 'ORDER_PURCHASE': {
+        const o = await this.prisma.siparis.findFirst({
+          where: { siparisNo: code, ...tenantWhere },
+        });
+        return !o;
+      }
+      case 'INVENTORY_COUNT': {
+        const sy = await this.prisma.sayim.findFirst({
+          where: { sayimNo: code, ...tenantWhere },
+        });
+        return !sy;
+      }
+      case 'TEKLIF': {
+        const t = await this.prisma.teklif.findFirst({
+          where: { teklifNo: code, ...tenantWhere },
+        });
+        return !t;
+      }
+      default:
+        return true;
     }
   }
 }

@@ -4,7 +4,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateCekSenetDto } from './dto/create-cek-senet.dto';
 import { UpdateCekSenetDto } from './dto/update-cek-senet.dto';
 import { FilterCekSenetDto } from './dto/filter-cek-senet.dto';
@@ -25,7 +26,7 @@ import {
 export class CekSenetService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
   async create(createDto: CreateCekSenetDto, userId: string) {
@@ -73,20 +74,12 @@ export class CekSenetService {
         durum = CekSenetDurum.PORTFOYDE;
       }
 
-      console.log('🔧 Yeni çek/senet oluşturuluyor:', {
-        portfoyTip: createDto.portfoyTip,
-        belirlenenDurum: durum,
-        manuelDurum: createDto.durum || 'yok',
+      const tenantId = await this.tenantResolver.resolveForCreate({
+        userId,
+        allowNull: true,
       });
+      const finalTenantId = (createDto as any).tenantId ?? tenantId ?? undefined;
 
-      // TenantId'yi al
-      const tenantId = this.tenantContext.getTenantId();
-      const isSuperAdmin = this.tenantContext.isSuperAdmin();
-      
-      // SUPER_ADMIN için dto'dan tenantId alınabilir, yoksa mevcut tenantId kullan
-      const finalTenantId = (createDto as any).tenantId || tenantId;
-
-      // Çek/Senet kaydını oluştur
       const cekSenet = await prisma.cekSenet.create({
         data: {
           tip: createDto.tip,
@@ -102,7 +95,7 @@ export class CekSenetService {
           durum: durum,
           aciklama: createDto.aciklama,
           createdBy: userId,
-          tenantId: finalTenantId,
+          ...(finalTenantId != null && { tenantId: finalTenantId }),
         },
         include: {
           cari: {
@@ -206,22 +199,11 @@ export class CekSenetService {
 
   async findAll(filterDto?: FilterCekSenetDto) {
     try {
-      console.log('🔍 [CekSenet Service] findAll çağrıldı:', filterDto);
-
-      const tenantId = this.tenantContext.getTenantId();
-      const isSuperAdmin = this.tenantContext.isSuperAdmin();
-
+      const tenantId = await this.tenantResolver.resolveForQuery();
       const where: Prisma.CekSenetWhereInput = {
         deletedAt: null,
+        ...buildTenantWhereClause(tenantId ?? undefined),
       };
-
-      // SUPER_ADMIN için tenantId filtresi ekleme
-      if (tenantId) {
-        where.tenantId = tenantId;
-      } else if (!isSuperAdmin) {
-        // TenantId yoksa ve SUPER_ADMIN değilse boş sonuç döndür
-        return [];
-      }
 
       if (filterDto?.tip) {
         where.tip = filterDto.tip;

@@ -325,7 +325,18 @@ const CekFormDialog = memo(({
           variant="contained"
           onClick={handleLocalSubmit}
           disabled={loading}
-          sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}
+          sx={{ 
+            bgcolor: 'var(--secondary)', 
+            color: 'var(--secondary-foreground)',
+            textTransform: 'none',
+            fontWeight: 600,
+            '&:hover': { 
+              bgcolor: 'var(--secondary-hover)',
+            },
+            '&:disabled': {
+              opacity: 0.5,
+            },
+          }}
         >
           {editMode ? 'Güncelle' : 'Kaydet'}
         </Button>
@@ -729,19 +740,53 @@ export default function CekPage() {
     <MainLayout>
       <Box sx={{ p: 3 }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" sx={{ fontWeight: 600, display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Payment sx={{ fontSize: 40, color: '#7c3aed' }} />
+          <Typography 
+            variant="h4" 
+            sx={{ 
+              fontWeight: 700,
+              fontSize: '1.875rem',
+              color: 'var(--foreground)',
+              letterSpacing: '-0.02em',
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: 1.5,
+            }}
+          >
+            <Payment sx={{ fontSize: 40, color: 'var(--secondary)' }} />
             Çek Yönetimi
           </Typography>
           <Box sx={{ display: 'flex', gap: 2 }}>
-            <Button variant="outlined" startIcon={<Refresh />} onClick={fetchCekler}>
+            <Button 
+              variant="outlined" 
+              startIcon={<Refresh />} 
+              onClick={fetchCekler}
+              sx={{
+                textTransform: 'none',
+                fontWeight: 600,
+                borderColor: 'var(--border)',
+                color: 'var(--muted-foreground)',
+                '&:hover': {
+                  bgcolor: 'var(--muted)',
+                  borderColor: 'var(--ring)',
+                  color: 'var(--foreground)',
+                },
+              }}
+            >
               Yenile
             </Button>
             <Button
               variant="contained"
               startIcon={<Add />}
               onClick={() => handleOpenDialog()}
-              sx={{ bgcolor: '#7c3aed', '&:hover': { bgcolor: '#6d28d9' } }}
+              sx={{ 
+                bgcolor: 'var(--secondary)', 
+                color: 'var(--secondary-foreground)',
+                textTransform: 'none',
+                fontWeight: 600,
+                '&:hover': { 
+                  bgcolor: 'var(--secondary-hover)',
+                },
+              }}
             >
               Yeni Çek
             </Button>
@@ -752,50 +797,135 @@ export default function CekPage() {
         {stats && (
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, md: 2.4 }}>
-              <Card sx={{ bgcolor: '#faf5ff', border: '1px solid #7c3aed' }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)', 
+                border: '1px solid var(--secondary)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Toplam Çek</Typography>
-                  <Typography variant="h5" sx={{ color: '#7c3aed', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Toplam Çek
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--secondary)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {stats.toplamKayit}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid size={{ xs: 12, md: 2.4 }}>
-              <Card sx={{ bgcolor: '#fffbeb', border: '1px solid #f59e0b' }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)', 
+                border: '1px solid var(--primary)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Portföyde</Typography>
-                  <Typography variant="h5" sx={{ color: '#f59e0b', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Portföyde
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--primary)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {stats.portfoyde}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid size={{ xs: 12, md: 2.4 }}>
-              <Card sx={{ bgcolor: '#ecfdf5', border: '1px solid #10b981' }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)', 
+                border: '1px solid var(--chart-2)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Tahsil Edildi</Typography>
-                  <Typography variant="h5" sx={{ color: '#10b981', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Tahsil Edildi
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--chart-2)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {stats.tahsilEdildi}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid size={{ xs: 12, md: 2.4 }}>
-              <Card sx={{ bgcolor: '#eff6ff', border: '1px solid #3b82f6' }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)', 
+                border: '1px solid var(--chart-1)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Ciro Edildi</Typography>
-                  <Typography variant="h5" sx={{ color: '#3b82f6', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Ciro Edildi
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--chart-1)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {stats.ciroEdildi}
                   </Typography>
                 </CardContent>
               </Card>
             </Grid>
             <Grid size={{ xs: 12, md: 2.4 }}>
-              <Card sx={{ bgcolor: '#fef2f2', border: '1px solid #ef4444' }}>
+              <Card sx={{ 
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)', 
+                border: '1px solid var(--destructive)',
+                borderRadius: 'var(--radius)',
+                boxShadow: 'var(--shadow-sm)',
+              }}>
                 <CardContent>
-                  <Typography variant="body2" color="textSecondary">Karşılıksız</Typography>
-                  <Typography variant="h5" sx={{ color: '#ef4444', fontWeight: 600 }}>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Karşılıksız
+                  </Typography>
+                  <Typography 
+                    variant="h5" 
+                    sx={{ 
+                      color: 'var(--destructive)', 
+                      fontWeight: 700,
+                      fontSize: '1.5rem',
+                    }}
+                  >
                     {stats.karsilikiz}
                   </Typography>
                 </CardContent>
@@ -885,19 +1015,26 @@ export default function CekPage() {
         </Paper>
 
         {/* Tablo */}
-        <TableContainer component={Paper}>
+        <TableContainer 
+          component={Paper}
+          sx={{
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            boxShadow: 'var(--shadow-sm)',
+          }}
+        >
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f9fafb' }}>
-                <TableCell sx={{ fontWeight: 600 }}>Portföy</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Cari</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Çek No</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Banka</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Tutar</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Vade</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Durum</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Kayıt Tarihi</TableCell>
-                <TableCell sx={{ fontWeight: 600 }} align="right">İşlemler</TableCell>
+              <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Portföy</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Cari</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Çek No</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Banka</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Tutar</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Vade</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Durum</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }}>Kayıt Tarihi</TableCell>
+                <TableCell sx={{ fontWeight: 600, color: 'var(--foreground)', fontSize: '0.875rem' }} align="right">İşlemler</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>

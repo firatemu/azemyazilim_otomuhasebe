@@ -28,6 +28,8 @@ services:
       - caddy_config:/config
     networks:
       - app_net
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     environment:
       - ACME_AGREE=true
     # healthcheck: DISABLED (geçici - staging container'ları başlatmak için)

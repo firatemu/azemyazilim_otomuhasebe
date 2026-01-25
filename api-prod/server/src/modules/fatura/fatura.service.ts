@@ -8,9 +8,13 @@ import {
 import { FaturaDurum, FaturaTipi, Prisma, IrsaliyeKaynakTip, IrsaliyeDurum } from '@prisma/client';
 import { Decimal } from '@prisma/client/runtime/library';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CodeTemplateService } from '../code-template/code-template.service';
 import { SatisIrsaliyesiService } from '../satis-irsaliyesi/satis-irsaliyesi.service';
+import { InvoiceProfitService } from '../invoice-profit/invoice-profit.service';
+import { CostingService } from '../costing/costing.service';
+import { SystemParameterService } from '../system-parameter/system-parameter.service';
 import { CreateFaturaDto } from './dto/create-fatura.dto';
 import { UpdateFaturaDto } from './dto/update-fatura.dto';
 
@@ -18,10 +22,13 @@ import { UpdateFaturaDto } from './dto/update-fatura.dto';
 export class FaturaService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     private codeTemplateService: CodeTemplateService,
     @Inject(forwardRef(() => SatisIrsaliyesiService))
     private satisIrsaliyesiService: SatisIrsaliyesiService,
+    private invoiceProfitService: InvoiceProfitService,
+    private costingService: CostingService,
+    private systemParameterService: SystemParameterService,
   ) { }
 
   private async createLog(
@@ -46,6 +53,78 @@ export class FaturaService {
     });
   }
 
+  /**
+   * ALIS faturası için maliyetlendirme servisini çalıştır
+   * Fatura içindeki kalemlerin stokId'leri için maliyet hesaplar
+   * Parametre kontrolü yapılır - eğer otomatik maliyetlendirme kapalıysa çalışmaz
+   */
+  private async calculateCostsForInvoiceItems(
+    kalemler: Array<{ stokId: string | null }>,
+    faturaId: string,
+    faturaNo: string,
+  ): Promise<void> {
+    // Parametre kontrolü - otomatik maliyetlendirme açık mı?
+    const autoCostingEnabled = await this.systemParameterService.getParameterAsBoolean(
+      'AUTO_COSTING_ON_PURCHASE_INVOICE',
+      true, // Varsayılan: true (mevcut davranış)
+    );
+
+    if (!autoCostingEnabled) {
+      console.log(
+        `[FaturaService] Fatura ${faturaNo} (${faturaId}) için otomatik maliyetlendirme kapalı, atlandı`,
+      );
+      return;
+    }
+
+    // Sadece stokId'si olan kalemler için maliyet hesapla
+    const stokIds = kalemler
+      .map((k) => k.stokId)
+      .filter((id): id is string => id !== null && id !== undefined);
+
+    if (stokIds.length === 0) {
+      console.log(
+        `[FaturaService] Fatura ${faturaNo} (${faturaId}) için maliyetlendirme atlandı - stokId bulunamadı`,
+      );
+      return;
+    }
+
+    // Unique stokId'leri al
+    const uniqueStokIds = [...new Set(stokIds)];
+
+    console.log(
+      `[FaturaService] Fatura ${faturaNo} (${faturaId}) için ${uniqueStokIds.length} stok için maliyetlendirme başlatılıyor...`,
+    );
+
+    // Her stok için maliyet hesapla (async olarak paralel çalıştır)
+    const costingPromises = uniqueStokIds.map(async (stokId) => {
+      try {
+        await this.costingService.calculateWeightedAverageCost(stokId);
+        console.log(
+          `[FaturaService] Stok ${stokId} için maliyetlendirme tamamlandı`,
+        );
+      } catch (error: any) {
+        // Maliyetlendirme hatası fatura işlemini engellemez, sadece log'lanır
+        console.error(
+          `[FaturaService] Stok ${stokId} için maliyetlendirme hatası:`,
+          {
+            stokId,
+            faturaId,
+            faturaNo,
+            error: error?.message || error,
+            stack: error?.stack,
+          },
+        );
+      }
+    });
+
+    // Tüm maliyetlendirme işlemlerini bekle
+    await Promise.allSettled(costingPromises);
+
+    console.log(
+      `[FaturaService] Fatura ${faturaNo} (${faturaId}) için maliyetlendirme tamamlandı`,
+    );
+  }
+
   async findAll(
     page = 1,
     limit = 50,
@@ -60,9 +139,11 @@ export class FaturaService {
     // #endregion
     try {
       const skip = (page - 1) * limit;
+      const tenantId = await this.tenantResolver.resolveForQuery();
 
       const where: Prisma.FaturaWhereInput = {
-        deletedAt: null, // Sadece silinmemiş kayıtlar
+        deletedAt: null,
+        ...buildTenantWhereClause(tenantId ?? undefined),
       };
 
       if (faturaTipi) {
@@ -241,8 +322,7 @@ export class FaturaService {
   ) {
     const { kalemler, siparisId, irsaliyeId, ...faturaData } = createFaturaDto;
 
-    // TenantId'yi TenantContextService'den al
-    const tenantId = this.tenantContext.getTenantId();
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
     // Eğer fatura numarası boşsa veya belirtilmemişse, şablondan otomatik oluştur
     if (!faturaData.faturaNo || faturaData.faturaNo.trim() === '') {
@@ -602,6 +682,65 @@ export class FaturaService {
         prisma,
       );
 
+      // Kar hesaplama (sadece SATIS faturaları için)
+      if (faturaData.faturaTipi === 'SATIS') {
+        try {
+          await this.invoiceProfitService.calculateAndSaveProfit(
+            fatura.id,
+            userId,
+            prisma, // Transaction içindeki prisma instance'ını geçir
+          );
+        } catch (error: any) {
+          // Kar hesaplama hatası fatura oluşturmayı engellemez, sadece log'lanır
+          console.error(
+            `[FaturaService] Fatura ${fatura.id} (${fatura.faturaNo}) için kar hesaplama hatası:`,
+            {
+              faturaId: fatura.id,
+              faturaNo: fatura.faturaNo,
+              error: error?.message || error,
+              stack: error?.stack,
+              userId,
+            },
+          );
+          // Hata durumunda fatura oluşturma devam eder, ancak profit kaydı oluşmaz
+          // Kullanıcı daha sonra manuel olarak yeniden hesaplayabilir
+        }
+      }
+
+      // Maliyetlendirme (sadece ALIS faturaları için ve parametre açıksa)
+      // Durum ne olursa olsun, parametre açıksa maliyetlendirme yapılır
+      // Maliyetlendirme servisi sadece ONAYLANDI durumundaki geçmiş faturaları dahil eder
+      if (faturaData.faturaTipi === 'ALIS') {
+        try {
+          const autoCostingEnabled = await this.systemParameterService.getParameterAsBoolean(
+            'AUTO_COSTING_ON_PURCHASE_INVOICE',
+            true, // Varsayılan: true
+          );
+
+          if (autoCostingEnabled) {
+            // Transaction dışında çalıştır (transaction commit edildikten sonra)
+            // Çünkü maliyetlendirme servisi fatura kayıtlarını okumak için transaction'ın commit edilmesini bekler
+            await this.calculateCostsForInvoiceItems(
+              fatura.kalemler,
+              fatura.id,
+              fatura.faturaNo,
+            );
+          }
+        } catch (error: any) {
+          // Maliyetlendirme hatası fatura oluşturmayı engellemez, sadece log'lanır
+          console.error(
+            `[FaturaService] Fatura ${fatura.id} (${fatura.faturaNo}) için maliyetlendirme hatası:`,
+            {
+              faturaId: fatura.id,
+              faturaNo: fatura.faturaNo,
+              error: error?.message || error,
+              stack: error?.stack,
+              userId,
+            },
+          );
+        }
+      }
+
       return fatura;
     });
   }
@@ -645,6 +784,42 @@ export class FaturaService {
         ipAddress,
         userAgent,
       );
+
+      // Durum değişikliği kontrolü (maliyetlendirme için)
+      if (
+        fatura.faturaTipi === 'ALIS' &&
+        updateData.durum &&
+        updateData.durum !== fatura.durum
+      ) {
+        // Durum değiştiğinde parametre açıksa maliyetlendirme yap
+        try {
+          const autoCostingEnabled = await this.systemParameterService.getParameterAsBoolean(
+            'AUTO_COSTING_ON_PURCHASE_INVOICE',
+            true, // Varsayılan: true
+          );
+
+          if (autoCostingEnabled) {
+            await this.calculateCostsForInvoiceItems(
+              updated.kalemler,
+              updated.id,
+              updated.faturaNo,
+            );
+          }
+        } catch (error: any) {
+          console.error(
+            `[FaturaService] Fatura ${updated.id} (${updated.faturaNo}) için durum değişikliği maliyetlendirme hatası:`,
+            {
+              faturaId: updated.id,
+              faturaNo: updated.faturaNo,
+              eskiDurum: fatura.durum,
+              yeniDurum: updateData.durum,
+              error: error?.message || error,
+              stack: error?.stack,
+              userId,
+            },
+          );
+        }
+      }
 
       return updated;
     }
@@ -714,6 +889,64 @@ export class FaturaService {
         userAgent,
         prisma,
       );
+
+      // Kar hesaplama güncelleme (sadece SATIS faturaları için)
+      if (fatura.faturaTipi === 'SATIS') {
+        try {
+          await this.invoiceProfitService.calculateAndSaveProfit(
+            updated.id,
+            userId,
+            prisma,
+          );
+        } catch (error: any) {
+          console.error(
+            `[FaturaService] Fatura ${updated.id} (${updated.faturaNo}) için kar hesaplama güncelleme hatası:`,
+            {
+              faturaId: updated.id,
+              faturaNo: updated.faturaNo,
+              error: error?.message || error,
+              stack: error?.stack,
+              userId,
+            },
+          );
+        }
+      }
+
+      // Maliyetlendirme (sadece ALIS faturaları için ve parametre açıksa)
+      // Kalemler güncellendiğinde veya durum değiştiğinde maliyetlendirme yap
+      if (fatura.faturaTipi === 'ALIS') {
+        const shouldCalculateCosts =
+          fatura.durum !== 'ONAYLANDI' || updateFaturaDto.kalemler || updateFaturaDto.durum;
+
+        if (shouldCalculateCosts) {
+          try {
+            const autoCostingEnabled = await this.systemParameterService.getParameterAsBoolean(
+              'AUTO_COSTING_ON_PURCHASE_INVOICE',
+              true, // Varsayılan: true
+            );
+
+            if (autoCostingEnabled) {
+              // Transaction dışında çalıştır
+              await this.calculateCostsForInvoiceItems(
+                updated.kalemler,
+                updated.id,
+                updated.faturaNo,
+              );
+            }
+          } catch (error: any) {
+            console.error(
+              `[FaturaService] Fatura ${updated.id} (${updated.faturaNo}) için maliyetlendirme güncelleme hatası:`,
+              {
+                faturaId: updated.id,
+                faturaNo: updated.faturaNo,
+                error: error?.message || error,
+                stack: error?.stack,
+                userId,
+              },
+            );
+          }
+        }
+      }
 
       return updated;
     });
@@ -808,6 +1041,37 @@ export class FaturaService {
         userAgent,
         prisma,
       );
+
+      // Maliyetlendirme (sadece ALIS faturaları için ve parametre açıksa)
+      // Durum ne olursa olsun, parametre açıksa maliyetlendirme yapılır
+      if (fatura.faturaTipi === 'ALIS') {
+        try {
+          const autoCostingEnabled = await this.systemParameterService.getParameterAsBoolean(
+            'AUTO_COSTING_ON_PURCHASE_INVOICE',
+            true, // Varsayılan: true
+          );
+
+          if (autoCostingEnabled) {
+            // Transaction dışında çalıştır
+            await this.calculateCostsForInvoiceItems(
+              fatura.kalemler,
+              fatura.id,
+              fatura.faturaNo,
+            );
+          }
+        } catch (error: any) {
+          console.error(
+            `[FaturaService] Fatura ${fatura.id} (${fatura.faturaNo}) için silme maliyetlendirme hatası:`,
+            {
+              faturaId: fatura.id,
+              faturaNo: fatura.faturaNo,
+              error: error?.message || error,
+              stack: error?.stack,
+              userId,
+            },
+          );
+        }
+      }
 
       return deleted;
     });
@@ -1121,7 +1385,7 @@ export class FaturaService {
           });
 
           // İrsaliye kalemlerini stoğa geri ekle (IADE tipi stok hareketi)
-          const tenantId = this.tenantContext.getTenantId();
+          const tenantId = await this.tenantResolver.resolveForCreate({ userId });
           for (const kalem of irsaliye.kalemler) {
             const miktar = typeof kalem.miktar === 'object' && 'toNumber' in kalem.miktar
               ? (kalem.miktar as Decimal).toNumber()
@@ -1230,6 +1494,17 @@ export class FaturaService {
 
       // Yeni durum ONAYLANDI ise, işlemleri uygula
       if (yeniDurum === 'ONAYLANDI') {
+        // Kar hesaplamasını güncelle (maliyet değişmiş olabilir)
+        if (fatura.faturaTipi === 'SATIS') {
+          try {
+            await this.invoiceProfitService.recalculateProfit(
+              id,
+              userId,
+            );
+          } catch (error) {
+            console.error('Kar hesaplama hatası:', error);
+          }
+        }
         // Cari hareket kaydı oluştur
         const cari = await prisma.cari.findUnique({
           where: { id: fatura.cariId },

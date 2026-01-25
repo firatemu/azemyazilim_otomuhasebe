@@ -1,16 +1,32 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+import { WarehouseService } from '../warehouse/warehouse.service';
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    @Inject(forwardRef(() => WarehouseService))
+    private warehouseService: WarehouseService,
+  ) {}
 
   async create(createTenantDto: CreateTenantDto) {
-    return this.prisma.tenant.create({
+    const tenant = await this.prisma.tenant.create({
       data: createTenantDto,
     });
+
+    // Yeni tenant için varsayılan ambar oluştur
+    try {
+      await this.warehouseService.createDefaultWarehouse(tenant.id);
+    } catch (error) {
+      console.error('Varsayılan ambar oluşturulamadı:', error);
+      // Hata olsa bile tenant oluşturulmuş olsun
+    }
+
+    return tenant;
   }
 
   async findAll() {
@@ -122,6 +138,56 @@ export class TenantsService {
     }
 
     return updatedTenant;
+  }
+
+  async getSettings(tenantId: string) {
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID bulunamadı');
+    }
+
+    let settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+    });
+
+    // Eğer settings yoksa, boş bir kayıt oluştur
+    if (!settings) {
+      settings = await this.prisma.tenantSettings.create({
+        data: {
+          tenantId,
+        },
+      });
+    }
+
+    return settings;
+  }
+
+  async updateSettings(tenantId: string, updateSettingsDto: UpdateTenantSettingsDto) {
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID bulunamadı');
+    }
+
+    // Önce mevcut settings'i kontrol et
+    let settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+    });
+
+    // Eğer yoksa oluştur
+    if (!settings) {
+      settings = await this.prisma.tenantSettings.create({
+        data: {
+          tenantId,
+          ...updateSettingsDto,
+        },
+      });
+    } else {
+      // Varsa güncelle
+      settings = await this.prisma.tenantSettings.update({
+        where: { tenantId },
+        data: updateSettingsDto,
+      });
+    }
+
+    return settings;
   }
 }
 

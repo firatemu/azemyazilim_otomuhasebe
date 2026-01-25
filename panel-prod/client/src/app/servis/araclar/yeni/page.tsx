@@ -152,15 +152,30 @@ export default function NewVehiclePage() {
         payload.email = data.email;
       }
 
+      console.log('[createCustomer] Sending payload:', payload);
+      console.log('[createCustomer] Payload keys:', Object.keys(payload));
+      console.log('[createCustomer] Payload type:', typeof payload);
+
       const response = await axios.post('/cari', payload);
+
+      console.log('[createCustomer] Response:', response.data);
+
       return response.data;
     },
     onSuccess: (data) => {
+      console.log('[createCustomer] Success:', data);
       refetchCustomers();
       setSelectedCustomer(data);
       setForm((prev) => ({ ...prev, customerId: data.id }));
       setCustomerDialogOpen(false);
       setQuickCustomer({ unvan: '', telefon: '', email: '', tip: 'MUSTERI' });
+    },
+    onError: (error) => {
+      console.error('[createCustomer] Error occurred:', error);
+      console.error('[createCustomer] Error response:', error.response);
+      console.error('[createCustomer] Error status:', error.response?.status);
+      console.error('[createCustomer] Error data:', error.response?.data);
+      console.error('[createCustomer] Error message:', error.message);
     },
   });
 

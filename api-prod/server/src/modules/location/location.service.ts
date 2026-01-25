@@ -4,7 +4,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
 import { CreateLocationDto } from './dto/create-location.dto';
 import { UpdateLocationDto } from './dto/update-location.dto';
 
@@ -12,7 +12,7 @@ import { UpdateLocationDto } from './dto/update-location.dto';
 export class LocationService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
   /**
@@ -164,41 +164,17 @@ export class LocationService {
     layer?: number,
     corridor?: string,
   ) {
-    console.log('🔍 [Location Service] findAll başlatıldı', { warehouseId, active, layer, corridor });
-    
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    
-    console.log('🔍 [Location Service] Tenant bilgileri', { tenantId, isSuperAdmin });
-    
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    const where: any = {};
+    if (warehouseId) where.warehouseId = warehouseId;
+    if (active !== undefined) where.active = active;
+    if (layer) where.layer = layer;
+    if (corridor) where.corridor = corridor;
+    if (tenantId) {
+      where.warehouse = { tenantId };
+    }
+
     try {
-      const where: any = {};
-
-      if (warehouseId) {
-        where.warehouseId = warehouseId;
-      }
-
-      if (active !== undefined) {
-        where.active = active;
-      }
-
-      if (layer) {
-        where.layer = layer;
-      }
-
-      if (corridor) {
-        where.corridor = corridor;
-      }
-
-      // SUPER_ADMIN için warehouse filtreleme (warehouse tenant'a bağlı)
-      // SUPER_ADMIN için tüm warehouse'ları görebilir, normal kullanıcılar sadece kendi tenant'ına ait warehouse'ları görebilir
-      if (tenantId && !isSuperAdmin) {
-        where.warehouse = {
-          tenantId,
-        };
-      }
-
-      console.log('🔍 [Location Service] Where condition:', JSON.stringify(where, null, 2));
       
       const result = await this.prisma.location.findMany({
         where,

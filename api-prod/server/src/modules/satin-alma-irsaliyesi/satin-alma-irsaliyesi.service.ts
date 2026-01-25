@@ -4,7 +4,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CodeTemplateService } from '../code-template/code-template.service';
 import { CreateSatınAlmaIrsaliyesiDto } from './dto/create-satin-alma-irsaliyesi.dto';
 import { UpdateSatınAlmaIrsaliyesiDto } from './dto/update-satin-alma-irsaliyesi.dto';
@@ -16,7 +17,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 export class SatınAlmaIrsaliyesiService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     private codeTemplateService: CodeTemplateService,
   ) {}
 
@@ -43,24 +44,15 @@ export class SatınAlmaIrsaliyesiService {
   }
 
   async findAll(filterDto: FilterSatınAlmaIrsaliyesiDto) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const page = filterDto.page ? parseInt(filterDto.page, 10) : 1;
     const limit = filterDto.limit ? parseInt(filterDto.limit, 10) : 50;
     const skip = (page - 1) * limit;
 
     const where: Prisma.SatınAlmaIrsaliyesiWhereInput = {
       deletedAt: null,
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
-
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
 
     if (filterDto.durum) {
       where.durum = filterDto.durum;
@@ -204,31 +196,18 @@ export class SatınAlmaIrsaliyesiService {
   ) {
     const { kalemler, ...irsaliyeData } = createDto;
 
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
-    // Boş stok satırlarını filtrele
     const validKalemler = kalemler.filter(k => k.stokId && k.stokId.trim() !== '');
-
     if (validKalemler.length === 0) {
       throw new BadRequestException('En az bir kalem eklemelisiniz');
     }
 
-    // İrsaliye numarası kontrolü
-    const whereIrsaliyeNo: any = {
-      irsaliyeNo: irsaliyeData.irsaliyeNo,
-    };
-
-    if (tenantId) {
-      whereIrsaliyeNo.tenantId = tenantId;
-    }
-
     const existingIrsaliye = await this.prisma.satınAlmaIrsaliyesi.findFirst({
-      where: whereIrsaliyeNo,
+      where: {
+        irsaliyeNo: irsaliyeData.irsaliyeNo,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
     });
 
     if (existingIrsaliye) {
@@ -287,7 +266,7 @@ export class SatınAlmaIrsaliyesiService {
       const irsaliye = await prisma.satınAlmaIrsaliyesi.create({
         data: {
           ...irsaliyeData,
-          tenantId,
+          ...(tenantId != null && { tenantId }),
           toplamTutar: new Decimal(toplamTutar),
           kdvTutar: new Decimal(kdvTutar),
           genelToplam: new Decimal(genelToplam),

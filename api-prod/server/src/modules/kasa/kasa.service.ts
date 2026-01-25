@@ -6,7 +6,8 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateKasaDto } from './dto/create-kasa.dto';
 import { UpdateKasaDto } from './dto/update-kasa.dto';
 import { CreateKasaHareketDto } from './dto/create-kasa-hareket.dto';
@@ -17,31 +18,15 @@ import { CodeTemplateService } from '../code-template/code-template.service';
 export class KasaService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => CodeTemplateService))
     private codeTemplateService: CodeTemplateService,
   ) {}
 
   async findAll(kasaTipi?: KasaTipi, aktif?: boolean) {
-    let tenantId = this.tenantContext.getTenantId();
-    
-    // STAGING ORTAMI İÇİN: Tenant ID yoksa default kullan
-    if (!tenantId) {
-      const isStaging = process.env.NODE_ENV === 'staging';
-      const defaultTenantId = process.env.STAGING_DEFAULT_TENANT_ID || 'cmi5of04z0000ksb3g5eyu6ts';
-      
-      if (isStaging && defaultTenantId) {
-        console.log('🔧 [KasaService] Tenant ID yok, staging ortamında default tenant ID kullanılıyor:', defaultTenantId);
-        tenantId = defaultTenantId;
-        // Tenant context'e set et
-        this.tenantContext.setTenant(defaultTenantId, 'kasa-service-user');
-      } else {
-        throw new BadRequestException('Tenant ID is required');
-      }
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const where: Prisma.KasaWhereInput = {
-      tenantId,
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
 
     if (kasaTipi) {
@@ -82,27 +67,11 @@ export class KasaService {
   }
 
   async findOne(id: string) {
-    let tenantId = this.tenantContext.getTenantId();
-    
-    // STAGING ORTAMI İÇİN: Tenant ID yoksa default kullan
-    if (!tenantId) {
-      const isStaging = process.env.NODE_ENV === 'staging';
-      const defaultTenantId = process.env.STAGING_DEFAULT_TENANT_ID || 'cmi5of04z0000ksb3g5eyu6ts';
-      
-      if (isStaging && defaultTenantId) {
-        console.log('🔧 [KasaService.findOne] Tenant ID yok, staging ortamında default tenant ID kullanılıyor:', defaultTenantId);
-        tenantId = defaultTenantId;
-        // Tenant context'e set et
-        this.tenantContext.setTenant(defaultTenantId, 'kasa-service-user');
-      } else {
-        throw new BadRequestException('Tenant ID is required');
-      }
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const kasa = await this.prisma.kasa.findFirst({
-      where: { 
+      where: {
         id,
-        tenantId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
       },
       include: {
         bankaHesaplari: {
@@ -171,28 +140,15 @@ export class KasaService {
       }
     }
 
-    let tenantId = this.tenantContext.getTenantId();
-    
-    // STAGING ORTAMI İÇİN: Tenant ID yoksa default kullan
-    if (!tenantId) {
-      const isStaging = process.env.NODE_ENV === 'staging';
-      const defaultTenantId = process.env.STAGING_DEFAULT_TENANT_ID || 'cmi5of04z0000ksb3g5eyu6ts';
-      
-      if (isStaging && defaultTenantId) {
-        console.log('🔧 [KasaService.create] Tenant ID yok, staging ortamında default tenant ID kullanılıyor:', defaultTenantId);
-        tenantId = defaultTenantId;
-        // Tenant context'e set et
-        this.tenantContext.setTenant(defaultTenantId, 'kasa-service-user');
-      } else {
-        throw new BadRequestException('Tenant ID is required');
-      }
-    }
+    const tenantId = await this.tenantResolver.resolveForCreate({
+      userId,
+      allowNull: true, // Staging ortamı için tenantId null olabilir
+    });
 
-    // Kasa kodu kontrolü (tenant-aware)
     const existing = await this.prisma.kasa.findFirst({
-      where: { 
+      where: {
         kasaKodu,
-        tenantId,
+        ...(tenantId != null && { tenantId }),
       },
     });
 
@@ -202,7 +158,7 @@ export class KasaService {
 
     const data = {
       kasaKodu,
-      tenantId,
+      ...(tenantId != null && { tenantId }),
       kasaAdi: createKasaDto.kasaAdi,
       kasaTipi: createKasaDto.kasaTipi,
       aktif: createKasaDto.aktif ?? true,

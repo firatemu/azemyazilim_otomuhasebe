@@ -1,0 +1,17 @@
+{
+  "terminal.integrated.cwd": "~",
+  "terminal.integrated.defaultProfile.linux": "bash",
+  "terminal.integrated.profiles.linux": {
+    "bash": {
+      "path": "/bin/bash",
+      "icon": "terminal-bash"
+    }
+  },
+  "terminal.integrated.env.linux": {
+    "HOME": "${env:HOME}",
+    "PATH": "${env:PATH}"
+  }
+}
+
+
+

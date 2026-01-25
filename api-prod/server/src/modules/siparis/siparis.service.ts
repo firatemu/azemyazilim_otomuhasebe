@@ -7,7 +7,8 @@ import {
 } from '@nestjs/common';
 import { IrsaliyeDurum, IrsaliyeKaynakTip, Prisma, SiparisDurum, SiparisTipi } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CodeTemplateService } from '../code-template/code-template.service';
 import { SatisIrsaliyesiService } from '../satis-irsaliyesi/satis-irsaliyesi.service';
 import { CreateSiparisDto } from './dto/create-siparis.dto';
@@ -17,7 +18,7 @@ import { UpdateSiparisDto } from './dto/update-siparis.dto';
 export class SiparisService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => SatisIrsaliyesiService))
     private satisIrsaliyesiService: SatisIrsaliyesiService,
     private codeTemplateService: CodeTemplateService,
@@ -52,24 +53,13 @@ export class SiparisService {
     search?: string,
     cariId?: string,
   ) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-
-    // SUPER_ADMIN için tenant kontrolünü atla
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
 
     const where: Prisma.SiparisWhereInput = {
-      deletedAt: null, // Sadece silinmemiş kayıtlar
+      deletedAt: null,
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
-
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
 
     if (siparisTipi) {
       where.siparisTipi = siparisTipi;
@@ -292,13 +282,7 @@ export class SiparisService {
   ) {
     const { kalemler, ...siparisData } = createSiparisDto;
 
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-
-    // SUPER_ADMIN için tenant kontrolünü atla
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
     // Boş stok satırlarını filtrele (stokId boş olanları sil)
     const validKalemler = kalemler.filter(k => k.stokId && k.stokId.trim() !== '');
@@ -307,7 +291,6 @@ export class SiparisService {
       throw new BadRequestException('En az bir kalem eklemelisiniz');
     }
 
-    // SUPER_ADMIN için dto'dan tenantId alınabilir, yoksa mevcut tenantId kullan
     const finalTenantId = (siparisData as any).tenantId || tenantId || undefined;
 
     // Sipariş numarası kontrolü (tenant-aware)
@@ -868,9 +851,6 @@ export class SiparisService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.tenantContext.getTenantId();
-
-    // Siparişi bul
     const siparis = await this.prisma.siparis.findUnique({
       where: { id },
       include: {
@@ -974,7 +954,7 @@ export class SiparisService {
     ipAddress?: string,
     userAgent?: string,
   ) {
-    const tenantId = this.tenantContext.getTenantId();
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
     // Siparişi bul (kalemler dahil, sevkEdilenMiktar ile)
     const siparis = await this.prisma.siparis.findUnique({
@@ -1087,24 +1067,13 @@ export class SiparisService {
   }
 
   async findSiparislerForInvoice(cariId?: string, search?: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-
-    // SUPER_ADMIN için tenant kontrolünü atla
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const where: Prisma.SiparisWhereInput = {
       deletedAt: null,
       siparisTipi: 'SATIS',
-      durum: 'SEVK_EDILDI', // Sadece sevk edilmiş siparişler
+      durum: 'SEVK_EDILDI',
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
-
-    // SUPER_ADMIN için tenantId filtresi ekleme
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
 
     if (cariId) {
       where.cariId = cariId;

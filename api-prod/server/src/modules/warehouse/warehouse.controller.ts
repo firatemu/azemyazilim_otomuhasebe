@@ -35,6 +35,21 @@ export class WarehouseController {
     return this.warehouseService.findByCode(code);
   }
 
+  @Get('default/get')
+  getDefault() {
+    return this.warehouseService.getDefaultWarehouse();
+  }
+
+  @Get(':id/inventory')
+  getInventory(@Param('id') id: string) {
+    return this.warehouseService.getWarehouseStock(id);
+  }
+
+  @Get(':id/stock-report')
+  getStockReport(@Param('id') id: string) {
+    return this.warehouseService.getWarehouseStock(id);
+  }
+
   @Post()
   create(@Body() createDto: CreateWarehouseDto) {
     return this.warehouseService.create(createDto);

@@ -21,6 +21,7 @@
     "seed:araclar": "ts-node prisma/seed-araclar.ts",
     "seed:araclar:extended": "ts-node prisma/seed-araclar-extended.ts",
     "seed:saas": "ts-node prisma/seed-saas.ts",
+    "import:postal-codes": "ts-node scripts/import-postal-codes.ts",
     "migrate:hizli-token": "node apply-hizli-token-migration.js",
     "migrate:all": "node apply-hizli-token-migration.js && npx prisma generate",
     "setup:hizli": "node run-hizli-setup.js",

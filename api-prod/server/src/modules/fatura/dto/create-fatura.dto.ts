@@ -70,6 +70,10 @@ export class CreateFaturaDto {
   @IsOptional()
   irsaliyeId?: string; // İrsaliye ID (irsaliye faturalandırıldığında)
 
+  @IsString()
+  @IsOptional()
+  warehouseId?: string; // Ambar ID
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateFaturaKalemiDto)

@@ -11,6 +11,56 @@ import { UpdateFirmaKrediKartiDto } from './dto/update-firma-kredi-karti.dto';
 export class FirmaKrediKartiService {
   constructor(private prisma: PrismaService) {}
 
+  /**
+   * Tarihten ayın gününü çıkarır (1-31)
+   */
+  private getDayOfMonth(date: Date | string | null | undefined): number | null {
+    if (!date) return null;
+    const d = typeof date === 'string' ? new Date(date) : date;
+    if (isNaN(d.getTime())) return null;
+    return d.getDate();
+  }
+
+  /**
+   * Hatırlatıcı oluşturur veya günceller
+   */
+  private async upsertHatirlatici(
+    kartId: string,
+    tip: 'HESAP_KESIM_TARIHI' | 'SON_ODEME_TARIHI',
+    tarih: Date | string | null | undefined,
+  ) {
+    if (!tarih) {
+      // Tarih yoksa hatırlatıcıyı sil
+      await this.prisma.firmaKrediKartiHatirlatici.deleteMany({
+        where: { kartId, tip },
+      });
+      return;
+    }
+
+    const gun = this.getDayOfMonth(tarih);
+    if (gun === null) return;
+
+    // Upsert: varsa güncelle, yoksa oluştur
+    await this.prisma.firmaKrediKartiHatirlatici.upsert({
+      where: {
+        kartId_tip: {
+          kartId,
+          tip,
+        },
+      },
+      update: {
+        gun,
+        aktif: true,
+      },
+      create: {
+        kartId,
+        tip,
+        gun,
+        aktif: true,
+      },
+    });
+  }
+
   async create(createDto: CreateFirmaKrediKartiDto) {
     // Kasa kontrolü
     const kasa = await this.prisma.kasa.findUnique({
@@ -45,15 +95,35 @@ export class FirmaKrediKartiService {
       kartTipi: createDto.kartTipi,
       sonDortHane: createDto.sonDortHane,
       limit: createDto.limit,
+      hesapKesimTarihi: createDto.hesapKesimTarihi
+        ? new Date(createDto.hesapKesimTarihi)
+        : null,
+      sonOdemeTarihi: createDto.sonOdemeTarihi
+        ? new Date(createDto.sonOdemeTarihi)
+        : null,
       aktif: createDto.aktif ?? true,
     };
 
-    return this.prisma.firmaKrediKarti.create({
+    const kart = await this.prisma.firmaKrediKarti.create({
       data,
       include: {
         kasa: true,
       },
     });
+
+    // Hatırlatıcıları oluştur
+    await this.upsertHatirlatici(
+      kart.id,
+      'HESAP_KESIM_TARIHI',
+      createDto.hesapKesimTarihi,
+    );
+    await this.upsertHatirlatici(
+      kart.id,
+      'SON_ODEME_TARIHI',
+      createDto.sonOdemeTarihi,
+    );
+
+    return kart;
   }
 
   async findAll(kasaId?: string) {
@@ -116,10 +186,41 @@ export class FirmaKrediKartiService {
       );
     }
 
-    return this.prisma.firmaKrediKarti.update({
+    // Tarih alanlarını Date'e çevir
+    const dataToUpdate: any = { ...updateData };
+    if (updateDto.hesapKesimTarihi !== undefined) {
+      dataToUpdate.hesapKesimTarihi = updateDto.hesapKesimTarihi
+        ? new Date(updateDto.hesapKesimTarihi)
+        : null;
+    }
+    if (updateDto.sonOdemeTarihi !== undefined) {
+      dataToUpdate.sonOdemeTarihi = updateDto.sonOdemeTarihi
+        ? new Date(updateDto.sonOdemeTarihi)
+        : null;
+    }
+
+    const kart = await this.prisma.firmaKrediKarti.update({
       where: { id },
-      data: updateData,
+      data: dataToUpdate,
     });
+
+    // Hatırlatıcıları güncelle
+    if (updateDto.hesapKesimTarihi !== undefined) {
+      await this.upsertHatirlatici(
+        id,
+        'HESAP_KESIM_TARIHI',
+        updateDto.hesapKesimTarihi,
+      );
+    }
+    if (updateDto.sonOdemeTarihi !== undefined) {
+      await this.upsertHatirlatici(
+        id,
+        'SON_ODEME_TARIHI',
+        updateDto.sonOdemeTarihi,
+      );
+    }
+
+    return kart;
   }
 
   async remove(id: string) {
@@ -137,5 +238,45 @@ export class FirmaKrediKartiService {
     return this.prisma.firmaKrediKarti.delete({
       where: { id },
     });
+  }
+
+  /**
+   * Bugünün gününe göre aktif hatırlatıcıları getirir
+   */
+  async getTodayReminders() {
+    const today = new Date().getDate(); // Ayın kaçıncı günü (1-31)
+
+    const reminders = await this.prisma.firmaKrediKartiHatirlatici.findMany({
+      where: {
+        gun: today,
+        aktif: true,
+      },
+      include: {
+        kart: {
+          include: {
+            kasa: {
+              select: {
+                kasaKodu: true,
+                kasaAdi: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    return reminders.map((r) => ({
+      id: r.id,
+      kartId: r.kartId,
+      tip: r.tip,
+      gun: r.gun,
+      kart: {
+        id: r.kart.id,
+        kartKodu: r.kart.kartKodu,
+        kartAdi: r.kart.kartAdi,
+        bankaAdi: r.kart.bankaAdi,
+        kasa: r.kart.kasa,
+      },
+    }));
   }
 }

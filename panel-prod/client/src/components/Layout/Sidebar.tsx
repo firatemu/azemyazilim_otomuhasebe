@@ -5,6 +5,7 @@ import { useTabStore } from '@/stores/tabStore';
 import {
   AccountBalance,
   AccountBalanceWallet,
+  Add,
   Assessment,
   Assignment,
   AttachMoney,
@@ -24,6 +25,8 @@ import {
   Inventory,
   LocalShipping,
   Logout,
+  Menu as MenuIcon,
+  MoreVert,
   Notifications,
   Payment,
   People,
@@ -41,6 +44,8 @@ import {
 } from '@mui/icons-material';
 import {
   Box,
+  Button,
+  Chip,
   Collapse,
   Divider,
   Drawer,
@@ -51,9 +56,12 @@ import {
   ListItemButton,
   ListItemIcon,
   ListItemText,
+  Menu,
+  MenuItem,
   TextField,
   Toolbar,
   Typography,
+  Avatar,
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useMemo, useState } from 'react';
@@ -61,20 +69,22 @@ import React, { useEffect, useMemo, useState } from 'react';
 export const SIDEBAR_WIDTH = 280;
 
 const palette = {
-  gradient: 'radial-gradient(circle at -10% 0%, #3a4b7f 0%, #1c2641 48%, #11182b 100%)',
-  headerGradient: 'linear-gradient(135deg, #445893 0%, #2c3a63 55%, #1b2541 100%)',
-  textPrimary: '#eef2ff',
-  textSecondary: 'rgba(226, 232, 255, 0.65)',
-  iconBg: 'rgba(255,255,255,0.15)',
-  iconBgActive: 'rgba(255,255,255,0.25)',
-  itemHover: 'rgba(255,255,255,0.08)',
-  itemBorder: 'rgba(255,255,255,0.08)',
-  itemSelectedBorder: 'rgba(140,168,255,0.5)',
-  itemSelectedBg: 'linear-gradient(135deg, #5d73f5 0%, #465bd4 55%, #2f3f8f 100%)',
-  submenuBg: 'linear-gradient(145deg, rgba(80,96,161,0.58) 0%, rgba(35,46,86,0.85) 100%)',
-  submenuBorder: 'rgba(132,159,255,0.32)',
-  searchBg: 'rgba(10,18,33,0.65)',
-  searchBorder: 'rgba(140,168,255,0.4)',
+  secondaryHex: '#527575',
+  // Light + clean, marka tokenlarıyla (örnek dashboard’a yakın)
+  gradient: 'var(--card)',
+  headerGradient: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 65%, #527575 35%) 0%, color-mix(in srgb, var(--primary) 45%, var(--background) 55%) 100%)',
+  textPrimary: 'var(--foreground)',
+  textSecondary: 'color-mix(in srgb, var(--foreground) 60%, transparent)',
+  iconBg: 'color-mix(in srgb, var(--primary) 10%, var(--card) 90%)',
+  iconBgActive: 'color-mix(in srgb, #527575 18%, var(--card) 82%)',
+  itemHover: 'color-mix(in srgb, #527575 24%, var(--card) 76%)',
+  itemBorder: 'color-mix(in srgb, var(--border) 85%, transparent)',
+  itemSelectedBorder: 'color-mix(in srgb, var(--primary) 55%, var(--border) 45%)',
+  itemSelectedBg: 'color-mix(in srgb, var(--primary) 35%, #527575 25%, var(--card) 40%)',
+  submenuBg: 'color-mix(in srgb, var(--card) 80%, #527575 20%)',
+  submenuBorder: 'color-mix(in srgb, #527575 45%, var(--border) 55%)',
+  searchBg: 'color-mix(in srgb, var(--input) 92%, var(--card) 8%)',
+  searchBorder: 'color-mix(in srgb, var(--border) 80%, var(--primary) 20%)',
 };
 
 const menuItems = [
@@ -122,6 +132,7 @@ const menuItems = [
       { id: 'fatura-alis', label: 'Satın Alma Faturaları', icon: ShoppingCart, path: '/fatura/alis', color: '#f59e0b' },
       { id: 'fatura-iade-satis', label: 'Satış İade Faturaları', icon: TrendingDown, path: '/fatura/iade/satis', color: '#ef4444' },
       { id: 'fatura-iade-alis', label: 'Satınalma İade Faturaları', icon: TrendingUp, path: '/fatura/iade/alis', color: '#06b6d4' },
+      { id: 'fatura-karlilik', label: 'Fatura Karlılığı', icon: TrendingUp, path: '/fatura/karlilik', color: '#10b981' },
       { id: 'fatura-arsiv', label: 'Fatura Arşivi', icon: Assessment, path: '/fatura/arsiv', color: '#ef4444' },
       { id: 'fatura-gelen-efatura', label: 'Gelen E-Faturalar', icon: CloudDownload, path: '/efatura/gelen', color: '#0ea5e9' },
     ],
@@ -257,6 +268,7 @@ const menuItems = [
     bgColor: '#f9fafb',
     subItems: [
       { id: 'ayarlar-numara-sablonlari', label: 'Numara Şablonları', icon: Settings, path: '/ayarlar/numara-sablonlari', color: '#6b7280' },
+      { id: 'ayarlar-parametreler', label: 'Parametreler', icon: Settings, path: '/ayarlar/parametreler', color: '#6b7280' },
     ],
   },
 ];
@@ -270,10 +282,12 @@ interface SidebarProps {
 
 export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarProps) {
   const { addTab, setActiveTab, activeTab } = useTabStore();
-  const { user } = useAuthStore();
+  const { user, clearAuth } = useAuthStore();
   const router = useRouter();
   const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
+  const [quickMenuAnchor, setQuickMenuAnchor] = useState<null | HTMLElement>(null);
 
   const handleMenuClick = (item: any) => {
     if (item.subItems) {
@@ -347,6 +361,38 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
     }
   }, [open]);
 
+  const handleQuickCreate = (type: string) => {
+    setQuickMenuAnchor(null);
+    // Quick create actions
+    switch (type) {
+      case 'fatura':
+        router.push('/fatura/satis');
+        break;
+      case 'cari':
+        router.push('/cari');
+        break;
+      case 'stok':
+        router.push('/stok/malzeme-listesi');
+        break;
+      default:
+        break;
+    }
+  };
+
+  const handleUserMenuClick = (event: React.MouseEvent<HTMLElement>) => {
+    setUserMenuAnchor(event.currentTarget);
+  };
+
+  const handleUserMenuClose = () => {
+    setUserMenuAnchor(null);
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    router.push('/login');
+    handleUserMenuClose();
+  };
+
   const drawerVariant = pinned ? 'permanent' : 'temporary';
 
   return (
@@ -370,39 +416,57 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
         },
       }}
     >
+      {/* Modern Header */}
       <Toolbar
         sx={{
-          background: palette.headerGradient,
+          background: 'var(--card)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 2,
-          py: 1.5,
-          px: 2,
-          boxShadow: 'inset 0 -1px 0 rgba(255,255,255,0.08)',
+          py: 2,
+          px: 2.5,
+          borderBottom: '1px solid var(--border)',
         }}
       >
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, flex: 1 }}>
           <Box
             sx={{
               display: 'flex',
               alignItems: 'center',
               justifyContent: 'center',
-              width: 42,
-              height: 42,
-              borderRadius: 2,
-              bgcolor: 'rgba(255,255,255,0.18)',
-              boxShadow: '0 12px 24px rgba(13,18,32,0.45)',
+              width: 40,
+              height: 40,
+              borderRadius: 'var(--radius)',
+              background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+              boxShadow: '0 4px 12px color-mix(in srgb, var(--primary) 30%, transparent)',
             }}
           >
-            <DirectionsCar sx={{ fontSize: 24, color: palette.textPrimary }} />
+            <DirectionsCar sx={{ fontSize: 22, color: 'var(--primary-foreground)' }} />
           </Box>
-          <Box>
-            <Typography variant="subtitle1" noWrap fontWeight="bold" sx={{ lineHeight: 1.2 }}>
-              Yedek Parça
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography 
+              variant="subtitle1" 
+              noWrap 
+              fontWeight="700" 
+              sx={{ 
+                lineHeight: 1.2,
+                fontSize: '1rem',
+                color: 'var(--foreground)',
+                letterSpacing: '-0.01em',
+              }}
+            >
+              Oto Muhasebe
             </Typography>
-            <Typography variant="caption" sx={{ color: palette.textSecondary, fontSize: '0.7rem' }}>
-              Otomasyon v1.0
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                color: 'var(--muted-foreground)', 
+                fontSize: '0.7rem',
+                display: 'block',
+              }}
+            >
+              ERP Sistemi
             </Typography>
           </Box>
         </Box>
@@ -410,23 +474,92 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
           onClick={pinned ? onTogglePin : onClose}
           size="small"
           sx={{
-            color: palette.textPrimary,
-            bgcolor: 'rgba(255,255,255,0.14)',
+            color: 'var(--muted-foreground)',
             '&:hover': {
-              bgcolor: 'rgba(255,255,255,0.25)',
+              bgcolor: 'var(--muted)',
+              color: 'var(--foreground)',
             },
+            transition: 'all 0.2s ease',
           }}
         >
           {pinned ? (
-            <PushPin sx={{ transform: 'rotate(45deg)' }} fontSize="small" />
+            <PushPin sx={{ fontSize: 18 }} />
           ) : (
-            <Close fontSize="small" />
+            <Close sx={{ fontSize: 18 }} />
           )}
         </IconButton>
       </Toolbar>
-      <Divider sx={{ borderColor: 'rgba(255,255,255,0.08)' }} />
+      
+      {/* Quick Actions Button */}
+      <Box sx={{ px: 2, pt: 2, pb: 1 }}>
+        <Button
+          fullWidth
+          variant="contained"
+          startIcon={<Add />}
+          onClick={(e) => setQuickMenuAnchor(e.currentTarget)}
+          sx={{
+            background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+            color: 'var(--primary-foreground)',
+            fontWeight: 600,
+            py: 1.25,
+            borderRadius: 'var(--radius)',
+            textTransform: 'none',
+            fontSize: '0.875rem',
+            boxShadow: '0 4px 12px color-mix(in srgb, var(--primary) 25%, transparent)',
+            '&:hover': {
+              background: 'linear-gradient(135deg, var(--primary), var(--secondary))',
+              boxShadow: '0 6px 16px color-mix(in srgb, var(--primary) 35%, transparent)',
+              transform: 'translateY(-1px)',
+            },
+            transition: 'all 0.2s ease',
+          }}
+        >
+          Hızlı İşlem
+        </Button>
+        <Menu
+          anchorEl={quickMenuAnchor}
+          open={Boolean(quickMenuAnchor)}
+          onClose={() => setQuickMenuAnchor(null)}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'left' }}
+          PaperProps={{
+            sx: {
+              mt: 1,
+              minWidth: 200,
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 8px 24px color-mix(in srgb, var(--foreground) 8%, transparent)',
+            },
+          }}
+        >
+          <MenuItem onClick={() => handleQuickCreate('fatura')} sx={{ py: 1.25 }}>
+            <Receipt sx={{ mr: 1.5, fontSize: 20, color: 'var(--primary)' }} />
+            <Box>
+              <Typography variant="body2" fontWeight={600}>Yeni Fatura</Typography>
+              <Typography variant="caption" color="text.secondary">Satış faturası oluştur</Typography>
+            </Box>
+          </MenuItem>
+          <MenuItem onClick={() => handleQuickCreate('cari')} sx={{ py: 1.25 }}>
+            <People sx={{ mr: 1.5, fontSize: 20, color: 'var(--secondary)' }} />
+            <Box>
+              <Typography variant="body2" fontWeight={600}>Yeni Cari</Typography>
+              <Typography variant="caption" color="text.secondary">Cari hesap ekle</Typography>
+            </Box>
+          </MenuItem>
+          <MenuItem onClick={() => handleQuickCreate('stok')} sx={{ py: 1.25 }}>
+            <Inventory sx={{ mr: 1.5, fontSize: 20, color: 'var(--chart-1)' }} />
+            <Box>
+              <Typography variant="body2" fontWeight={600}>Yeni Stok</Typography>
+              <Typography variant="caption" color="text.secondary">Malzeme ekle</Typography>
+            </Box>
+          </MenuItem>
+        </Menu>
+      </Box>
+      
+      <Divider sx={{ borderColor: 'var(--border)', mx: 2 }} />
 
-      <Box sx={{ px: 2, pt: 2 }}>
+      {/* Modern Search */}
+      <Box sx={{ px: 2, pt: 2, pb: 1 }}>
         <TextField
           size="small"
           fullWidth
@@ -436,29 +569,30 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <Search sx={{ color: palette.textSecondary, fontSize: 20 }} />
+                <Search sx={{ color: 'var(--muted-foreground)', fontSize: 18 }} />
               </InputAdornment>
             ),
           }}
           sx={{
             '& .MuiOutlinedInput-root': {
-              color: palette.textPrimary,
-              bgcolor: palette.searchBg,
+              bgcolor: 'var(--input)',
+              borderRadius: 'var(--radius)',
               '& fieldset': {
-                borderColor: palette.searchBorder,
+                borderColor: 'var(--border)',
               },
               '&:hover fieldset': {
-                borderColor: 'rgba(148,177,255,0.6)',
+                borderColor: 'var(--ring)',
               },
               '&.Mui-focused fieldset': {
-                borderColor: '#a7baff',
-                boxShadow: '0 0 0 2px rgba(113,135,230,0.35)',
+                borderColor: 'var(--primary)',
+                borderWidth: '2px',
               },
             },
             '& .MuiOutlinedInput-input': {
               fontSize: '0.875rem',
+              py: 1.25,
               '&::placeholder': {
-                color: palette.textSecondary,
+                color: 'var(--muted-foreground)',
                 opacity: 1,
               },
             },
@@ -466,10 +600,11 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
         />
       </Box>
 
-      <List sx={{ px: 1.5, pt: 1, flexGrow: 1, overflowY: 'auto' }}>
+      <List sx={{ px: 1.5, pt: 1, flexGrow: 1, overflowY: 'auto', '&::-webkit-scrollbar': { width: '6px' }, '&::-webkit-scrollbar-track': { bgcolor: 'transparent' }, '&::-webkit-scrollbar-thumb': { bgcolor: 'var(--border)', borderRadius: '3px', '&:hover': { bgcolor: 'var(--muted-foreground)' } } }}>
         {filteredMenuItems.length === 0 && searchTerm ? (
-          <Box sx={{ px: 2, py: 3, textAlign: 'center' }}>
-            <Typography variant="caption" sx={{ color: palette.textSecondary }}>
+          <Box sx={{ px: 2, py: 4, textAlign: 'center' }}>
+            <Search sx={{ fontSize: 48, color: 'var(--muted-foreground)', mb: 1, opacity: 0.5 }} />
+            <Typography variant="body2" sx={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>
               "{searchTerm}" için sonuç bulunamadı
             </Typography>
           </Box>
@@ -481,68 +616,95 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
 
             return (
               <React.Fragment key={item.id}>
-                <ListItem disablePadding sx={{ mb: 0.75 }}>
+                <ListItem disablePadding sx={{ mb: 0.5 }}>
                   <ListItemButton
                     onClick={() => handleMenuClick(item)}
                     sx={{
-                      borderRadius: 2.5,
-                      mb: 0.4,
+                      borderRadius: 'var(--radius)',
                       px: 1.5,
-                      py: 1.05,
-                      transition: 'all 0.22s ease-out',
-                      background: isActive ? palette.itemSelectedBg : 'rgba(255,255,255,0.035)',
-                      border: isActive ? `1px solid ${palette.itemSelectedBorder}` : `1px solid ${palette.itemBorder}`,
-                      boxShadow: isActive ? '0 14px 24px rgba(38,53,102,0.35)' : 'none',
+                      py: 0.875,
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      background: isActive 
+                        ? 'color-mix(in srgb, var(--primary) 10%, var(--card) 90%)' 
+                        : 'transparent',
+                      position: 'relative',
+                      '&::before': isActive ? {
+                        content: '""',
+                        position: 'absolute',
+                        left: 0,
+                        top: '50%',
+                        transform: 'translateY(-50%)',
+                        width: 3,
+                        height: '60%',
+                        bgcolor: 'var(--primary)',
+                        borderRadius: '0 2px 2px 0',
+                      } : {},
                       '&:hover': {
-                        background: isActive ? palette.itemSelectedBg : palette.itemHover,
-                        borderColor: palette.itemSelectedBorder,
-                        transform: 'translateX(3px)',
+                        background: isActive 
+                          ? 'color-mix(in srgb, var(--primary) 10%, var(--card) 90%)' 
+                          : 'color-mix(in srgb, #527575 20%, var(--card) 80%)',
+                        transform: 'translateX(2px)',
                       },
                     }}
                   >
-                    <ListItemIcon sx={{ minWidth: 44 }}>
-                      <Box
-                        sx={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          width: 34,
-                          height: 34,
-                          borderRadius: 2,
-                          bgcolor: isActive ? palette.iconBgActive : palette.iconBg,
-                          transition: 'all 0.22s ease-out',
-                        }}
-                      >
-                        <item.icon sx={{ color: palette.textPrimary, fontSize: 21 }} />
-                      </Box>
+                    <ListItemIcon sx={{ minWidth: 40 }}>
+                    <Box
+                      sx={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        width: 32,
+                        height: 32,
+                        borderRadius: 'calc(var(--radius) - 2px)',
+                        bgcolor: isActive 
+                          ? 'color-mix(in srgb, var(--primary) 12%, transparent)' 
+                          : 'transparent',
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      <item.icon sx={{ 
+                        color: isActive ? 'var(--primary)' : 'var(--muted-foreground)', 
+                        fontSize: 18,
+                        transition: 'color 0.2s ease',
+                      }} />
+                    </Box>
                     </ListItemIcon>
                     <ListItemText
                       primary={item.label}
                       sx={{
                         '& .MuiListItemText-primary': {
                           fontWeight: isActive ? 600 : 500,
-                          fontSize: '0.95rem',
-                          color: isActive ? palette.textPrimary : palette.textSecondary,
-                          letterSpacing: '0.01em',
+                          fontSize: '0.875rem',
+                          color: isActive ? 'var(--foreground)' : 'var(--muted-foreground)',
+                          letterSpacing: '-0.01em',
+                          transition: 'all 0.2s ease',
                         },
                       }}
                     />
-                    {hasSubMenu && (isOpen ? <ExpandLess sx={{ color: palette.textPrimary }} /> : <ExpandMore sx={{ color: palette.textPrimary }} />)}
+                    {hasSubMenu && (
+                      <Box sx={{ 
+                        color: isActive ? 'var(--primary)' : 'var(--muted-foreground)',
+                        transition: 'all 0.2s ease',
+                        transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                      }}>
+                        <ExpandMore sx={{ fontSize: 18 }} />
+                      </Box>
+                    )}
                   </ListItemButton>
                 </ListItem>
 
                 {hasSubMenu && (
-                  <Collapse in={isOpen} timeout={180} unmountOnExit>
+                  <Collapse in={isOpen} timeout={200} unmountOnExit>
                     <Box
                       sx={{
-                        bgcolor: palette.submenuBg,
-                        borderRadius: 2.5,
+                        bgcolor: 'color-mix(in srgb, var(--muted) 85%, #527575 15%)',
+                        borderRadius: 'var(--radius)',
                         mx: 1,
                         mb: 1,
-                        px: 1,
-                        py: 1,
-                        border: `1px solid ${palette.submenuBorder}`,
-                        boxShadow: '0 12px 18px rgba(14,21,37,0.45)',
+                        mt: 0.5,
+                        px: 0.5,
+                        py: 0.75,
+                        border: '1px solid color-mix(in srgb, var(--border) 75%, #527575 25%)',
                       }}
                     >
                       <List component="div" disablePadding>
@@ -554,35 +716,42 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                             const isSubActive = activeTab === subItem.id;
 
                             return (
-                              <ListItem key={subItem.id} disablePadding sx={{ pl: 1 }}>
+                              <ListItem key={subItem.id} disablePadding>
                                 <ListItemButton
                                   onClick={() => handleSubMenuClick(item, subItem)}
                                   sx={{
-                                    borderRadius: 1.75,
-                                    mb: 0.35,
-                                    py: 0.85,
-                                    px: 1.15,
-                                    transition: 'all 0.18s ease-out',
-                                    bgcolor: isSubActive ? 'rgba(255,255,255,0.14)' : 'transparent',
+                                    borderRadius: 'calc(var(--radius) - 2px)',
+                                    mb: 0.25,
+                                    py: 0.75,
+                                    px: 1.25,
+                                    transition: 'all 0.2s ease',
+                                    bgcolor: isSubActive ? 'color-mix(in srgb, #527575 18%, transparent)' : 'transparent',
                                     '&:hover': {
-                                      bgcolor: 'rgba(255,255,255,0.18)',
-                                      transform: 'translateX(4px)',
+                                      bgcolor: isSubActive 
+                                        ? 'color-mix(in srgb, #527575 18%, transparent)' 
+                                        : 'color-mix(in srgb, #527575 14%, transparent)',
+                                      transform: 'translateX(2px)',
                                     },
                                   }}
                                 >
-                                  <ListItemIcon sx={{ minWidth: 34 }}>
+                                  <ListItemIcon sx={{ minWidth: 32 }}>
                                     <Box
                                       sx={{
                                         display: 'flex',
                                         alignItems: 'center',
                                         justifyContent: 'center',
-                                        width: 26,
-                                        height: 26,
-                                        borderRadius: 1.5,
-                                        bgcolor: isSubActive ? 'rgba(255,255,255,0.22)' : 'rgba(255,255,255,0.12)',
+                                        width: 24,
+                                        height: 24,
+                                        borderRadius: 'calc(var(--radius) - 4px)',
+                                        bgcolor: isSubActive 
+                                          ? 'color-mix(in srgb, #527575 10%, transparent)' 
+                                          : 'transparent',
                                       }}
                                     >
-                                      <subItem.icon sx={{ color: palette.textPrimary, fontSize: 17 }} />
+                                      <subItem.icon sx={{ 
+                                        color: isSubActive ? '#527575' : 'var(--muted-foreground)', 
+                                        fontSize: 16,
+                                      }} />
                                     </Box>
                                   </ListItemIcon>
                                   <ListItemText
@@ -590,8 +759,8 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                                     sx={{
                                       '& .MuiListItemText-primary': {
                                         fontWeight: isSubActive ? 600 : 500,
-                                        fontSize: '0.87rem',
-                                        color: palette.textPrimary,
+                                        fontSize: '0.8125rem',
+                                        color: isSubActive ? '#527575' : 'var(--muted-foreground)',
                                       },
                                     }}
                                   />
@@ -609,43 +778,121 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
         )}
       </List>
 
-      <Box sx={{ px: 2.2, pb: 3 }}>
+      {/* Modern User Profile Section */}
+      <Box sx={{ px: 2, pb: 2, pt: 1, borderTop: '1px solid var(--border)' }}>
         <Box
           sx={{
-            bgcolor: 'rgba(9,15,28,0.65)',
-            borderRadius: 3,
-            border: '1px solid rgba(129,154,224,0.28)',
-            px: 2,
-            py: 1.6,
-            boxShadow: '0 16px 30px rgba(9,14,25,0.55)',
+            bgcolor: 'var(--card)',
+            borderRadius: 'var(--radius)',
+            border: '1px solid var(--border)',
+            p: 1.5,
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
             gap: 1.5,
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+            '&:hover': {
+              bgcolor: 'var(--muted)',
+              borderColor: 'var(--ring)',
+            },
           }}
+          onClick={handleUserMenuClick}
         >
-          <Box>
-            <Typography variant="body2" sx={{ color: palette.textPrimary, fontWeight: 600 }}>
+          <Avatar
+            sx={{
+              width: 36,
+              height: 36,
+              bgcolor: 'var(--primary)',
+              color: 'var(--primary-foreground)',
+              fontWeight: 600,
+              fontSize: '0.875rem',
+            }}
+          >
+            {user?.fullName?.[0]?.toUpperCase() || 'U'}
+          </Avatar>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
+            <Typography 
+              variant="body2" 
+              sx={{ 
+                fontWeight: 600,
+                color: 'var(--foreground)',
+                fontSize: '0.875rem',
+                lineHeight: 1.2,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {user?.fullName || 'Kullanıcı'}
             </Typography>
-            <Typography variant="caption" sx={{ color: palette.textSecondary }}>
+            <Typography 
+              variant="caption" 
+              sx={{ 
+                color: 'var(--muted-foreground)',
+                fontSize: '0.75rem',
+                display: 'block',
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap',
+              }}
+            >
               {user?.role || 'Rol bilgisi'}
             </Typography>
           </Box>
           <IconButton
             size="small"
             sx={{
-              color: palette.textPrimary,
-              border: '1px solid rgba(120,146,234,0.45)',
-              bgcolor: 'rgba(92,118,222,0.22)',
+              color: 'var(--muted-foreground)',
               '&:hover': {
-                bgcolor: 'rgba(92,118,222,0.35)',
+                bgcolor: 'var(--accent)',
+                color: 'var(--foreground)',
               },
             }}
           >
-            <Logout fontSize="small" />
+            <MoreVert sx={{ fontSize: 18 }} />
           </IconButton>
         </Box>
+        <Menu
+          anchorEl={userMenuAnchor}
+          open={Boolean(userMenuAnchor)}
+          onClose={handleUserMenuClose}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+          transformOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+          PaperProps={{
+            sx: {
+              mt: 1,
+              minWidth: 200,
+              borderRadius: 'var(--radius)',
+              border: '1px solid var(--border)',
+              boxShadow: '0 8px 24px color-mix(in srgb, var(--foreground) 8%, transparent)',
+            },
+          }}
+        >
+          <MenuItem onClick={handleUserMenuClose} sx={{ py: 1 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, width: '100%' }}>
+              <Avatar sx={{ width: 32, height: 32, bgcolor: 'var(--primary)', fontSize: '0.75rem' }}>
+                {user?.fullName?.[0]?.toUpperCase() || 'U'}
+              </Avatar>
+              <Box>
+                <Typography variant="body2" fontWeight={600}>
+                  {user?.fullName || 'Kullanıcı'}
+                </Typography>
+                <Typography variant="caption" color="text.secondary">
+                  {user?.email || user?.role || 'Bilgi yok'}
+                </Typography>
+              </Box>
+            </Box>
+          </MenuItem>
+          <Divider sx={{ my: 0.5 }} />
+          <MenuItem onClick={handleUserMenuClose} sx={{ py: 1 }}>
+            <Settings sx={{ mr: 1.5, fontSize: 18, color: 'var(--muted-foreground)' }} />
+            <Typography variant="body2">Ayarlar</Typography>
+          </MenuItem>
+          <MenuItem onClick={handleLogout} sx={{ py: 1, color: 'var(--destructive)' }}>
+            <Logout sx={{ mr: 1.5, fontSize: 18 }} />
+            <Typography variant="body2" fontWeight={500}>Çıkış Yap</Typography>
+          </MenuItem>
+        </Menu>
       </Box>
     </Drawer>
   );

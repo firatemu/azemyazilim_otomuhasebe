@@ -6,7 +6,8 @@ import {
   forwardRef,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreatePersonelDto } from './dto/create-personel.dto';
 import { UpdatePersonelDto } from './dto/update-personel.dto';
 import { CreatePersonelOdemeDto } from './dto/create-personel-odeme.dto';
@@ -17,27 +18,21 @@ import { CodeTemplateService } from '../code-template/code-template.service';
 export class PersonelService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => CodeTemplateService))
     private codeTemplateService: CodeTemplateService,
   ) {}
 
   async create(createDto: CreatePersonelDto, userId: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
-    // TC Kimlik No kontrolü (sadece girilmişse ve tenantId varsa)
     if (createDto.tcKimlikNo && tenantId) {
       const existingTc = await this.prisma.personel.findFirst({
-        where: { 
+        where: {
           tcKimlikNo: createDto.tcKimlikNo,
           tenantId,
         },
       });
-
       if (existingTc) {
         throw new BadRequestException(
           'Bu TC Kimlik No ile kayıtlı personel var',
@@ -45,7 +40,6 @@ export class PersonelService {
       }
     }
 
-    // Eğer personelKodu girilmemişse otomatik üret
     if (!createDto.personelKodu) {
       try {
         createDto.personelKodu =
@@ -57,26 +51,22 @@ export class PersonelService {
       }
     }
 
-    // Personel kodu kontrolü (tenantId varsa)
-    if (tenantId) {
+    const finalTenantId = (createDto as any).tenantId ?? tenantId;
+    if (finalTenantId) {
       const existingKod = await this.prisma.personel.findFirst({
-        where: { 
+        where: {
           personelKodu: createDto.personelKodu,
-          tenantId,
+          tenantId: finalTenantId,
         },
       });
-
       if (existingKod) {
         throw new BadRequestException('Bu personel kodu kullanılıyor');
       }
     }
 
-    // SUPER_ADMIN için dto'dan tenantId alınabilir, yoksa mevcut tenantId kullan
-    const finalTenantId = (createDto as any).tenantId || tenantId;
-
     const data: any = {
       ...createDto,
-      tenantId: finalTenantId,
+      ...(finalTenantId != null && { tenantId: finalTenantId }),
       createdBy: userId,
     };
 
@@ -101,17 +91,10 @@ export class PersonelService {
   }
 
   async findAll(aktif?: boolean, departman?: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
-    const where: Prisma.PersonelWhereInput = {};
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    const where: Prisma.PersonelWhereInput = {
+      ...buildTenantWhereClause(tenantId ?? undefined),
+    };
     if (aktif !== undefined) {
       where.aktif = aktif;
     }
@@ -138,19 +121,12 @@ export class PersonelService {
   }
 
   async findOne(id: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    const isSuperAdmin = this.tenantContext.isSuperAdmin();
-    if (!tenantId && !isSuperAdmin) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
-    const where: any = { id };
-    if (tenantId) {
-      where.tenantId = tenantId;
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const personel = await this.prisma.personel.findFirst({
-      where,
+      where: {
+        id,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
       include: {
         odemeler: {
           include: {

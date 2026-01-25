@@ -4,7 +4,8 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateSayimDto } from './dto/create-sayim.dto';
 import { UpdateSayimDto } from './dto/update-sayim.dto';
 import { AddKalemDto } from './dto/add-kalem.dto';
@@ -14,17 +15,13 @@ import { SayimTipi, SayimDurum, Prisma } from '@prisma/client';
 export class SayimService {
   constructor(
     private prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
   async findAll(sayimTipi?: SayimTipi, durum?: SayimDurum) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const where: Prisma.SayimWhereInput = {
-      tenantId,
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
 
     if (sayimTipi) {
@@ -58,15 +55,11 @@ export class SayimService {
   }
 
   async findOne(id: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const sayim = await this.prisma.sayim.findFirst({
-      where: { 
+      where: {
         id,
-        tenantId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
       },
       include: {
         kalemler: {
@@ -121,16 +114,12 @@ export class SayimService {
   async create(createSayimDto: CreateSayimDto, userId?: string) {
     const { kalemler, ...sayimData } = createSayimDto;
 
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
+    const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
-    // Sayım numarası kontrolü (tenant-aware)
     const existingSayim = await this.prisma.sayim.findFirst({
-      where: { 
+      where: {
         sayimNo: sayimData.sayimNo,
-        tenantId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
       },
     });
 
@@ -199,7 +188,7 @@ export class SayimService {
       const sayim = await prisma.sayim.create({
         data: {
           ...sayimData,
-          tenantId,
+          ...(tenantId != null && { tenantId }),
           createdBy: userId,
           kalemler: {
             create: kalemlerWithSystemQty,

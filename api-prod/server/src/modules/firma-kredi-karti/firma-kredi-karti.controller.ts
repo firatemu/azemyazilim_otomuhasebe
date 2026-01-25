@@ -45,4 +45,9 @@ export class FirmaKrediKartiController {
   remove(@Param('id') id: string) {
     return this.firmaKrediKartiService.remove(id);
   }
+
+  @Get('hatirlaticilar/bugun')
+  getTodayReminders() {
+    return this.firmaKrediKartiService.getTodayReminders();
+  }
 }

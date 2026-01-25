@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   Box,
   Typography,
@@ -34,7 +34,7 @@ import {
 import { Delete, Save, ArrowBack, ToggleOn, ToggleOff, LocalShipping } from '@mui/icons-material';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 
 interface Cari {
   id: string;
@@ -65,8 +65,10 @@ interface FaturaKalemi {
   iskontoFormula?: string;
 }
 
-export default function YeniAlisFaturasiPage() {
+function YeniAlisFaturasiPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const irsaliyeId = searchParams.get('irsaliyeId');
 
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
@@ -97,16 +99,12 @@ export default function YeniAlisFaturasiPage() {
     fetchCariler();
     fetchStoklar();
 
-    // URL parametrelerini oku
-    const urlParams = new URLSearchParams(window.location.search);
-    const irsaliyeId = urlParams.get('irsaliyeId');
-
     if (irsaliyeId) {
       fetchIrsaliyeBilgileri(irsaliyeId);
     } else {
       generateFaturaNo();
     }
-  }, []);
+  }, [irsaliyeId]);
 
   const fetchCariler = async () => {
     try {
@@ -1242,3 +1240,10 @@ export default function YeniAlisFaturasiPage() {
   );
 }
 
+export default function YeniAlisFaturasiPage() {
+  return (
+    <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}><CircularProgress /></Box>}>
+      <YeniAlisFaturasiPageContent />
+    </Suspense>
+  );
+}

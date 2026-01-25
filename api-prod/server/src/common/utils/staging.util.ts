@@ -32,11 +32,17 @@ export function getTenantIdForQuery(tenantId: string | undefined): string | unde
  * Database sorgusu için tenantId filtresi oluştur
  * Staging'de tenantId null/undefined olabilir
  */
-export function buildTenantWhereClause(tenantId: string | undefined): { tenantId?: string } | {} {
+export function buildTenantWhereClause(tenantId: string | undefined): any {
   if (isStagingEnvironment()) {
     // Staging'de tenantId opsiyonel
     if (tenantId) {
-      return { tenantId };
+      // Hem tenantId'li hem null olanları getir
+      return {
+        OR: [
+          { tenantId },
+          { tenantId: null },
+        ],
+      };
     }
     // TenantId yoksa boş obje döndür (tüm kayıtları getir)
     return {};

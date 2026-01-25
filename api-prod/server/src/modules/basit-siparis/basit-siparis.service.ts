@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
-import { TenantContextService } from '../../common/services/tenant-context.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateBasitSiparisDto } from './dto';
 import { BasitSiparisDurum } from '@prisma/client';
 
@@ -8,7 +9,7 @@ import { BasitSiparisDurum } from '@prisma/client';
 export class BasitSiparisService {
   constructor(
     private readonly prisma: PrismaService,
-    private tenantContext: TenantContextService,
+    private tenantResolver: TenantResolverService,
   ) {}
 
   /**
@@ -16,15 +17,18 @@ export class BasitSiparisService {
    * Durum otomatik olarak ONAY_BEKLIYOR olarak ayarlanır
    */
   async create(dto: CreateBasitSiparisDto) {
-    const tenantId = this.tenantContext.getTenantId();
+    const tenantId = await this.tenantResolver.resolveForCreate({});
     if (!tenantId) {
       throw new BadRequestException('Tenant ID is required');
     }
 
-    // Firma ve ürün kontrolü
     const [firma, urun] = await Promise.all([
-      this.prisma.cari.findFirst({ where: { id: dto.firmaId, tenantId } }),
-      this.prisma.stok.findFirst({ where: { id: dto.urunId, tenantId } }),
+      this.prisma.cari.findFirst({
+        where: { id: dto.firmaId, ...buildTenantWhereClause(tenantId) },
+      }),
+      this.prisma.stok.findFirst({
+        where: { id: dto.urunId, ...buildTenantWhereClause(tenantId) },
+      }),
     ]);
 
     if (!firma) {
@@ -67,23 +71,13 @@ export class BasitSiparisService {
     return siparis;
   }
 
-  /**
-   * Tüm siparişleri listele
-   */
   async findAll(page = 1, limit = 50, durum?: BasitSiparisDurum) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
-
     const where: any = {
-      tenantId,
+      ...buildTenantWhereClause(tenantId ?? undefined),
     };
-    if (durum) {
-      where.durum = durum;
-    }
+    if (durum) where.durum = durum;
 
     const [siparisler, total] = await Promise.all([
       this.prisma.basitSiparis.findMany({
@@ -124,19 +118,12 @@ export class BasitSiparisService {
     };
   }
 
-  /**
-   * Tek sipariş getir
-   */
   async findOne(id: string) {
-    const tenantId = this.tenantContext.getTenantId();
-    if (!tenantId) {
-      throw new BadRequestException('Tenant ID is required');
-    }
-
+    const tenantId = await this.tenantResolver.resolveForQuery();
     const siparis = await this.prisma.basitSiparis.findFirst({
-      where: { 
+      where: {
         id,
-        tenantId,
+        ...buildTenantWhereClause(tenantId ?? undefined),
       },
       include: {
         firma: {

@@ -2,7 +2,8 @@
 
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
-import { Add, Assignment, Close, Delete, Edit, Print, Search, Undo, Visibility, Send, CheckCircle, Error as ErrorIcon, HourglassEmpty, CloudUpload, LocalShipping, Cancel, ArrowUpward, ArrowDownward } from '@mui/icons-material';
+import { getProfitByInvoice, type ProfitByInvoiceResponse } from '@/services/invoiceProfitService';
+import { Add, Assignment, Close, Delete, Edit, Print, Search, Undo, Visibility, Send, CheckCircle, Error as ErrorIcon, HourglassEmpty, CloudUpload, LocalShipping, Cancel, ArrowUpward, ArrowDownward, MoreVert, TrendingUp } from '@mui/icons-material';
 import {
   Alert,
   Box,
@@ -17,6 +18,7 @@ import {
   IconButton,
   InputLabel,
   Link,
+  Menu,
   MenuItem,
   Paper,
   Select,
@@ -110,7 +112,7 @@ export default function SatisFaturalariPage() {
   const [stoklar, setStoklar] = useState<Stok[]>([]);
   const [loading, setLoading] = useState(false);
   const [faturaDurumlari, setFaturaDurumlari] = useState<Record<string, string>>({});
-  
+
   // Sorting states
   const [sortBy, setSortBy] = useState('tarih');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
@@ -143,6 +145,16 @@ export default function SatisFaturalariPage() {
 
   // E-Fatura gönderme state
   const [sendingEInvoice, setSendingEInvoice] = useState<string | null>(null);
+
+  // Açılır menü state
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [menuFaturaId, setMenuFaturaId] = useState<string | null>(null);
+
+  // Kar görüntüleme state
+  const [openProfitDialog, setOpenProfitDialog] = useState(false);
+  const [profitData, setProfitData] = useState<any>(null);
+  const [loadingProfit, setLoadingProfit] = useState(false);
+
 
 
   useEffect(() => {
@@ -202,6 +214,17 @@ export default function SatisFaturalariPage() {
   const showSnackbar = (message: string, severity: 'success' | 'error' | 'info') => {
     setSnackbar({ open: true, message, severity });
   };
+
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, faturaId: string) => {
+    setAnchorEl(event.currentTarget);
+    setMenuFaturaId(faturaId);
+  };
+
+  const handleMenuClose = () => {
+    setAnchorEl(null);
+    setMenuFaturaId(null);
+  };
+
 
   const resetForm = () => {
     setFormData({
@@ -615,7 +638,13 @@ export default function SatisFaturalariPage() {
                   size="small"
                   onClick={handleAddKalem}
                   sx={{
-                    background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+                    bgcolor: 'var(--secondary)',
+                    color: 'var(--secondary-foreground)',
+                    textTransform: 'none',
+                    fontWeight: 600,
+                    '&:hover': {
+                      bgcolor: 'var(--secondary-hover)',
+                    },
                   }}
                 >
                   Kalem Ekle
@@ -724,23 +753,56 @@ export default function SatisFaturalariPage() {
             </Box>
 
             {/* Toplam */}
-            <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f9fafb' }}>
+            <Paper 
+              variant="outlined" 
+              sx={{ 
+                p: 2, 
+                bgcolor: 'var(--muted)',
+                border: '1px solid var(--border)',
+                borderRadius: 'var(--radius-md)',
+              }}
+            >
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Ara Toplam:</Typography>
-                  <Typography variant="h6" fontWeight="bold">{formatCurrency(toplamTutar)}</Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Ara Toplam:
+                  </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ fontWeight: 700, color: 'var(--foreground)' }}
+                  >
+                    {formatCurrency(toplamTutar)}
+                  </Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">KDV Toplamı:</Typography>
-                  <Typography variant="h6" fontWeight="bold">{formatCurrency(kdvTutar)}</Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    KDV Toplamı:
+                  </Typography>
+                  <Typography 
+                    variant="h6" 
+                    sx={{ fontWeight: 700, color: 'var(--foreground)' }}
+                  >
+                    {formatCurrency(kdvTutar)}
+                  </Typography>
                 </Box>
                 <Box>
-                  <Typography variant="body2" color="text.secondary">Genel Toplam:</Typography>
+                  <Typography 
+                    variant="body2" 
+                    sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
+                  >
+                    Genel Toplam:
+                  </Typography>
                   <Typography
                     variant="h6"
-                    fontWeight="bold"
                     sx={{
-                      color: '#8b5cf6',
+                      fontWeight: 700,
+                      color: 'var(--secondary)',
                     }}
                   >
                     {formatCurrency(genelToplam)}
@@ -751,14 +813,30 @@ export default function SatisFaturalariPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setOpenAdd(false); setOpenEdit(false); }}>
+          <Button 
+            onClick={() => { setOpenAdd(false); setOpenEdit(false); }}
+            sx={{
+              textTransform: 'none',
+              fontWeight: 600,
+              color: 'var(--muted-foreground)',
+              '&:hover': {
+                bgcolor: 'var(--muted)',
+              },
+            }}
+          >
             İptal
           </Button>
           <Button
             onClick={handleSave}
             variant="contained"
             sx={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+              bgcolor: 'var(--secondary)',
+              color: 'var(--secondary-foreground)',
+              textTransform: 'none',
+              fontWeight: 600,
+              '&:hover': {
+                bgcolor: 'var(--secondary-hover)',
+              },
             }}
           >
             {openAdd ? 'Oluştur' : 'Güncelle'}
@@ -772,14 +850,25 @@ export default function SatisFaturalariPage() {
     <MainLayout>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" fontWeight="bold" sx={{
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            WebkitBackgroundClip: 'text',
-            WebkitTextFillColor: 'transparent',
-          }}>
+          <Typography 
+            variant="h4" 
+            sx={{
+              fontWeight: 700,
+              fontSize: '1.875rem',
+              color: 'var(--foreground)',
+              letterSpacing: '-0.02em',
+              mb: 0.5,
+            }}
+          >
             Satış Faturaları
           </Typography>
-          <Typography variant="body2" color="text.secondary">
+          <Typography 
+            variant="body2" 
+            sx={{
+              color: 'var(--muted-foreground)',
+              fontSize: '0.875rem',
+            }}
+          >
             Satış faturalarını yönetin
           </Typography>
         </Box>
@@ -788,11 +877,15 @@ export default function SatisFaturalariPage() {
           startIcon={<Add />}
           onClick={() => router.push('/fatura/satis/yeni')}
           sx={{
-            background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-            boxShadow: '0 4px 12px rgba(139, 92, 246, 0.4)',
+            bgcolor: 'var(--secondary)',
+            color: 'var(--secondary-foreground)',
+            boxShadow: 'var(--shadow-sm)',
+            textTransform: 'none',
+            fontWeight: 600,
             '&:hover': {
-              background: 'linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)',
-              boxShadow: '0 6px 16px rgba(139, 92, 246, 0.6)',
+              bgcolor: 'var(--secondary-hover)',
+              boxShadow: 'var(--shadow-md)',
+              transform: 'translateY(-1px)',
             }
           }}
         >
@@ -823,13 +916,28 @@ export default function SatisFaturalariPage() {
         </Box>
       </Paper>
 
-      <TableContainer component={Paper} sx={{ borderRadius: 2 }}>
+      <TableContainer 
+        component={Paper} 
+        sx={{ 
+          borderRadius: 'var(--radius)',
+          border: '1px solid var(--border)',
+          boxShadow: 'var(--shadow-sm)',
+        }}
+      >
         <Table>
-          <TableHead sx={{ bgcolor: '#f8f9fa' }}>
+          <TableHead sx={{ bgcolor: 'var(--muted)' }}>
             <TableRow>
-              <TableCell sx={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => handleSort('faturaNo')}>
+              <TableCell 
+                sx={{ 
+                  fontWeight: 600, 
+                  cursor: 'pointer',
+                  color: 'var(--foreground)',
+                  fontSize: '0.875rem',
+                }} 
+                onClick={() => handleSort('faturaNo')}
+              >
                 <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" fontWeight="600">Fatura No</Typography>
+                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>Fatura No</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
                     {sortBy === 'faturaNo' && (
                       sortOrder === 'asc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />
@@ -907,10 +1015,19 @@ export default function SatisFaturalariPage() {
                 <TableRow
                   key={fatura.id}
                   hover
-                  sx={{ '&:hover': { bgcolor: '#f9f9f9' } }}
+                  sx={{ 
+                    '&:hover': { bgcolor: 'var(--muted)' },
+                    transition: 'background-color 0.2s ease',
+                  }}
                 >
                   <TableCell>
-                    <Typography variant="body2" fontWeight="600" color="#8b5cf6">
+                    <Typography 
+                      variant="body2" 
+                      sx={{
+                        fontWeight: 600,
+                        color: 'var(--secondary)',
+                      }}
+                    >
                       {fatura.faturaNo}
                     </Typography>
                   </TableCell>
@@ -932,103 +1049,199 @@ export default function SatisFaturalariPage() {
                   <TableCell align="center">
                     <IconButton
                       size="small"
-                      onClick={() => openViewDialog(fatura)}
+                      onClick={(e) => handleMenuOpen(e, fatura.id)}
                       sx={{
-                        color: '#3b82f6',
-                        '&:hover': { bgcolor: '#eff6ff' }
+                        color: 'var(--muted-foreground)',
+                        '&:hover': {
+                          bgcolor: 'var(--muted)',
+                          color: 'var(--secondary)'
+                        }
                       }}
-                      title="Görüntüle"
                     >
-                      <Visibility fontSize="small" />
+                      <MoreVert fontSize="small" />
                     </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => router.push(`/fatura/satis/duzenle/${fatura.id}`)}
-                      sx={{
-                        color: '#f59e0b',
-                        '&:hover': { bgcolor: '#fffbeb' }
+
+                    <Menu
+                      anchorEl={anchorEl}
+                      open={Boolean(anchorEl) && menuFaturaId === fatura.id}
+                      onClose={handleMenuClose}
+                      PaperProps={{
+                        sx: {
+                          mt: 1,
+                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+                          borderRadius: 2,
+                          minWidth: 200,
+                        }
                       }}
-                      title="Düzenle"
                     >
-                      <Edit fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => router.push(`/fatura/satis/print/${fatura.id}`)}
-                      sx={{
-                        color: '#10b981',
-                        '&:hover': { bgcolor: '#ecfdf5' }
-                      }}
-                      title="Yazdır"
-                    >
-                      <Print fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => router.push(`/fatura/satis/malzeme-hazirlama/${fatura.id}`)}
-                      sx={{
-                        color: '#8b5cf6',
-                        '&:hover': { bgcolor: '#f5f3ff' }
-                      }}
-                      title="Malzeme Hazırlama Fişi"
-                    >
-                      <Assignment fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => router.push(`/fatura/iade/satis/yeni?originalId=${fatura.id}`)}
-                      sx={{
-                        color: '#ef4444',
-                        '&:hover': { bgcolor: '#fef2f2' }
-                      }}
-                      title="İade Oluştur"
-                    >
-                      <Undo fontSize="small" />
-                    </IconButton>
-                    {fatura.durum === 'ONAYLANDI' && fatura.faturaTipi === 'SATIS' && (
-                      <IconButton
-                        size="small"
-                        onClick={() => handleSendEInvoice(fatura)}
-                        disabled={sendingEInvoice === fatura.id || fatura.efaturaStatus === 'SENT'}
-                        sx={{
-                          color: fatura.efaturaStatus === 'SENT' ? '#6b7280' : '#10b981',
-                          '&:hover': { bgcolor: '#ecfdf5' },
-                          '&:disabled': { opacity: 0.5 }
+                      <MenuItem
+                        onClick={() => {
+                          openViewDialog(fatura);
+                          handleMenuClose();
                         }}
-                        title={fatura.efaturaStatus === 'SENT' ? 'E-Fatura gönderildi' : 'E-Fatura Gönder'}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)' }
+                        }}
                       >
-                        {sendingEInvoice === fatura.id ? (
-                          <CircularProgress size={16} />
-                        ) : (
-                          <CloudUpload fontSize="small" />
-                        )}
-                      </IconButton>
-                    )}
-                    <IconButton
-                      size="small"
-                      onClick={() => openIptalDialog(fatura)}
-                      disabled={fatura.durum === 'IPTAL'}
-                      sx={{
-                        color: fatura.durum === 'IPTAL' ? '#9ca3af' : '#ef4444',
-                        '&:hover': { bgcolor: '#fef2f2' },
-                        '&:disabled': { opacity: 0.5 }
-                      }}
-                      title="İptal Et"
-                    >
-                      <Cancel fontSize="small" />
-                    </IconButton>
-                    <IconButton
-                      size="small"
-                      onClick={() => openDeleteDialog(fatura)}
-                      sx={{
-                        color: '#ef4444',
-                        '&:hover': { bgcolor: '#fef2f2' }
-                      }}
-                      title="Sil"
-                      disabled={fatura.durum === 'ONAYLANDI' || fatura.durum === 'IPTAL'}
-                    >
-                      <Delete fontSize="small" />
-                    </IconButton>
+                        <Visibility fontSize="small" sx={{ color: 'var(--chart-1)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Görüntüle</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          router.push(`/fatura/satis/duzenle/${fatura.id}`);
+                          handleMenuClose();
+                        }}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)' }
+                        }}
+                      >
+                        <Edit fontSize="small" sx={{ color: 'var(--primary)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Düzenle</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          router.push(`/fatura/satis/print/${fatura.id}`);
+                          handleMenuClose();
+                        }}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)' }
+                        }}
+                      >
+                        <Print fontSize="small" sx={{ color: 'var(--chart-2)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Yazdır</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          router.push(`/fatura/satis/malzeme-hazirlama/${fatura.id}`);
+                          handleMenuClose();
+                        }}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)' }
+                        }}
+                      >
+                        <Assignment fontSize="small" sx={{ color: 'var(--secondary)' }} />
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Malzeme Hazırlama Fişi</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          router.push(`/fatura/iade/satis/yeni?originalId=${fatura.id}`);
+                          handleMenuClose();
+                        }}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#fef2f2' }
+                        }}
+                      >
+                        <Undo fontSize="small" sx={{ color: '#ef4444' }} />
+                        <Typography variant="body2">İade Oluştur</Typography>
+                      </MenuItem>
+
+                      {fatura.faturaTipi === 'SATIS' && (
+                        <MenuItem
+                          onClick={async () => {
+                            try {
+                              setLoadingProfit(true);
+                              const profit = await getProfitByInvoice(fatura.id);
+                              setProfitData(profit);
+                              setOpenProfitDialog(true);
+                            } catch (error: any) {
+                              showSnackbar(
+                                error.response?.data?.message || 'Kar bilgileri yüklenirken hata oluştu',
+                                'error'
+                              );
+                            } finally {
+                              setLoadingProfit(false);
+                              handleMenuClose();
+                            }
+                          }}
+                          disabled={loadingProfit}
+                          sx={{
+                            gap: 1.5,
+                            py: 1,
+                            '&:hover': { bgcolor: 'color-mix(in srgb, #10b981 10%, transparent)' }
+                          }}
+                        >
+                          {loadingProfit ? (
+                            <CircularProgress size={16} sx={{ color: '#10b981' }} />
+                          ) : (
+                            <TrendingUp fontSize="small" sx={{ color: '#10b981' }} />
+                          )}
+                          <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Karlılık Görüntüle</Typography>
+                        </MenuItem>
+                      )}
+
+                      {fatura.durum === 'ONAYLANDI' && fatura.faturaTipi === 'SATIS' && (
+                        <MenuItem
+                          onClick={() => {
+                            handleSendEInvoice(fatura);
+                            handleMenuClose();
+                          }}
+                          disabled={sendingEInvoice === fatura.id || fatura.efaturaStatus === 'SENT'}
+                          sx={{
+                            gap: 1.5,
+                            py: 1,
+                            '&:hover': { bgcolor: '#ecfdf5' },
+                            '&.Mui-disabled': { opacity: 0.5 }
+                          }}
+                        >
+                          {sendingEInvoice === fatura.id ? (
+                            <CircularProgress size={16} sx={{ color: '#10b981' }} />
+                          ) : (
+                            <CloudUpload fontSize="small" sx={{ color: fatura.efaturaStatus === 'SENT' ? '#6b7280' : '#10b981' }} />
+                          )}
+                          <Typography variant="body2">
+                            {fatura.efaturaStatus === 'SENT' ? 'E-Fatura Gönderildi' : 'E-Fatura Gönder'}
+                          </Typography>
+                        </MenuItem>
+                      )}
+
+                      <MenuItem
+                        onClick={() => {
+                          openIptalDialog(fatura);
+                          handleMenuClose();
+                        }}
+                        disabled={fatura.durum === 'IPTAL'}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#fef2f2' },
+                          '&.Mui-disabled': { opacity: 0.5 }
+                        }}
+                      >
+                        <Cancel fontSize="small" sx={{ color: fatura.durum === 'IPTAL' ? '#9ca3af' : '#ef4444' }} />
+                        <Typography variant="body2">İptal Et</Typography>
+                      </MenuItem>
+
+                      <MenuItem
+                        onClick={() => {
+                          openDeleteDialog(fatura);
+                          handleMenuClose();
+                        }}
+                        disabled={fatura.durum === 'ONAYLANDI' || fatura.durum === 'IPTAL'}
+                        sx={{
+                          gap: 1.5,
+                          py: 1,
+                          '&:hover': { bgcolor: '#fef2f2' },
+                          '&.Mui-disabled': { opacity: 0.5 }
+                        }}
+                      >
+                        <Delete fontSize="small" sx={{ color: '#ef4444' }} />
+                        <Typography variant="body2">Sil</Typography>
+                      </MenuItem>
+                    </Menu>
                   </TableCell>
                 </TableRow>
               ))
@@ -1425,6 +1638,193 @@ export default function SatisFaturalariPage() {
             }}
           >
             Onayla ve Değiştir
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Kar Görüntüleme Dialog */}
+      <Dialog
+        open={openProfitDialog}
+        onClose={() => {
+          setOpenProfitDialog(false);
+          setProfitData(null);
+        }}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          <Box display="flex" alignItems="center" gap={2}>
+            <TrendingUp sx={{ color: '#10b981' }} />
+            <Typography variant="h6">Fatura Karlılığı</Typography>
+            {profitData && (
+              <Chip
+                label={profitData.fatura.faturaNo}
+                color="primary"
+                size="small"
+              />
+            )}
+          </Box>
+        </DialogTitle>
+        <DialogContent>
+          {loadingProfit ? (
+            <Box display="flex" justifyContent="center" py={4}>
+              <CircularProgress />
+            </Box>
+          ) : profitData ? (
+            <Box>
+              {/* Fatura Özeti */}
+              <Paper elevation={1} sx={{ p: 3, mb: 3, bgcolor: '#f9fafb' }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                  Fatura Özeti
+                </Typography>
+                <Box display="flex" justifyContent="space-between" mb={2}>
+                  <Typography variant="body2">Cari:</Typography>
+                  <Typography variant="body2" fontWeight="bold">
+                    {profitData.fatura.cari.unvan}
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between" mb={2}>
+                  <Typography variant="body2">Tarih:</Typography>
+                  <Typography variant="body2">
+                    {new Date(profitData.fatura.tarih).toLocaleDateString('tr-TR')}
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between" mb={2}>
+                  <Typography variant="body2">Toplam Satış:</Typography>
+                  <Typography variant="body2" fontWeight="bold" color="primary">
+                    {new Intl.NumberFormat('tr-TR', {
+                      style: 'currency',
+                      currency: 'TRY',
+                    }).format(profitData.fatura.toplamSatisTutari)}
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between" mb={2}>
+                  <Typography variant="body2">Toplam Maliyet:</Typography>
+                  <Typography variant="body2" fontWeight="bold">
+                    {new Intl.NumberFormat('tr-TR', {
+                      style: 'currency',
+                      currency: 'TRY',
+                    }).format(profitData.fatura.toplamMaliyet)}
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between" mb={2}>
+                  <Typography variant="body2" fontWeight="bold">Toplam Kar:</Typography>
+                  <Typography
+                    variant="h6"
+                    fontWeight="bold"
+                    color={profitData.fatura.toplamKar >= 0 ? 'success.main' : 'error.main'}
+                  >
+                    {new Intl.NumberFormat('tr-TR', {
+                      style: 'currency',
+                      currency: 'TRY',
+                    }).format(profitData.fatura.toplamKar)}
+                  </Typography>
+                </Box>
+                <Box display="flex" justifyContent="space-between">
+                  <Typography variant="body2">Kar Oranı:</Typography>
+                  <Typography
+                    variant="body2"
+                    fontWeight="bold"
+                    color={profitData.fatura.karOrani >= 0 ? 'success.main' : 'error.main'}
+                  >
+                    {profitData.fatura.karOrani.toFixed(2)}%
+                  </Typography>
+                </Box>
+              </Paper>
+
+              {/* Kalem Detayları */}
+              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
+                Kalem Detayları
+              </Typography>
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Ürün</TableCell>
+                      <TableCell align="right">Miktar</TableCell>
+                      <TableCell align="right">Birim Fiyat</TableCell>
+                      <TableCell align="right">Birim Maliyet</TableCell>
+                      <TableCell align="right">Toplam Satış</TableCell>
+                      <TableCell align="right">Toplam Maliyet</TableCell>
+                      <TableCell align="right">Kar</TableCell>
+                      <TableCell align="right">Kar Oranı</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {profitData.kalemler.map((kalem: any) => (
+                      <TableRow key={kalem.id}>
+                        <TableCell>
+                          <Typography variant="body2" fontWeight="medium">
+                            {kalem.stok?.stokKodu || '-'}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {kalem.stok?.stokAdi || '-'}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">{kalem.miktar}</TableCell>
+                        <TableCell align="right">
+                          {new Intl.NumberFormat('tr-TR', {
+                            style: 'currency',
+                            currency: 'TRY',
+                          }).format(kalem.birimFiyat)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {new Intl.NumberFormat('tr-TR', {
+                            style: 'currency',
+                            currency: 'TRY',
+                          }).format(kalem.birimMaliyet)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {new Intl.NumberFormat('tr-TR', {
+                            style: 'currency',
+                            currency: 'TRY',
+                          }).format(kalem.toplamSatisTutari)}
+                        </TableCell>
+                        <TableCell align="right">
+                          {new Intl.NumberFormat('tr-TR', {
+                            style: 'currency',
+                            currency: 'TRY',
+                          }).format(kalem.toplamMaliyet)}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            color: kalem.kar >= 0 ? 'success.main' : 'error.main',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {new Intl.NumberFormat('tr-TR', {
+                            style: 'currency',
+                            currency: 'TRY',
+                          }).format(kalem.kar)}
+                        </TableCell>
+                        <TableCell
+                          align="right"
+                          sx={{
+                            color: kalem.karOrani >= 0 ? 'success.main' : 'error.main',
+                            fontWeight: 'bold',
+                          }}
+                        >
+                          {kalem.karOrani.toFixed(2)}%
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Box>
+          ) : (
+            <Typography variant="body2" color="text.secondary">
+              Kar bilgisi bulunamadı
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => {
+            setOpenProfitDialog(false);
+            setProfitData(null);
+          }}>
+            Kapat
           </Button>
         </DialogActions>
       </Dialog>

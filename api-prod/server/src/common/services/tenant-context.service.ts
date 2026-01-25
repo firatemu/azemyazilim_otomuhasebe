@@ -22,17 +22,18 @@ export class TenantContextService {
       return undefined; // SUPER_ADMIN tenant kontrollerini atlayabilir
     }
 
-    // STAGING ORTAMI İÇİN: Tenant ID gereksiz - undefined döndür
+    // Staging/development: Middleware tenant set ettiyse (header, user.tenantId, STAGING_DEFAULT)
+    // onu döndür. Yoksa undefined (opsiyonel tenant).
+    // Böylece Kasa vb. create işlemlerinde FK için gerçek tenant kullanılır; var olmayan
+    // hardcoded default’a düşülmez.
     const isStaging = process.env.NODE_ENV === 'staging' ||
                       process.env.NODE_ENV === 'development' ||
                       (typeof process !== 'undefined' && process.env.STAGING_DISABLE_TENANT === 'true');
 
     if (isStaging) {
-      // Staging'de tenant ID opsiyonel - undefined döndür
-      return undefined;
+      return this.tenantId;
     }
 
-    // Production'da tenant ID döndür
     return this.tenantId;
   }
 
