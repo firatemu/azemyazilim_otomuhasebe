@@ -20,7 +20,7 @@ import { Decimal } from '@prisma/client/runtime/library';
 
 @Injectable()
 export class PurchaseOrdersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * Sipariş numarası oluştur (PO-{YEAR}-{INCREMENT})
@@ -404,7 +404,7 @@ export class PurchaseOrdersService {
       throw new NotFoundException('Sipariş bulunamadı');
     }
 
-    if (order.invoices.length > 0) {
+    if (order.invoices) {
       throw new BadRequestException(
         'Bu siparişe ait faturalar bulunduğu için silinemez',
       );

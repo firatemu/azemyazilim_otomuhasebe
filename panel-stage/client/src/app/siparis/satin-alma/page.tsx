@@ -94,9 +94,26 @@ const durumMetinleri: Record<string, string> = {
   IPTAL: 'İptal',
 };
 
+import { useTabStore } from '@/stores/tabStore';
+
+// ... imports
+
 export default function SatinAlmaSiparisleriPage() {
   const router = useRouter();
+  const { addTab } = useTabStore();
   const [searchTerm, setSearchTerm] = useState('');
+  // ... state definitions
+
+  const handleCreate = () => {
+    addTab({
+      id: 'yeni-satin-alma-siparis',
+      label: 'Yeni Satın Alma Siparişi',
+      path: '/siparis/satin-alma/yeni',
+      icon: 'add_shopping_cart'
+    });
+    router.push('/siparis/satin-alma/yeni');
+  };
+
   const [siparisler, setSiparisler] = useState<SatinAlmaSiparisi[]>([]);
   const [loading, setLoading] = useState(false);
   const [durumFilter, setDurumFilter] = useState<'ALL' | 'BEKLEMEDE' | 'SIPARIS_VERILDI' | 'SEVK_EDILDI' | 'KISMI_SEVK' | 'FATURALANDI' | 'IPTAL'>('ALL');
@@ -298,7 +315,7 @@ export default function SatinAlmaSiparisleriPage() {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => router.push('/siparis/satin-alma/yeni')}
+            onClick={handleCreate}
             sx={{
               background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
             }}

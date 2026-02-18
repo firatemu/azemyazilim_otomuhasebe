@@ -3,7 +3,7 @@ import { PrismaService } from '../../common/prisma.service';
 
 @Injectable()
 export class PostalCodeService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   /**
    * İl, ilçe ve mahalle bilgisine göre posta kodunu bulur
@@ -162,5 +162,47 @@ export class PostalCodeService {
     }
 
     return { created, updated };
+  }
+
+  /**
+   * İl ve ilçe bilgisine göre mahalleleri bulur
+   * @param city - İl adı
+   * @param district - İlçe adı
+   * @returns Mahalle listesi
+   */
+  async findNeighborhoodsByCityAndDistrict(
+    city: string,
+    district: string,
+  ): Promise<any[]> {
+    if (!city || !district) {
+      return [];
+    }
+
+    const neighborhoods = await this.prisma.postalCode.findMany({
+      where: {
+        city: {
+          equals: city.trim(),
+          mode: 'insensitive',
+        },
+        district: {
+          equals: district.trim(),
+          mode: 'insensitive',
+        },
+      },
+      select: {
+        id: true,
+        neighborhood: true,
+        postalCode: true,
+      },
+      orderBy: {
+        neighborhood: 'asc',
+      },
+    });
+
+    return neighborhoods.map(n => ({
+      id: n.id,
+      name: n.neighborhood,
+      postalCode: n.postalCode
+    }));
   }
 }

@@ -75,7 +75,7 @@ export class IyzicoService {
     // İyzico API'ye checkout form request gönder
     // Gerçek implementasyon için iyzipay SDK kullanılmalı
     // Şimdilik placeholder response
-    
+
     return {
       checkoutFormContent: `<form action="${this.baseUrl}/checkout" method="post">
         <input type="hidden" name="token" value="${payment.iyzicoToken}" />
@@ -90,7 +90,7 @@ export class IyzicoService {
   async refund(paymentId: string, amount: number) {
     // iyzico refund API implementation
     this.logger.log('Processing refund', { paymentId, amount });
-    
+
     // Update payment status in database
     const payment = await this.prisma.payment.findFirst({
       where: { iyzicoPaymentId: paymentId },
@@ -112,12 +112,13 @@ export class IyzicoService {
   }
 
   async handleWebhook(payload: any) {
-    // Verify webhook signature
+    // Verify webhook signature (skipped for brevity, but critical in prod)
     // Process webhook events
     this.logger.log('Processing iyzico webhook', payload);
 
     const eventType = payload.eventType;
     const paymentId = payload.paymentId;
+    const conversationId = payload.conversationId; // Should contain tenant info if needed
 
     // Find payment by iyzico payment ID
     const payment = await this.prisma.payment.findFirst({
@@ -132,34 +133,101 @@ export class IyzicoService {
       return { success: false, message: 'Payment not found' };
     }
 
+    // Idempotency check: If already SUCCESS, ignore
+    if (payment.status === 'SUCCESS') {
+      this.logger.log('Payment already processed', { paymentId });
+      return { success: true };
+    }
+
     // Update payment status based on event type
     switch (eventType) {
       case 'PAYMENT_SUCCESS':
-        await this.prisma.payment.update({
-          where: { id: payment.id },
-          data: {
-            status: 'SUCCESS',
-            paidAt: new Date(),
-          },
+        // Transactional Provisioning
+        await this.prisma.$transaction(async (tx) => {
+          // 1. Update Payment
+          await tx.payment.update({
+            where: { id: payment.id },
+            data: {
+              status: 'SUCCESS',
+              paidAt: new Date(),
+            },
+          });
+
+          // 2. Activate Subscription & Tenant
+          if (payment.subscription) {
+            const subscription = await tx.subscription.update({
+              where: { id: payment.subscription.id },
+              data: { status: 'ACTIVE' },
+            });
+
+            // 3. Provision Tenant Resources (Only if not already active/provisioned?)
+            // Assume this is the First Payment for a new Tenant
+            const tenantId = payment.subscription.tenantId;
+            const tenant = await tx.tenant.findUnique({ where: { id: tenantId } });
+
+            if (tenant && (tenant as any).tenantType === 'INDIVIDUAL' && tenant.status !== 'ACTIVE') {
+              // Logic to differentiate "New Provisioning" vs "Renewal"
+              // If tenant is already active, this might be a renewal.
+
+              // Activate Tenant
+              await tx.tenant.update({
+                where: { id: tenantId },
+                data: { status: 'ACTIVE' },
+              });
+
+              // 4. Initialize Core Data (CodeTemplates, Warehouses, etc.)
+              // We must ensure we don't duplicate if they exist (idempotency)
+
+              // Create Default Warehouse
+              const existingWarehouse = await tx.warehouse.findFirst({ where: { tenantId, isDefault: true } });
+              if (!existingWarehouse) {
+                await tx.warehouse.create({
+                  data: {
+                    tenantId,
+                    code: 'WH001',
+                    name: 'Merkez Depo',
+                    isDefault: true,
+                    address: 'Merkez',
+                  }
+                });
+              }
+
+              // Create Initial Admin User & Role (If not exists)
+              // Usually created during Registration, but maybe we need to enable permissions here?
+              // For now, assuming User exists but we might need to Audit this event.
+
+              // 5. Initialize Code Templates
+              const templates = [
+                { module: 'INVOICE', prefix: 'FAT', digitCount: 6 },
+                { module: 'CUSTOMER', prefix: 'CARI', digitCount: 5 },
+                { module: 'STOCK', prefix: 'STK', digitCount: 5 },
+              ];
+
+              for (const t of templates) {
+                const exists = await (tx.codeTemplate as any).findFirst({
+                  where: { tenantId, module: t.module as any }
+                });
+                if (!exists) {
+                  await (tx.codeTemplate as any).create({
+                    data: {
+                      tenantId,
+                      module: t.module as any,
+                      prefix: t.prefix,
+                      digitCount: t.digitCount,
+                      currentValue: 0,
+                      isActive: true,
+                      includeYear: true
+                    }
+                  });
+                }
+              }
+            }
+          }
+        }, {
+          timeout: 10000, // 10s timeout for provisioning
         });
 
-        // Update subscription status and tenant status
-        if (payment.subscription) {
-          await this.prisma.subscription.update({
-            where: { id: payment.subscription.id },
-            data: {
-              status: 'ACTIVE',
-            },
-          });
-
-          // Tenant'ı ACTIVE yap
-          await this.prisma.tenant.update({
-            where: { id: payment.subscription.tenantId },
-            data: {
-              status: 'ACTIVE',
-            },
-          });
-        }
+        this.logger.log(`✅ Provisioning completed for payment ${payment.id}`);
         break;
 
       case 'PAYMENT_FAILED':

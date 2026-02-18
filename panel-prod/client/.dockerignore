@@ -1,5 +1,7 @@
 node_modules
 .next
+.next.bak
+.pnpm-store
 out
 build
 dist
@@ -11,3 +13,10 @@ yarn-debug.log*
 yarn-error.log*
 .env*.local
 .cache
+dev
+server
+static
+trace
+diagnostics
+export
+cache

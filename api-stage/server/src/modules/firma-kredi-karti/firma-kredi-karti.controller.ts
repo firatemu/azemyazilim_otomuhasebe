@@ -19,7 +19,7 @@ import { UpdateFirmaKrediKartiDto } from './dto/update-firma-kredi-karti.dto';
 export class FirmaKrediKartiController {
   constructor(
     private readonly firmaKrediKartiService: FirmaKrediKartiService,
-  ) {}
+  ) { }
 
   @Post()
   create(@Body() createDto: CreateFirmaKrediKartiDto) {
@@ -46,8 +46,4 @@ export class FirmaKrediKartiController {
     return this.firmaKrediKartiService.remove(id);
   }
 
-  @Get('hatirlaticilar/bugun')
-  getTodayReminders() {
-    return this.firmaKrediKartiService.getTodayReminders();
-  }
 }

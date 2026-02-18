@@ -53,9 +53,26 @@ interface SatisIrsaliyesi {
   createdAt?: string;
 }
 
+import { useTabStore } from '@/stores/tabStore';
+
+// ... imports
+
 export default function SatisIrsaliyeleriPage() {
   const router = useRouter();
+  const { addTab } = useTabStore();
   const [searchTerm, setSearchTerm] = useState('');
+  // ... state definitions
+
+  const handleCreate = () => {
+    addTab({
+      id: 'yeni-satis-irsaliyesi',
+      label: 'Yeni Satış İrsaliyesi',
+      path: '/satis-irsaliyesi/yeni',
+      icon: 'local_shipping'
+    });
+    router.push('/satis-irsaliyesi/yeni');
+  };
+
   const [irsaliyeler, setIrsaliyeler] = useState<SatisIrsaliyesi[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
@@ -170,9 +187,9 @@ export default function SatisIrsaliyeleriPage() {
         {/* Header */}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography 
-              variant="h4" 
-              sx={{ 
+            <Typography
+              variant="h4"
+              sx={{
                 fontWeight: 700,
                 fontSize: '1.875rem',
                 color: 'var(--foreground)',
@@ -182,8 +199,8 @@ export default function SatisIrsaliyeleriPage() {
             >
               Satış İrsaliyeleri
             </Typography>
-            <Typography 
-              variant="body2" 
+            <Typography
+              variant="body2"
               sx={{
                 color: 'var(--muted-foreground)',
                 fontSize: '0.875rem',
@@ -195,7 +212,7 @@ export default function SatisIrsaliyeleriPage() {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => router.push('/satis-irsaliyesi/yeni')}
+            onClick={handleCreate}
             sx={{
               bgcolor: 'var(--secondary)',
               color: 'var(--secondary-foreground)',
@@ -214,9 +231,9 @@ export default function SatisIrsaliyeleriPage() {
           </Button>
         </Box>
 
-        <Paper sx={{ 
-          p: 2, 
-          mb: 3, 
+        <Paper sx={{
+          p: 2,
+          mb: 3,
           borderRadius: 'var(--radius)',
           boxShadow: 'var(--shadow-sm)',
           bgcolor: 'var(--card)',
@@ -261,9 +278,9 @@ export default function SatisIrsaliyeleriPage() {
             <CircularProgress />
           </Box>
         ) : (
-          <TableContainer 
-            component={Paper} 
-            sx={{ 
+          <TableContainer
+            component={Paper}
+            sx={{
               borderRadius: 'var(--radius)',
               boxShadow: 'var(--shadow-sm)',
               bgcolor: 'var(--card)',
@@ -295,8 +312,8 @@ export default function SatisIrsaliyeleriPage() {
                   </TableRow>
                 ) : (
                   irsaliyeler.map((irsaliye) => (
-                    <TableRow 
-                      key={irsaliye.id} 
+                    <TableRow
+                      key={irsaliye.id}
                       hover
                       sx={{
                         '&:hover': {
@@ -331,9 +348,9 @@ export default function SatisIrsaliyeleriPage() {
                       <TableCell align="right" sx={{ color: 'var(--foreground)' }}>{formatCurrency(irsaliye.toplamTutar)}</TableCell>
                       <TableCell align="right" sx={{ color: 'var(--foreground)' }}>{formatCurrency(irsaliye.kdvTutar)}</TableCell>
                       <TableCell align="right">
-                        <Typography 
-                          variant="body2" 
-                          sx={{ 
+                        <Typography
+                          variant="body2"
+                          sx={{
                             fontWeight: 700,
                             color: 'var(--primary)',
                           }}
@@ -346,14 +363,14 @@ export default function SatisIrsaliyeleriPage() {
                           label={getDurumLabel(irsaliye.durum)}
                           size="small"
                           sx={{
-                            bgcolor: irsaliye.durum === 'FATURALANDI' 
-                              ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)' 
+                            bgcolor: irsaliye.durum === 'FATURALANDI'
+                              ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)'
                               : 'color-mix(in srgb, var(--chart-3) 15%, transparent)',
-                            color: irsaliye.durum === 'FATURALANDI' 
-                              ? 'var(--chart-2)' 
+                            color: irsaliye.durum === 'FATURALANDI'
+                              ? 'var(--chart-2)'
                               : 'var(--chart-3)',
-                            borderColor: irsaliye.durum === 'FATURALANDI' 
-                              ? 'var(--chart-2)' 
+                            borderColor: irsaliye.durum === 'FATURALANDI'
+                              ? 'var(--chart-2)'
                               : 'var(--chart-3)',
                           }}
                           variant="outlined"
@@ -366,7 +383,7 @@ export default function SatisIrsaliyeleriPage() {
                             onClick={() => router.push(`/satis-irsaliyesi/${irsaliye.id}`)}
                             sx={{
                               color: 'var(--primary)',
-                              '&:hover': { 
+                              '&:hover': {
                                 bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
                               },
                             }}
@@ -379,7 +396,7 @@ export default function SatisIrsaliyeleriPage() {
                             onClick={() => router.push(`/satis-irsaliyesi/print/${irsaliye.id}`)}
                             sx={{
                               color: 'var(--chart-2)',
-                              '&:hover': { 
+                              '&:hover': {
                                 bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)',
                               },
                             }}
@@ -392,7 +409,7 @@ export default function SatisIrsaliyeleriPage() {
                             onClick={(e) => handleMenuOpen(e, irsaliye)}
                             sx={{
                               color: 'var(--muted-foreground)',
-                              '&:hover': { 
+                              '&:hover': {
                                 bgcolor: 'color-mix(in srgb, var(--muted-foreground) 10%, transparent)',
                               },
                             }}
@@ -415,57 +432,71 @@ export default function SatisIrsaliyeleriPage() {
           onClose={handleMenuClose}
           disableAutoFocusItem
         >
-          <MenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMenuClose();
-              if (selectedIrsaliyeForMenu) router.push(`/satis-irsaliyesi/${selectedIrsaliyeForMenu.id}`);
-            }}
-          >
-            Görüntüle
-          </MenuItem>
-          <MenuItem
-            onClick={(e) => {
-              e.stopPropagation();
-              handleMenuClose();
-              if (selectedIrsaliyeForMenu) router.push(`/satis-irsaliyesi/print/${selectedIrsaliyeForMenu.id}`);
-            }}
-          >
-            Yazdır
-          </MenuItem>
-          {selectedIrsaliyeForMenu?.durum === 'FATURALANMADI' && (
-            <>
+          {(() => {
+            if (!selectedIrsaliyeForMenu) return null;
+
+            const items = [
               <MenuItem
+                key="view"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleMenuClose();
-                  if (selectedIrsaliyeForMenu) router.push(`/fatura/satis/yeni?irsaliyeId=${selectedIrsaliyeForMenu.id}`);
+                  router.push(`/satis-irsaliyesi/${selectedIrsaliyeForMenu.id}`);
                 }}
               >
-                Faturalandır
-              </MenuItem>
+                Görüntüle
+              </MenuItem>,
               <MenuItem
+                key="print"
                 onClick={(e) => {
                   e.stopPropagation();
                   handleMenuClose();
-                  if (selectedIrsaliyeForMenu) router.push(`/satis-irsaliyesi/${selectedIrsaliyeForMenu.id}/duzenle`);
+                  router.push(`/satis-irsaliyesi/print/${selectedIrsaliyeForMenu.id}`);
                 }}
               >
-                Düzenle
+                Yazdır
               </MenuItem>
-              <MenuItem
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleMenuClose();
-                  setSelectedIrsaliye(selectedIrsaliyeForMenu);
-                  setOpenDelete(true);
-                }}
-                sx={{ color: 'var(--destructive)' }}
-              >
-                Sil
-              </MenuItem>
-            </>
-          )}
+            ];
+
+            if (selectedIrsaliyeForMenu.durum === 'FATURALANMADI') {
+              items.push(
+                <MenuItem
+                  key="invoice"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMenuClose();
+                    router.push(`/fatura/satis/yeni?irsaliyeId=${selectedIrsaliyeForMenu.id}`);
+                  }}
+                >
+                  Faturalandır
+                </MenuItem>,
+                <MenuItem
+                  key="edit"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMenuClose();
+                    router.push(`/satis-irsaliyesi/${selectedIrsaliyeForMenu.id}/duzenle`);
+                  }}
+                >
+                  Düzenle
+                </MenuItem>,
+                <MenuItem
+                  key="delete"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleMenuClose();
+                    setSelectedIrsaliye(selectedIrsaliyeForMenu);
+                    setOpenDelete(true);
+                  }}
+                  sx={{ color: 'var(--destructive)' }}
+                >
+                  Sil
+                </MenuItem>
+              );
+            }
+
+            return items;
+          })()}
         </Menu>
 
         <Dialog open={openDelete} onClose={() => setOpenDelete(false)}>

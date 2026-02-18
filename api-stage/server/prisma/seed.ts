@@ -1,177 +1,186 @@
 import { PrismaClient } from '@prisma/client';
+import * as bcrypt from 'bcrypt';
 
 const prisma = new PrismaClient();
 
 async function main() {
   console.log('Seed işlemi başlıyor...');
 
-  // Örnek stok verileri
-  const stoklar = [
-    {
-      stokKodu: 'BRK001',
-      stokAdi: 'Fren Balatası Ön Takım',
-      birim: 'Takım',
-      alisFiyati: 120.00,
-      satisFiyati: 180.00,
-      anaKategori: 'Fren Sistemleri',
-      altKategori: 'Fren Balatası',
-      marka: 'Kale',
-      oem: 'KLB-236002',
-      olcu: '12x1.5',
-      kategori: 'Fren Sistemleri',
+  // 1. Plan Oluştur
+  const limitJson = {
+    maxUsers: 10,
+    maxStorage: 1024,
+  };
+
+  const trialPlan = await prisma.plan.upsert({
+    where: { slug: 'trial' },
+    update: {},
+    create: {
+      name: 'Deneme Paketi',
+      slug: 'trial',
+      price: 0,
+      description: '14 günlük ücretsiz deneme paketi',
+      features: {},
+      limits: limitJson,
+      isActive: true,
     },
-    {
-      stokKodu: 'BRK002',
-      stokAdi: 'Fren Diski Ön',
-      birim: 'Adet',
-      alisFiyati: 250.00,
-      satisFiyati: 380.00,
-      anaKategori: 'Fren Sistemleri',
-      altKategori: 'Fren Diski',
-      marka: 'Brembo',
-      oem: '09.9772.11',
-      olcu: '280x22mm',
-      kategori: 'Fren Sistemleri',
+  });
+  console.log('✓ Plan oluşturuldu/güncellendi');
+
+  // 2. Tenant Oluştur
+  const tenant = await prisma.tenant.upsert({
+    where: { subdomain: 'demo' },
+    update: {},
+    create: {
+      name: 'Demo Şirketi',
+      subdomain: 'demo',
+      status: 'ACTIVE',
+      subscription: {
+        create: {
+          planId: trialPlan.id,
+          status: 'ACTIVE',
+          startDate: new Date(),
+          endDate: new Date(new Date().setFullYear(new Date().getFullYear() + 1)),
+        },
+      },
     },
-    {
-      stokKodu: 'FLT001',
-      stokAdi: 'Yağ Filtresi',
-      birim: 'Adet',
-      alisFiyati: 35.00,
-      satisFiyati: 65.00,
-      anaKategori: 'Motor Parçaları',
-      altKategori: 'Filtre',
-      marka: 'Mann Filter',
-      oem: 'W 712/75',
-      kategori: 'Motor Parçaları',
-    },
-    {
-      stokKodu: 'OIL001',
-      stokAdi: 'Motor Yağı 5W-30',
-      birim: 'Litre',
-      alisFiyati: 85.00,
-      satisFiyati: 135.00,
-      anaKategori: 'Motor Parçaları',
-      altKategori: 'Yağlar',
-      marka: 'Mobil',
-      olcu: '5W-30',
-      kategori: 'Motor Parçaları',
-    },
-    {
-      stokKodu: 'AMR001',
-      stokAdi: 'Amortisör Ön Sağ',
-      birim: 'Adet',
-      alisFiyati: 450.00,
-      satisFiyati: 680.00,
-      anaKategori: 'Süspansiyon',
-      altKategori: 'Amortisör',
-      marka: 'Sachs',
-      oem: '313-267',
-      kategori: 'Süspansiyon',
-    },
+  });
+  console.log('✓ Tenant oluşturuldu/güncellendi');
+
+  // 3. Permissions Oluştur
+  const modules = [
+    'dashboard',
+    'users',
+    'roles',
+    'permissions',
+    'invoices',
+    'cariye',
+    'products',
+    'expenses',
+    'reports',
+    'settings',
+    'work_orders',
+    'vehicles',
+    'technicians',
+    'procurement',
+    'finance',
+    'collecting',
+    'payments',
+    'cek_senet',
+    'teklif',
+    'siparis',
+    'irsaliye',
+    'kasa',
+    'banka',
+    'ik',
+    'depo',
+    'veri_aktarim',
   ];
 
-  for (const stok of stoklar) {
-    // Seed script için tenantId olmadan çalışır, findFirst kullan
-    const existing = await prisma.stok.findFirst({
-      where: { stokKodu: stok.stokKodu },
-    });
-    
-    if (existing) {
-      await prisma.stok.update({
-        where: { id: existing.id },
-        data: stok,
-      });
-    } else {
-      await prisma.stok.create({
-        data: stok,
-      });
-    }
-    console.log(`✓ ${stok.stokKodu} - ${stok.stokAdi}`);
-  }
-
-  // Örnek cari verileri
-  const cariler = [
-    {
-      cariKodu: 'CARI001',
-      unvan: 'ABC Otomotiv San. ve Tic. Ltd. Şti.',
-      tip: 'MUSTERI' as const,
-      vergiNo: '1234567890',
-      vergiDairesi: 'Kağıthane',
-      telefon: '+90 212 555 0101',
-      email: 'info@abcotomotiv.com',
-      adres: 'İstanbul, Kağıthane',
-      yetkili: 'Ahmet Yılmaz',
-    },
-    {
-      cariKodu: 'CARI002',
-      unvan: 'DEF Yedek Parça A.Ş.',
-      tip: 'TEDARIKCI' as const,
-      vergiNo: '9876543210',
-      vergiDairesi: 'Beşiktaş',
-      telefon: '+90 212 555 0202',
-      email: 'satis@defyedekparca.com',
-      adres: 'İstanbul, Beşiktaş',
-      yetkili: 'Mehmet Demir',
-    },
-    {
-      cariKodu: 'CARI003',
-      unvan: 'GHI Servis ve Ticaret',
-      tip: 'HER_IKISI' as const,
-      vergiNo: '5647382910',
-      vergiDairesi: 'Kadıköy',
-      telefon: '+90 216 555 0303',
-      email: 'iletisim@ghiservis.com',
-      adres: 'İstanbul, Kadıköy',
-      yetkili: 'Selin Kara',
-    },
-    {
-      cariKodu: 'CARI004',
-      unvan: 'JKL Otomotiv',
-      tip: 'MUSTERI' as const,
-      telefon: '+90 312 555 0404',
-      email: 'info@jkloto.com',
-      adres: 'Ankara, Çankaya',
-      yetkili: 'Burak Şen',
-    },
-    {
-      cariKodu: 'CARI005',
-      unvan: 'MNO Dış Ticaret Ltd.',
-      tip: 'TEDARIKCI' as const,
-      telefon: '+90 232 555 0505',
-      email: 'export@mnodisticaret.com',
-      adres: 'İzmir, Konak',
-      yetkili: 'Elif Aydın',
-    },
-    {
-      cariKodu: 'CARI006',
-      unvan: 'PQR Parça ve Servis',
-      tip: 'HER_IKISI' as const,
-      telefon: '+90 224 555 0606',
-      email: 'destek@pqrparca.com',
-      adres: 'Bursa, Nilüfer',
-      yetkili: 'Can Gür',
-    },
+  const actions = [
+    'view',
+    'list',
+    'create',
+    'update',
+    'delete',
+    'export',
+    'import',
+    'approve',
+    'cancel',
+    'print',
   ];
 
-  for (const cari of cariler) {
-    // Seed script için tenantId olmadan çalışır, findFirst kullan
-    const existing = await prisma.cari.findFirst({
-      where: { cariKodu: cari.cariKodu },
-    });
-    
-    if (existing) {
-      await prisma.cari.update({
-        where: { id: existing.id },
-        data: cari,
+  console.log('... İzinler oluşturuluyor');
+  const allPermissions: string[] = [];
+
+  for (const module of modules) {
+    for (const action of actions) {
+      const perm = await prisma.permission.upsert({
+        where: {
+          module_action: {
+            module,
+            action,
+          },
+        },
+        update: {},
+        create: {
+          module,
+          action,
+          description: `${module} module - ${action} action`,
+        },
       });
-    } else {
-      await prisma.cari.create({
-        data: cari,
-      });
+      allPermissions.push(perm.id);
     }
-    console.log(`✓ ${cari.cariKodu} - ${cari.unvan}`);
   }
+  console.log(`✓ ${allPermissions.length} izin oluşturuldu/güncellendi`);
+
+  // 4. Admin Role Oluştur
+  const adminRole = await prisma.role.upsert({
+    where: {
+      tenantId_name: {
+        tenantId: tenant.id,
+        name: 'Yönetici',
+      },
+    },
+    update: {},
+    create: {
+      name: 'Yönetici',
+      description: 'Tam yetkili sistem yöneticisi',
+      isSystemRole: true,
+      tenantId: tenant.id,
+    },
+  });
+  console.log('✓ Yönetici rolü oluşturuldu');
+
+  // 5. Role Permissions Ata (Tüm izinler)
+  // Mevcut izinleri temizle ve yeniden ata
+  // await prisma.rolePermission.deleteMany({ where: { roleId: adminRole.id } });
+
+  const rolePermissionsData = allPermissions.map(permissionId => ({
+    roleId: adminRole.id,
+    permissionId,
+  }));
+
+  // Batch insert yerine loop ile upsert ya da createMany (conflict skip)
+  // SQLite/Postgres farkı olmaması için createMany skipDuplicates kullanıyoruz
+  await prisma.rolePermission.createMany({
+    data: rolePermissionsData,
+    skipDuplicates: true,
+  });
+  console.log('✓ Yönetici rolüne izinler atandı');
+
+  // 6. Admin User Oluştur
+  // Şifre: 1212
+  const hash = await bcrypt.hash('1212', 10);
+
+  const adminUser = await prisma.user.upsert({
+    where: {
+      email_tenantId: {
+        email: 'info@azemyazilim.com',
+        tenantId: tenant.id,
+      },
+    },
+    update: {
+      password: hash,
+      tenantId: tenant.id,
+      role: 'SUPER_ADMIN', // Legacy enum role kept for backward compat/bypass
+      roleId: adminRole.id, // Link to new granular role
+    },
+    create: {
+      email: 'info@azemyazilim.com',
+      username: 'azem',
+      password: hash,
+      firstName: 'Azem',
+      lastName: 'Yazılım',
+      fullName: 'Azem Yazılım',
+      phone: '5555555555',
+      role: 'SUPER_ADMIN',
+      roleId: adminRole.id,
+      isActive: true,
+      tenantId: tenant.id,
+    },
+  });
+  console.log(`✓ Admin user oluşturuldu: info@azemyazilim.com / 1212`);
 
   console.log('✅ Seed işlemi tamamlandı!');
 }

@@ -1,15 +1,15 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll(search?: string, limit: number = 100, page: number = 1) {
     const skip = (page - 1) * limit;
-    
+
     const where: any = {};
-    
+
     if (search) {
       where.OR = [
         { email: { contains: search, mode: 'insensitive' } },
@@ -97,6 +97,11 @@ export class UsersService {
 
     if (!user) {
       throw new NotFoundException(`User with ID ${id} not found`);
+    }
+
+    // Superadmin deactivation protection
+    if (user.role === 'SUPER_ADMIN' && user.isActive) {
+      throw new BadRequestException('Superadmin yetkisi olan kullanıcı pasife alınamaz.');
     }
 
     // Kullanıcının aktif durumunu tersine çevir

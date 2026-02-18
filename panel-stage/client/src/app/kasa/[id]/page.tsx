@@ -56,7 +56,7 @@ interface Kasa {
   id: string;
   kasaKodu: string;
   kasaAdi: string;
-  kasaTipi: 'NAKIT' | 'BANKA' | 'FIRMA_KREDI_KARTI' | 'CEK_SENET';
+  kasaTipi: 'NAKIT' | 'BANKA' | 'FIRMA_KREDI_KARTI';
   bakiye: number;
   aktif: boolean;
   bankaHesaplari?: BankaHesabi[];
@@ -432,7 +432,7 @@ const BankaHesabiHareketleri: React.FC<BankaHesabiHareketleriProps> = ({ bankaHe
 // Kasa Hareketleri Component
 interface KasaHareketleriProps {
   kasaId: string;
-  kasaTipi: 'NAKIT' | 'BANKA' | 'FIRMA_KREDI_KARTI' | 'CEK_SENET';
+  kasaTipi: 'NAKIT' | 'BANKA' | 'FIRMA_KREDI_KARTI';
 }
 
 const KasaHareketleri: React.FC<KasaHareketleriProps> = ({ kasaId, kasaTipi }) => {
@@ -1004,12 +1004,7 @@ export default function KasaDetayPage() {
           </Alert>
         )}
 
-        {/* ÇEK/SENET KASASI */}
-        {kasa.kasaTipi === 'CEK_SENET' && (
-          <Alert severity="info">
-            📄 Çek ve Senet kasası için <strong>Bordro (Çek/Senet)</strong> menüsünden işlem yapabilirsiniz.
-          </Alert>
-        )}
+
 
         {/* KASA HAREKETLERİ - Tüm kasa tipleri için */}
         <Box sx={{ mt: 4 }}>

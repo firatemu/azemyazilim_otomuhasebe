@@ -15,6 +15,9 @@ COPY server/src ./server/src
 COPY server/tsconfig.json ./server/tsconfig.json
 COPY server/nest-cli.json ./server/nest-cli.json
 
+# Generate Prisma Client
+RUN cd server && npx prisma generate --schema=./prisma/schema.prisma
+
 # Build
 RUN cd server && npm run build
 

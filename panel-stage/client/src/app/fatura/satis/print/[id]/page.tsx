@@ -63,13 +63,14 @@ export default function FaturaPrintPage() {
   const params = useParams();
   const router = useRouter();
   const id = params.id as string;
-  
+
   const [fatura, setFatura] = useState<Fatura | null>(null);
+  const [companyInfo, setCompanyInfo] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [paperSize, setPaperSize] = useState<'A4' | 'A5' | 'A5-landscape'>('A4');
   const [template, setTemplate] = useState<'classic' | 'modern'>('classic');
   const [zoom, setZoom] = useState(100);
-  
+
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -81,6 +82,14 @@ export default function FaturaPrintPage() {
       setLoading(true);
       const response = await axios.get(`/fatura/${id}`);
       setFatura(response.data);
+
+      // Fetch company settings
+      try {
+        const settingsRes = await axios.get('/tenants/settings');
+        setCompanyInfo(settingsRes.data);
+      } catch (err) {
+        console.error('Firma bilgileri yüklenemedi:', err);
+      }
     } catch (error) {
       console.error('Fatura yüklenemedi:', error);
     } finally {
@@ -117,7 +126,7 @@ export default function FaturaPrintPage() {
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
-      
+
       pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
       pdf.save(`Fatura-${fatura?.faturaNo}.pdf`);
     } catch (error) {
@@ -147,20 +156,20 @@ export default function FaturaPrintPage() {
   }
 
   return (
-    <Box sx={{ 
-      bgcolor: '#f5f5f5', 
-      minHeight: '100vh', 
-      p: { xs: 1, sm: 2, md: 3 },
+    <Box sx={{
+      bgcolor: '#f5f5f5',
+      minHeight: '100vh',
+      p: { xs: 1, sm: 2, md: 2 },
       overflowX: 'auto',
       width: '100%',
       maxWidth: '100vw',
     }}>
       {/* Kontrol Paneli */}
-      <Paper sx={{ 
-        p: { xs: 1, sm: 2 }, 
-        mb: 3, 
-        position: 'sticky', 
-        top: 0, 
+      <Paper sx={{
+        p: { xs: 1, sm: 2 },
+        mb: 2,
+        position: 'sticky',
+        top: 0,
         zIndex: 1000,
         overflowX: 'auto',
         '&::-webkit-scrollbar': {
@@ -171,26 +180,26 @@ export default function FaturaPrintPage() {
           borderRadius: '2px',
         },
       }}>
-        <Stack 
-          direction={{ xs: 'column', sm: 'row' }} 
-          spacing={{ xs: 2, sm: 2 }} 
-          alignItems={{ xs: 'stretch', sm: 'center' }} 
+        <Stack
+          direction={{ xs: 'column', sm: 'row' }}
+          spacing={{ xs: 2, sm: 2 }}
+          alignItems={{ xs: 'stretch', sm: 'center' }}
           justifyContent="space-between"
         >
           {/* Sol Taraf - Başlık ve Format Seçimleri */}
-          <Stack 
-            direction={{ xs: 'column', sm: 'row' }} 
-            spacing={{ xs: 1.5, sm: 2 }} 
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            spacing={{ xs: 1.5, sm: 2 }}
             alignItems={{ xs: 'stretch', sm: 'center' }}
             sx={{ flex: { xs: '1 1 auto', sm: '0 1 auto' }, minWidth: 0 }}
           >
             <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' }, whiteSpace: 'nowrap' }}>
-              Fatura Önizleme
+              Fatura Önizleme - {companyInfo?.companyName || 'Firma'}
             </Typography>
-            
-            <Stack 
-              direction={{ xs: 'column', sm: 'row' }} 
-              spacing={{ xs: 1, sm: 2 }} 
+
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={{ xs: 1, sm: 2 }}
               alignItems={{ xs: 'stretch', sm: 'center' }}
               sx={{ flexWrap: 'wrap', gap: { xs: 1, sm: 0 } }}
             >
@@ -235,18 +244,18 @@ export default function FaturaPrintPage() {
                 </Button>
               </ButtonGroup>
 
-              <Divider 
+              <Divider
                 orientation="vertical"
-                flexItem 
+                flexItem
                 sx={{ display: { xs: 'none', sm: 'block' } }}
               />
 
               {/* Zoom Kontrolleri */}
-              <Stack 
-                direction="row" 
-                spacing={0.5} 
+              <Stack
+                direction="row"
+                spacing={0.5}
                 alignItems="center"
-                sx={{ 
+                sx={{
                   justifyContent: { xs: 'center', sm: 'flex-start' },
                   border: { xs: '1px solid #e0e0e0', sm: 'none' },
                   borderRadius: { xs: 1, sm: 0 },
@@ -255,18 +264,18 @@ export default function FaturaPrintPage() {
                 }}
               >
                 <Tooltip title="Uzaklaştır">
-                  <IconButton 
-                    size="small" 
+                  <IconButton
+                    size="small"
                     onClick={() => setZoom(z => Math.max(z - 10, 50))}
                     sx={{ p: { xs: 0.75, sm: 0.5 } }}
                   >
                     <ZoomOut fontSize="small" />
                   </IconButton>
                 </Tooltip>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
-                    minWidth: '45px', 
+                <Typography
+                  variant="body2"
+                  sx={{
+                    minWidth: '45px',
                     textAlign: 'center',
                     fontSize: { xs: '0.75rem', sm: '0.875rem' },
                   }}
@@ -274,8 +283,8 @@ export default function FaturaPrintPage() {
                   {zoom}%
                 </Typography>
                 <Tooltip title="Yakınlaştır">
-                  <IconButton 
-                    size="small" 
+                  <IconButton
+                    size="small"
                     onClick={() => setZoom(z => Math.min(z + 10, 150))}
                     sx={{ p: { xs: 0.75, sm: 0.5 } }}
                   >
@@ -287,10 +296,10 @@ export default function FaturaPrintPage() {
           </Stack>
 
           {/* Sağ Taraf - Aksiyon Butonları */}
-          <Stack 
-            direction={{ xs: 'column', sm: 'row' }} 
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
             spacing={{ xs: 1, sm: 2 }}
-            sx={{ 
+            sx={{
               width: { xs: '100%', sm: 'auto' },
               '& > button': {
                 width: { xs: '100%', sm: 'auto' },
@@ -325,8 +334,8 @@ export default function FaturaPrintPage() {
       </Paper>
 
       {/* Fatura Önizleme */}
-      <Box sx={{ 
-        display: 'flex', 
+      <Box sx={{
+        display: 'flex',
         justifyContent: { xs: 'flex-start', sm: 'center' },
         transform: { xs: 'none', sm: `scale(${zoom / 100})` },
         transformOrigin: 'top center',
@@ -347,9 +356,9 @@ export default function FaturaPrintPage() {
       }}>
         <div ref={printRef} style={{ minWidth: 'fit-content' }}>
           {template === 'classic' ? (
-            <ClassicTemplate fatura={fatura} paperSize={paperSize} formatDate={formatDate} formatMoney={formatMoney} />
+            <ClassicTemplate fatura={fatura} companyInfo={companyInfo} paperSize={paperSize} formatDate={formatDate} formatMoney={formatMoney} />
           ) : (
-            <ModernTemplate fatura={fatura} paperSize={paperSize} formatDate={formatDate} formatMoney={formatMoney} />
+            <ModernTemplate fatura={fatura} companyInfo={companyInfo} paperSize={paperSize} formatDate={formatDate} formatMoney={formatMoney} />
           )}
         </div>
       </Box>
@@ -372,13 +381,15 @@ export default function FaturaPrintPage() {
 }
 
 // Klasik Şablon
-function ClassicTemplate({ 
-  fatura, 
-  paperSize, 
-  formatDate, 
-  formatMoney 
-}: { 
-  fatura: Fatura; 
+function ClassicTemplate({
+  fatura,
+  companyInfo,
+  paperSize,
+  formatDate,
+  formatMoney
+}: {
+  fatura: Fatura;
+  companyInfo: any;
   paperSize: 'A4' | 'A5' | 'A5-landscape';
   formatDate: (date: string) => string;
   formatMoney: (amount: number) => string;
@@ -410,14 +421,30 @@ function ClassicTemplate({
       {/* Header */}
       <Box sx={{ borderBottom: '3px solid #191970', pb: 2, mb: 3 }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography variant="h4" sx={{ color: '#191970', fontWeight: 'bold', fontSize: paperSize === 'A4' ? '24pt' : '18pt' }}>
-              YEDEK PARÇA
-            </Typography>
-            <Typography variant="body2" sx={{ color: '#666', mt: 0.5 }}>
-              Otomasyon Sistemi
-            </Typography>
-          </Box>
+          <Stack direction="row" spacing={2} alignItems="center">
+            {companyInfo?.logoUrl && (
+              <img
+                src={companyInfo.logoUrl}
+                alt="Logo"
+                style={{
+                  height: paperSize === 'A4' ? '80px' : '60px',
+                  maxWidth: '150px',
+                  objectFit: 'contain'
+                }}
+              />
+            )}
+            <Box>
+              <Typography variant="h4" sx={{ color: '#191970', fontWeight: 'bold', fontSize: paperSize === 'A4' ? '18pt' : '14pt', lineHeight: 1.2 }}>
+                {companyInfo?.companyName || 'Firma Adı'}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666', mt: 0.5, maxWidth: '300px' }}>
+                {companyInfo?.address}
+              </Typography>
+              <Typography variant="body2" sx={{ color: '#666' }}>
+                {companyInfo?.phone && `Tel: ${companyInfo.phone}`} {companyInfo?.email && `| E-posta: ${companyInfo.email}`}
+              </Typography>
+            </Box>
+          </Stack>
           <Box sx={{ textAlign: 'right' }}>
             <Typography variant="h5" sx={{ color: '#191970', fontWeight: 'bold', fontSize: paperSize === 'A4' ? '18pt' : '14pt' }}>
               SATIŞ FATURASI
@@ -457,7 +484,7 @@ function ClassicTemplate({
       </Box>
 
       {/* Ürün Tablosu */}
-      <TableContainer sx={{ 
+      <TableContainer sx={{
         mb: 2,
         overflowX: 'auto',
         WebkitOverflowScrolling: 'touch',
@@ -472,18 +499,18 @@ function ClassicTemplate({
           background: '#f1f1f1',
         },
       }}>
-        <Table size="small" sx={{ 
+        <Table size="small" sx={{
           '& td, & th': { fontSize: 'inherit', py: 0.5 },
           minWidth: { xs: '600px', sm: 'auto' },
         }}>
           <TableHead>
             <TableRow sx={{ bgcolor: '#191970' }}>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Ürün Kodu</TableCell>
-              <TableCell sx={{ color: 'white', fontWeight: 'bold' }}>Ürün Adı</TableCell>
-              <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>Miktar</TableCell>
-              <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold' }}>Birim Fiyat</TableCell>
-              <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold' }}>KDV %</TableCell>
-              <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold' }}>Toplam</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Ürün Kodu</TableCell>
+              <TableCell sx={{ color: 'white', fontWeight: 'bold', width: '45%' }}>Ürün Adı</TableCell>
+              <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold', width: '10%' }}>Miktar</TableCell>
+              <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold', width: '10%' }}>Birim Fiyat</TableCell>
+              <TableCell align="center" sx={{ color: 'white', fontWeight: 'bold', width: '5%' }}>KDV %</TableCell>
+              <TableCell align="right" sx={{ color: 'white', fontWeight: 'bold', width: '15%' }}>Toplam</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -552,13 +579,15 @@ function ClassicTemplate({
 }
 
 // Modern Şablon
-function ModernTemplate({ 
-  fatura, 
-  paperSize, 
-  formatDate, 
-  formatMoney 
-}: { 
-  fatura: Fatura; 
+function ModernTemplate({
+  fatura,
+  companyInfo,
+  paperSize,
+  formatDate,
+  formatMoney
+}: {
+  fatura: Fatura;
+  companyInfo: any;
   paperSize: 'A4' | 'A5' | 'A5-landscape';
   formatDate: (date: string) => string;
   formatMoney: (amount: number) => string;
@@ -589,22 +618,37 @@ function ModernTemplate({
       }}
     >
       {/* Modern Header with Gradient */}
-      <Box sx={{ 
+      <Box sx={{
         background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
         color: 'white',
         p: paperSize === 'A4' ? 4 : 2,
         pb: paperSize === 'A4' ? 3 : 2,
       }}>
         <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
-          <Box>
-            <Typography variant="h3" sx={{ fontWeight: 300, mb: 0.5, fontSize: paperSize === 'A4' ? '28pt' : '20pt' }}>
-              INVOICE
-            </Typography>
-            <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
-              Yedek Parça Otomasyon
-            </Typography>
-          </Box>
-          <Box sx={{ 
+          <Stack direction="row" spacing={2} alignItems="center">
+            {companyInfo?.logoUrl && (
+              <Box
+                component="img"
+                src={companyInfo.logoUrl}
+                alt="Logo"
+                sx={{
+                  height: paperSize === 'A4' ? '70px' : '50px',
+                  maxWidth: '120px',
+                  filter: 'brightness(0) invert(1)',
+                  objectFit: 'contain'
+                }}
+              />
+            )}
+            <Box>
+              <Typography variant="h3" sx={{ fontWeight: 300, mb: 0.5, fontSize: paperSize === 'A4' ? '24pt' : '18pt' }}>
+                {companyInfo?.companyName || 'INVOICE'}
+              </Typography>
+              <Typography variant="subtitle2" sx={{ opacity: 0.9 }}>
+                {companyInfo?.address}
+              </Typography>
+            </Box>
+          </Stack>
+          <Box sx={{
             textAlign: 'right',
             bgcolor: 'rgba(255,255,255,0.15)',
             backdropFilter: 'blur(10px)',
@@ -623,8 +667,8 @@ function ModernTemplate({
 
       <Box sx={{ p: paperSize === 'A4' ? 4 : 2 }}>
         {/* Müşteri Bilgileri - Modern Card */}
-        <Box sx={{ 
-          mb: 3, 
+        <Box sx={{
+          mb: 3,
           p: 2,
           border: '1px solid #e0e0e0',
           borderRadius: 2,
@@ -658,7 +702,7 @@ function ModernTemplate({
         </Box>
 
         {/* Ürün Tablosu - Minimalist */}
-        <TableContainer sx={{ 
+        <TableContainer sx={{
           mb: 2,
           overflowX: 'auto',
           WebkitOverflowScrolling: 'touch',
@@ -673,16 +717,16 @@ function ModernTemplate({
             background: '#f1f1f1',
           },
         }}>
-          <Table size="small" sx={{ 
+          <Table size="small" sx={{
             '& td, & th': { fontSize: 'inherit', border: 'none', py: 1 },
             minWidth: { xs: '600px', sm: 'auto' },
           }}>
             <TableHead>
               <TableRow sx={{ borderBottom: '2px solid #667eea' }}>
-                <TableCell sx={{ fontWeight: 'bold', color: '#667eea' }}>ÜRÜN</TableCell>
-                <TableCell align="center" sx={{ fontWeight: 'bold', color: '#667eea' }}>ADET</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#667eea' }}>FİYAT</TableCell>
-                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#667eea' }}>TOPLAM</TableCell>
+                <TableCell sx={{ fontWeight: 'bold', color: '#667eea', width: '60%' }}>ÜRÜN</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 'bold', color: '#667eea', width: '10%' }}>ADET</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#667eea', width: '15%' }}>FİYAT</TableCell>
+                <TableCell align="right" sx={{ fontWeight: 'bold', color: '#667eea', width: '15%' }}>TOPLAM</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
@@ -711,7 +755,7 @@ function ModernTemplate({
 
         {/* Toplamlar - Modern Card */}
         <Box sx={{ display: 'flex', justifyContent: 'flex-end', mt: 3 }}>
-          <Box sx={{ 
+          <Box sx={{
             width: paperSize === 'A4' ? '280px' : '200px',
             background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
             color: 'white',
@@ -767,10 +811,10 @@ function ModernTemplate({
       </Box>
 
       {/* Modern Footer */}
-      <Box sx={{ 
-        position: 'absolute', 
-        bottom: 0, 
-        left: 0, 
+      <Box sx={{
+        position: 'absolute',
+        bottom: 0,
+        left: 0,
         right: 0,
         p: 2,
         bgcolor: '#f8f9fa',

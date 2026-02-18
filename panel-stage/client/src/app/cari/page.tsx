@@ -37,11 +37,13 @@ import { cities, getDistricts } from '@/lib/cities';
 import { useDebounce } from '@/hooks/useDebounce';
 import TableSkeleton from '@/components/Loading/TableSkeleton';
 import { useTabStore } from '@/stores/tabStore';
+import { CariFormData, initialCariFormData } from '@/components/cari/types';
+import NewCariDialog from '@/components/cari/NewCariDialog';
 
 export default function CariPage() {
   const router = useRouter();
   const { addTab, setActiveTab } = useTabStore();
-  const [cariler, setCariler] = useState([]);
+  const [cariler, setCariler] = useState<any[]>([]);
   const [search, setSearch] = useState('');
   const debouncedSearch = useDebounce(search, 500);
   const [loading, setLoading] = useState(false);
@@ -53,6 +55,8 @@ export default function CariPage() {
   const [selectedCari, setSelectedCari] = useState<any>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as any });
   const [selectedCity, setSelectedCity] = useState('İstanbul');
+  const [formData, setFormData] = useState<CariFormData>(initialCariFormData);
+  const [satisElemanlari, setSatisElemanlari] = useState<any[]>([]);
 
   // Menu state
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -72,29 +76,21 @@ export default function CariPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []); // Sadece component mount olduğunda çalış
 
-  const [formData, setFormData] = useState({
-    cariKodu: '',
-    unvan: '',
-    tip: 'MUSTERI',
-    sirketTipi: 'KURUMSAL', // KURUMSAL veya SAHIS
-    vergiNo: '',
-    vergiDairesi: '',
-    tcKimlikNo: '',
-    isimSoyisim: '',
-    telefon: '',
-    email: '',
-    yetkili: '',
-    ulke: 'Türkiye',
-    il: 'İstanbul',
-    ilce: 'Kadıköy',
-    adres: '',
-    vadeSuresi: '',
-    aktif: true,
-  });
-
   useEffect(() => {
     fetchCariler();
   }, [debouncedSearch]); // Debounced search ile arama
+
+  useEffect(() => {
+    const fetchSatisElemanlari = async () => {
+      try {
+        const response = await axios.get('/satis-elemani');
+        setSatisElemanlari(response.data || []);
+      } catch (error) {
+        console.error('Satış elemanları yüklenirken hata:', error);
+      }
+    };
+    fetchSatisElemanlari();
+  }, []);
 
   const fetchCariler = async () => {
     try {
@@ -136,23 +132,8 @@ export default function CariPage() {
     }
 
     setFormData({
+      ...initialCariFormData,
       cariKodu: nextCode || '',
-      unvan: '',
-      tip: 'MUSTERI',
-      sirketTipi: 'KURUMSAL',
-      vergiNo: '',
-      vergiDairesi: '',
-      tcKimlikNo: '',
-      isimSoyisim: '',
-      telefon: '',
-      email: '',
-      yetkili: '',
-      ulke: 'Türkiye',
-      il: 'İstanbul',
-      ilce: 'Kadıköy',
-      adres: '',
-      vadeSuresi: '',
-      aktif: true,
     });
     setSelectedCity('İstanbul');
   };
@@ -163,99 +144,89 @@ export default function CariPage() {
     setFormData(prev => ({ ...prev, il: city, ilce: districts[0] || 'Merkez' }));
   }, []);
 
-  const handleAdd = async () => {
-    try {
-      // Validasyon: Sadece unvan zorunlu (cariKodu boşsa backend otomatik üretir)
-      if (!formData.unvan || !formData.unvan.trim()) {
-        showSnackbar('Ünvan boş olamaz', 'error');
-        return;
-      }
+  const prepareDataToSend = (data: CariFormData) => {
+    const dataToSend: any = { ...data };
 
-      // Adres bilgilerini birleştir
-      const fullAdres = `${formData.ilce}, ${formData.il}${formData.adres ? ', ' + formData.adres : ''}`;
-      const dataToSend: any = { ...formData, adres: fullAdres };
-
-      // vadeSuresi'yi number'a çevir veya null yap
-      if (dataToSend.vadeSuresi) {
-        dataToSend.vadeSuresi = parseInt(dataToSend.vadeSuresi);
-      } else {
-        delete dataToSend.vadeSuresi; // Boşsa gönderme
-      }
-
-      delete dataToSend.ulke;
-      delete dataToSend.il;
-      delete dataToSend.ilce;
-
-      // Şahıs şirketi değilse TC ve isim-soyisim kaldır
-      if (formData.sirketTipi !== 'SAHIS') {
-        delete dataToSend.tcKimlikNo;
-        delete dataToSend.isimSoyisim;
-      } else {
-        // Şahıs şirketi ise vergi no ve vergi dairesi kaldır
-        delete dataToSend.vergiNo;
-        delete dataToSend.vergiDairesi;
-      }
-
-      // sirketTipi alanını kaldır (veritabanında bu alan yok)
-      delete dataToSend.sirketTipi;
-
-      // cariKodu boşsa veya sadece boşluklardan oluşuyorsa undefined yap (backend otomatik üretsin)
-      if (!dataToSend.cariKodu || !dataToSend.cariKodu.trim()) {
-        dataToSend.cariKodu = undefined;
-      } else {
-        dataToSend.cariKodu = dataToSend.cariKodu.trim();
-      }
-
-      // Boş alanları temizle (undefined yap)
-      if (!dataToSend.telefon || !dataToSend.telefon.trim()) delete dataToSend.telefon;
-      if (!dataToSend.email || !dataToSend.email.trim()) delete dataToSend.email;
-      if (!dataToSend.yetkili || !dataToSend.yetkili.trim()) delete dataToSend.yetkili;
-      if (!dataToSend.vergiNo || !dataToSend.vergiNo.trim()) delete dataToSend.vergiNo;
-      if (!dataToSend.vergiDairesi || !dataToSend.vergiDairesi.trim()) delete dataToSend.vergiDairesi;
-      if (!dataToSend.tcKimlikNo || !dataToSend.tcKimlikNo.trim()) delete dataToSend.tcKimlikNo;
-      if (!dataToSend.isimSoyisim || !dataToSend.isimSoyisim.trim()) delete dataToSend.isimSoyisim;
-      if (!dataToSend.adres || !dataToSend.adres.trim()) delete dataToSend.adres;
-      if (!dataToSend.tip) delete dataToSend.tip; // tip opsiyonel, verilmezse backend MUSTERI kullanır
-
-      await axios.post('/cari', dataToSend);
-      showSnackbar('Cari başarıyla eklendi', 'success');
-      setOpenAdd(false);
-      resetForm();
-      fetchCariler();
-    } catch (error: any) {
-      showSnackbar(error.response?.data?.message || 'Cari eklenemedi', 'error');
+    // Tip dönüşümleri
+    if (dataToSend.vadeSuresi) {
+      dataToSend.vadeSuresi = parseInt(dataToSend.vadeSuresi) || 0;
+    } else {
+      dataToSend.vadeSuresi = undefined;
     }
+
+    if (!dataToSend.vadeGun && dataToSend.vadeSuresi) {
+      dataToSend.vadeGun = dataToSend.vadeSuresi;
+    }
+
+    // Şahıs şirketi değilse TC ve isim-soyisim temizle
+    if (data.sirketTipi !== 'SAHIS') {
+      dataToSend.tcKimlikNo = undefined;
+      dataToSend.isimSoyisim = undefined;
+    } else {
+      dataToSend.vergiNo = undefined;
+      dataToSend.vergiDairesi = undefined;
+    }
+
+    // Boş risk değerleri
+    if (!dataToSend.riskLimiti) dataToSend.riskLimiti = 0;
+    if (!dataToSend.teminatTutar) dataToSend.teminatTutar = 0;
+
+    // cariKodu temizliği
+    if (!dataToSend.cariKodu || !dataToSend.cariKodu.trim()) {
+      dataToSend.cariKodu = undefined;
+    } else {
+      dataToSend.cariKodu = dataToSend.cariKodu.trim();
+    }
+
+    // Boş alanları temizle
+    const nullableFields = ['telefon', 'email', 'yetkili', 'vergiNo', 'vergiDairesi', 'tcKimlikNo', 'isimSoyisim', 'adres', 'webSite', 'faks', 'sektor', 'ozelKod1', 'ozelKod2', 'bankaBilgileri'];
+    nullableFields.forEach(field => {
+      if (dataToSend[field] !== undefined && (dataToSend[field] === '' || dataToSend[field] === null)) {
+        dataToSend[field] = undefined;
+      }
+    });
+
+    // İlişkili tabloları temizle (Prisma ID'lerini ve relation ID'lerini sil)
+    if (dataToSend.yetkililer) {
+      dataToSend.yetkililer = dataToSend.yetkililer.map((y: any) => {
+        const { id, cariId, createdAt, updatedAt, ...rest } = y;
+        return rest;
+      });
+    }
+
+    if (dataToSend.ekAdresler) {
+      dataToSend.ekAdresler = dataToSend.ekAdresler.map((a: any) => {
+        const { id, cariId, createdAt, updatedAt, ...rest } = a;
+        return rest;
+      });
+    }
+
+    if (dataToSend.tedarikciBankalar) {
+      dataToSend.tedarikciBankalar = dataToSend.tedarikciBankalar.map((b: any) => {
+        const { id, cariId, createdAt, updatedAt, ...rest } = b;
+        return rest;
+      });
+    }
+
+    return dataToSend;
   };
+
+
 
   const handleEdit = async () => {
     try {
-      // Adres bilgilerini birleştir
-      const fullAdres = `${formData.ilce}, ${formData.il}${formData.adres ? ', ' + formData.adres : ''}`;
-      const dataToSend: any = { ...formData, adres: fullAdres };
+      if (!selectedCari) return;
 
-      // vadeSuresi'yi number'a çevir veya null yap
-      if (dataToSend.vadeSuresi) {
-        dataToSend.vadeSuresi = parseInt(dataToSend.vadeSuresi);
-      } else {
-        delete dataToSend.vadeSuresi; // Boşsa gönderme
-      }
+      const dataToSend = prepareDataToSend(formData);
 
-      delete dataToSend.ulke;
-      delete dataToSend.il;
-      delete dataToSend.ilce;
-
-      // Şahıs şirketi değilse TC ve isim-soyisim kaldır
-      if (formData.sirketTipi !== 'SAHIS') {
-        delete dataToSend.tcKimlikNo;
-        delete dataToSend.isimSoyisim;
-      } else {
-        // Şahıs şirketi ise vergi no ve vergi dairesi kaldır
-        delete dataToSend.vergiNo;
-        delete dataToSend.vergiDairesi;
-      }
-
-      // sirketTipi alanını kaldır (veritabanında bu alan yok)
-      delete dataToSend.sirketTipi;
+      delete dataToSend.id;
+      delete dataToSend.createdAt;
+      delete dataToSend.updatedAt;
+      delete dataToSend.tenantId;
+      delete dataToSend.bakiye; // Bakiye guncellenemez
+      delete dataToSend.cariHareketler;
+      delete dataToSend.faturalar;
+      delete dataToSend.tahsilatlar;
 
       await axios.patch(`/cari/${selectedCari.id}`, dataToSend);
       showSnackbar('Cari başarıyla güncellendi', 'success');
@@ -280,40 +251,73 @@ export default function CariPage() {
     }
   };
 
-  const openEditDialog = (cari: any) => {
-    setSelectedCari(cari);
+  const openEditDialog = async (cariSummary: any) => {
+    try {
+      // Detaylı veriyi çek (ilişkisel tablolar için)
+      const response = await axios.get(`/cari/${cariSummary.id}`);
+      const cari = response.data;
 
-    // Eski adres formatını parse et (varsa)
-    const adresParts = cari.adres ? cari.adres.split(',').map((s: string) => s.trim()) : [];
-    const ilce = adresParts.length > 0 ? adresParts[0] : 'Kadıköy';
-    const il = adresParts.length > 1 ? adresParts[1] : 'İstanbul';
-    const adresDetay = adresParts.length > 2 ? adresParts.slice(2).join(', ') : '';
+      setSelectedCari(cari);
 
-    setSelectedCity(il);
+      // Adres ayrıştırma (Eski veri uyumluluğu)
+      let il = cari.il || 'İstanbul';
+      let ilce = cari.ilce || 'Kadıköy';
+      let adresDetay = cari.adres || '';
 
-    // Şahıs şirketi kontrolü (TC kimlik no varsa veya vergi no yoksa)
-    const isSahis = cari.tcKimlikNo || (!cari.vergiNo && cari.isimSoyisim);
+      if (!cari.il && cari.adres && cari.adres.includes(',')) {
+        const parts = cari.adres.split(',').map((s: string) => s.trim());
+        if (parts.length >= 2) {
+          ilce = parts[0];
+          il = parts[1];
+          adresDetay = parts.slice(2).join(', ');
+        }
+      }
 
-    setFormData({
-      cariKodu: cari.cariKodu,
-      unvan: cari.unvan,
-      tip: cari.tip,
-      sirketTipi: isSahis ? 'SAHIS' : 'KURUMSAL',
-      vergiNo: cari.vergiNo || '',
-      vergiDairesi: cari.vergiDairesi || '',
-      tcKimlikNo: cari.tcKimlikNo || '',
-      isimSoyisim: cari.isimSoyisim || '',
-      telefon: cari.telefon || '',
-      email: cari.email || '',
-      yetkili: cari.yetkili || '',
-      ulke: 'Türkiye',
-      il: il,
-      ilce: ilce,
-      adres: adresDetay,
-      vadeSuresi: cari.vadeSuresi?.toString() || '',
-      aktif: cari.aktif !== undefined ? cari.aktif : true,
-    });
-    setOpenEdit(true);
+      setSelectedCity(il);
+
+      // Şahıs şirketi kontrolü
+      const isSahis = cari.tcKimlikNo || (!cari.vergiNo && cari.isimSoyisim);
+
+      setFormData({
+        ...initialCariFormData,
+        ...cari,
+        cariKodu: cari.cariKodu,
+        unvan: cari.unvan,
+        tip: cari.tip,
+        sirketTipi: cari.sirketTipi || (isSahis ? 'SAHIS' : 'KURUMSAL'),
+        vergiNo: cari.vergiNo || '',
+        vergiDairesi: cari.vergiDairesi || '',
+        tcKimlikNo: cari.tcKimlikNo || '',
+        isimSoyisim: cari.isimSoyisim || '',
+        telefon: cari.telefon || '',
+        email: cari.email || '',
+        yetkili: cari.yetkili || '',
+        ulke: cari.ulke || 'Türkiye',
+        il: il,
+        ilce: ilce,
+        adres: adresDetay,
+        vadeSuresi: cari.vadeSuresi?.toString() || '',
+        vadeGun: cari.vadeGun || 0,
+        aktif: cari.aktif !== undefined ? cari.aktif : true,
+        riskLimiti: cari.riskLimiti || 0,
+        riskDurumu: cari.riskDurumu || 'NORMAL',
+        teminatTutar: cari.teminatTutar || 0,
+        sektor: cari.sektor || '',
+        ozelKod1: cari.ozelKod1 || '',
+        ozelKod2: cari.ozelKod2 || '',
+        webSite: cari.webSite || '',
+        faks: cari.faks || '',
+        paraBirimi: cari.paraBirimi || 'TRY',
+        bankaBilgileri: cari.bankaBilgileri || '',
+        yetkililer: cari.yetkililer || [],
+        ekAdresler: cari.ekAdresler || [],
+        tedarikciBankalar: cari.tedarikciBankalar || [],
+      });
+      setOpenEdit(true);
+    } catch (error) {
+      console.error("Cari detay yüklenemedi", error);
+      showSnackbar('Cari bilgileri yüklenirken hata oluştu', 'error');
+    }
   };
 
   const openViewDialog = async (cari: any) => {
@@ -331,17 +335,16 @@ export default function CariPage() {
     setOpenDelete(true);
   };
 
-  const handleFormChange = useCallback((field: string, value: string | boolean) => {
+  const handleFormChange = useCallback((field: string, value: any) => {
     setFormData(prev => ({ ...prev, [field]: value }));
   }, []);
-
 
   return (
     <MainLayout>
       <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography 
-            variant="h4" 
+          <Typography
+            variant="h4"
             sx={{
               fontWeight: 700,
               fontSize: '1.875rem',
@@ -352,8 +355,8 @@ export default function CariPage() {
           >
             Cari Yönetimi
           </Typography>
-          <Typography 
-            variant="body2" 
+          <Typography
+            variant="body2"
             sx={{
               color: 'var(--muted-foreground)',
               fontSize: '0.875rem',
@@ -383,7 +386,9 @@ export default function CariPage() {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => { resetForm(); setOpenAdd(true); }}
+            onClick={() => {
+              setOpenAdd(true);
+            }}
             sx={{
               bgcolor: 'var(--secondary)',
               color: 'var(--secondary-foreground)',
@@ -402,9 +407,9 @@ export default function CariPage() {
         </Box>
       </Box>
 
-      <Paper sx={{ 
-        p: 2, 
-        mb: 3, 
+      <Paper sx={{
+        p: 2,
+        mb: 3,
         borderRadius: 'var(--radius)',
         border: '1px solid var(--border)',
         bgcolor: 'var(--card)',
@@ -426,7 +431,7 @@ export default function CariPage() {
           <Button
             variant="contained"
             onClick={fetchCariler}
-            sx={{ 
+            sx={{
               minWidth: 100,
               bgcolor: 'var(--secondary)',
               color: 'var(--secondary-foreground)',
@@ -448,12 +453,12 @@ export default function CariPage() {
           onClick={() => setShowInactive(!showInactive)}
           sx={{
             color: showInactive ? 'var(--destructive)' : 'var(--chart-2)',
-            bgcolor: showInactive 
-              ? 'color-mix(in srgb, var(--destructive) 10%, transparent)' 
+            bgcolor: showInactive
+              ? 'color-mix(in srgb, var(--destructive) 10%, transparent)'
               : 'color-mix(in srgb, var(--chart-2) 10%, transparent)',
             '&:hover': {
-              bgcolor: showInactive 
-                ? 'color-mix(in srgb, var(--destructive) 20%, transparent)' 
+              bgcolor: showInactive
+                ? 'color-mix(in srgb, var(--destructive) 20%, transparent)'
                 : 'color-mix(in srgb, var(--chart-2) 20%, transparent)',
             },
             borderRadius: 'var(--radius-md)',
@@ -463,10 +468,10 @@ export default function CariPage() {
           title={showInactive ? 'Kullanım İçi Carileri Göster' : 'Kullanım Dışı Carileri Göster'}
         >
           {showInactive ? <ToggleOff fontSize="small" /> : <ToggleOn fontSize="small" />}
-          <Typography 
-            variant="caption" 
-            sx={{ 
-              ml: 1, 
+          <Typography
+            variant="caption"
+            sx={{
+              ml: 1,
               fontWeight: 600,
               fontSize: '0.8125rem',
             }}
@@ -476,9 +481,9 @@ export default function CariPage() {
         </IconButton>
       </Box>
 
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
+      <TableContainer
+        component={Paper}
+        sx={{
           borderRadius: 'var(--radius)',
           border: '1px solid var(--border)',
           boxShadow: 'var(--shadow-sm)',
@@ -491,6 +496,7 @@ export default function CariPage() {
               <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Tip</TableCell>
               <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Cari Kodu</TableCell>
               <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Ünvan</TableCell>
+              <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Satış Elemanı</TableCell>
               <TableCell sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Yetkili</TableCell>
               <TableCell align="right" sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>Bakiye</TableCell>
               <TableCell align="center" sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>İşlemler</TableCell>
@@ -498,10 +504,10 @@ export default function CariPage() {
           </TableHead>
           <TableBody>
             {loading ? (
-              <TableSkeleton rows={5} columns={6} />
+              <TableSkeleton rows={5} columns={7} />
             ) : cariler.filter((cari: any) => showInactive ? cari.aktif === false : cari.aktif !== false).length === 0 ? (
               <TableRow>
-                <TableCell colSpan={6} align="center" sx={{ py: 8 }}>
+                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                   <Typography variant="body1" sx={{ color: 'var(--muted-foreground)' }}>
                     {showInactive ? 'Kullanım dışı cari bulunamadı' : 'Kullanım içi cari bulunamadı'}
                   </Typography>
@@ -512,8 +518,8 @@ export default function CariPage() {
               </TableRow>
             ) : (
               cariler.filter((cari: any) => showInactive ? cari.aktif === false : cari.aktif !== false).map((cari: any) => (
-                <TableRow 
-                  key={cari.id} 
+                <TableRow
+                  key={cari.id}
                   hover
                   sx={{
                     bgcolor: 'var(--background)',
@@ -525,14 +531,14 @@ export default function CariPage() {
                 >
                   <TableCell>
                     <Chip
-                      label={cari.tip === 'MUSTERI' ? 'Müşteri' : 'Tedarikçi'}
+                      label={cari.tip === 'MUSTERI' ? 'Müşteri' : (cari.tip === 'HER_IKISI' ? 'Müşteri & Tedarikçi' : 'Tedarikçi')}
                       size="small"
                       sx={{
-                        bgcolor: cari.tip === 'MUSTERI' 
-                          ? 'color-mix(in srgb, var(--chart-1) 15%, transparent)' 
-                          : 'color-mix(in srgb, var(--primary) 15%, transparent)',
-                        color: cari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
-                        borderColor: cari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
+                        bgcolor: cari.tip === 'MUSTERI'
+                          ? 'color-mix(in srgb, var(--chart-1) 15%, transparent)'
+                          : (cari.tip === 'HER_IKISI' ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)' : 'color-mix(in srgb, var(--primary) 15%, transparent)'),
+                        color: cari.tip === 'MUSTERI' ? 'var(--chart-1)' : (cari.tip === 'HER_IKISI' ? 'var(--chart-2)' : 'var(--primary)'),
+                        borderColor: cari.tip === 'MUSTERI' ? 'var(--chart-1)' : (cari.tip === 'HER_IKISI' ? 'var(--chart-2)' : 'var(--primary)'),
                         fontWeight: 600,
                         fontSize: '0.75rem',
                       }}
@@ -541,6 +547,7 @@ export default function CariPage() {
                   </TableCell>
                   <TableCell sx={{ color: 'var(--primary)' }}>{cari.cariKodu}</TableCell>
                   <TableCell sx={{ color: 'var(--foreground)' }}>{cari.unvan}</TableCell>
+                  <TableCell sx={{ color: 'var(--muted-foreground)' }}>{cari.satisElemani?.adSoyad || '-'}</TableCell>
                   <TableCell sx={{ color: 'var(--muted-foreground)' }}>{cari.yetkili || '-'}</TableCell>
                   <TableCell align="right" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>
                     ₺{parseFloat(cari.bakiye || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2 })}
@@ -559,82 +566,6 @@ export default function CariPage() {
                     >
                       <MoreVert fontSize="small" />
                     </IconButton>
-
-                    <Menu
-                      anchorEl={anchorEl}
-                      open={Boolean(anchorEl) && menuCariId === cari.id}
-                      onClose={handleMenuClose}
-                      PaperProps={{
-                        sx: {
-                          mt: 1,
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                          borderRadius: 2,
-                          minWidth: 200,
-                        }
-                      }}
-                    >
-                      <MenuItem
-                        onClick={() => {
-                          router.push(`/cari/${cari.id}`);
-                          handleMenuClose();
-                        }}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)' }
-                        }}
-                      >
-                        <Receipt fontSize="small" sx={{ color: 'var(--chart-2)' }} />
-                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Ekstre</Typography>
-                      </MenuItem>
-
-                      <MenuItem
-                        onClick={() => {
-                          openViewDialog(cari);
-                          handleMenuClose();
-                        }}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)' }
-                        }}
-                      >
-                        <Visibility fontSize="small" sx={{ color: 'var(--chart-1)' }} />
-                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>İncele</Typography>
-                      </MenuItem>
-
-                      <MenuItem
-                        onClick={() => {
-                          openEditDialog(cari);
-                          handleMenuClose();
-                        }}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)' }
-                        }}
-                      >
-                        <Edit fontSize="small" sx={{ color: 'var(--secondary)' }} />
-                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Düzenle</Typography>
-                      </MenuItem>
-
-                      <MenuItem
-                        onClick={() => {
-                          openDeleteDialog(cari);
-                          handleMenuClose();
-                        }}
-                        disabled={!!(cari.hareketSayisi && cari.hareketSayisi > 0)}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)' },
-                          '&.Mui-disabled': { opacity: 0.5 }
-                        }}
-                      >
-                        <Delete fontSize="small" sx={{ color: 'var(--destructive)' }} />
-                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Sil</Typography>
-                      </MenuItem>
-                    </Menu>
                   </TableCell>
                 </TableRow>
               ))
@@ -643,80 +574,107 @@ export default function CariPage() {
         </Table>
       </TableContainer>
 
-      {/* Yeni Cari Ekle Dialog */}
-      <Dialog 
-        open={openAdd} 
-        onClose={() => setOpenAdd(false)} 
-        maxWidth="md" 
-        fullWidth
+      {/* Action Menu (Moved outside for performance and accessibility) */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
         PaperProps={{
           sx: {
-            borderRadius: 'var(--radius)',
-            border: '1px solid var(--border)',
-            bgcolor: 'var(--card)',
-            backgroundImage: 'none',
-          },
+            mt: 1,
+            boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
+            borderRadius: 2,
+            minWidth: 200,
+          }
         }}
       >
-        <DialogTitle sx={{
-          bgcolor: 'var(--secondary)',
-          color: 'var(--secondary-foreground)',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          fontWeight: 700,
-          fontSize: '1.125rem',
-        }}>
-          Yeni Cari Ekle
-          <IconButton size="small" onClick={() => setOpenAdd(false)} sx={{ color: 'var(--secondary-foreground)' }}>
-            <Close />
-          </IconButton>
-        </DialogTitle>
-        <DialogContent sx={{ bgcolor: 'var(--background)' }}>
-          <CariForm
-            data={formData}
-            onChange={handleFormChange}
-            onCityChange={handleCityChange}
-            availableDistricts={availableDistricts}
-          />
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button 
-            onClick={() => setOpenAdd(false)}
-            sx={{
-              textTransform: 'none',
-              fontWeight: 600,
-              color: 'var(--muted-foreground)',
-              '&:hover': {
-                bgcolor: 'var(--muted)',
-              },
-            }}
-          >
-            İptal
-          </Button>
-          <Button
-            variant="contained"
-            onClick={handleAdd}
-            sx={{
-              bgcolor: 'var(--secondary)',
-              color: 'var(--secondary-foreground)',
-              textTransform: 'none',
-              fontWeight: 600,
-              '&:hover': {
-                bgcolor: 'var(--secondary-hover)',
-              },
-            }}
-          >
-            Kaydet
-          </Button>
-        </DialogActions>
-      </Dialog>
+        {(() => {
+          const cari = cariler.find((c: any) => c.id === menuCariId);
+          if (!cari) return null;
+
+          return [
+            <MenuItem
+              key="statement"
+              onClick={() => {
+                router.push(`/cari/${cari.id}`);
+                handleMenuClose();
+              }}
+              sx={{
+                gap: 1.5,
+                py: 1,
+                '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)' }
+              }}
+            >
+              <Receipt fontSize="small" sx={{ color: 'var(--chart-2)' }} />
+              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Ekstre</Typography>
+            </MenuItem>,
+
+            <MenuItem
+              key="view"
+              onClick={() => {
+                openViewDialog(cari);
+                handleMenuClose();
+              }}
+              sx={{
+                gap: 1.5,
+                py: 1,
+                '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)' }
+              }}
+            >
+              <Visibility fontSize="small" sx={{ color: 'var(--chart-1)' }} />
+              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>İncele</Typography>
+            </MenuItem>,
+
+            <MenuItem
+              key="edit"
+              onClick={() => {
+                openEditDialog(cari);
+                handleMenuClose();
+              }}
+              sx={{
+                gap: 1.5,
+                py: 1,
+                '&:hover': { bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)' }
+              }}
+            >
+              <Edit fontSize="small" sx={{ color: 'var(--secondary)' }} />
+              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Düzenle</Typography>
+            </MenuItem>,
+
+            <MenuItem
+              key="delete"
+              onClick={() => {
+                openDeleteDialog(cari);
+                handleMenuClose();
+              }}
+              disabled={!!(cari?.hareketSayisi && cari.hareketSayisi > 0)}
+              sx={{
+                gap: 1.5,
+                py: 1,
+                '&:hover': { bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)' },
+                '&.Mui-disabled': { opacity: 0.5 }
+              }}
+            >
+              <Delete fontSize="small" sx={{ color: 'var(--destructive)' }} />
+              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Sil</Typography>
+            </MenuItem>
+          ];
+        })()}
+      </Menu>
+
+      {/* Yeni Cari Ekle Dialog */}
+      <NewCariDialog
+        open={openAdd}
+        onClose={() => setOpenAdd(false)}
+        onSuccess={fetchCariler}
+        showSnackbar={showSnackbar}
+      />
 
       {/* Cari Düzenle Dialog */}
-      <Dialog 
-        open={openEdit} 
-        onClose={() => setOpenEdit(false)} 
-        maxWidth="md" 
+      <Dialog
+        open={openEdit}
+        onClose={() => setOpenEdit(false)}
+        maxWidth="md"
         fullWidth
         PaperProps={{
           sx: {
@@ -747,10 +705,11 @@ export default function CariPage() {
             onChange={handleFormChange}
             onCityChange={handleCityChange}
             availableDistricts={availableDistricts}
+            satisElemanlari={satisElemanlari}
           />
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button 
+          <Button
             onClick={() => setOpenEdit(false)}
             sx={{
               textTransform: 'none',
@@ -782,10 +741,10 @@ export default function CariPage() {
       </Dialog>
 
       {/* Cari İncele Dialog */}
-      <Dialog 
-        open={openView} 
-        onClose={() => setOpenView(false)} 
-        maxWidth="md" 
+      <Dialog
+        open={openView}
+        onClose={() => setOpenView(false)}
+        maxWidth="md"
         fullWidth
         PaperProps={{
           sx: {
@@ -825,14 +784,14 @@ export default function CariPage() {
                 <Box>
                   <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>Tip</Typography>
                   <Chip
-                    label={selectedCari.tip}
+                    label={selectedCari.tip === 'MUSTERI' ? 'Müşteri' : (selectedCari.tip === 'HER_IKISI' ? 'Müşteri & Tedarikçi' : 'Tedarikçi')}
                     size="small"
                     sx={{
-                      bgcolor: selectedCari.tip === 'MUSTERI' 
-                        ? 'color-mix(in srgb, var(--chart-1) 15%, transparent)' 
-                        : 'color-mix(in srgb, var(--primary) 15%, transparent)',
-                      color: selectedCari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
-                      borderColor: selectedCari.tip === 'MUSTERI' ? 'var(--chart-1)' : 'var(--primary)',
+                      bgcolor: selectedCari.tip === 'MUSTERI'
+                        ? 'color-mix(in srgb, var(--chart-1) 15%, transparent)'
+                        : (selectedCari.tip === 'HER_IKISI' ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)' : 'color-mix(in srgb, var(--primary) 15%, transparent)'),
+                      color: selectedCari.tip === 'MUSTERI' ? 'var(--chart-1)' : (selectedCari.tip === 'HER_IKISI' ? 'var(--chart-2)' : 'var(--primary)'),
+                      borderColor: selectedCari.tip === 'MUSTERI' ? 'var(--chart-1)' : (selectedCari.tip === 'HER_IKISI' ? 'var(--chart-2)' : 'var(--primary)'),
                       fontWeight: 600,
                       fontSize: '0.75rem',
                     }}
@@ -841,8 +800,8 @@ export default function CariPage() {
                 </Box>
                 <Box>
                   <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>Bakiye</Typography>
-                  <Typography 
-                    variant="h6" 
+                  <Typography
+                    variant="h6"
                     sx={{
                       fontWeight: 700,
                       color: parseFloat(selectedCari.bakiye) >= 0 ? 'var(--chart-2)' : 'var(--destructive)',
@@ -887,8 +846,8 @@ export default function CariPage() {
       </Dialog>
 
       {/* Cari Sil Dialog */}
-      <Dialog 
-        open={openDelete} 
+      <Dialog
+        open={openDelete}
         onClose={() => setOpenDelete(false)}
         PaperProps={{
           sx: {
@@ -908,9 +867,9 @@ export default function CariPage() {
           Cari Sil
         </DialogTitle>
         <DialogContent sx={{ mt: 2 }}>
-          <Alert 
-            severity="warning" 
-            sx={{ 
+          <Alert
+            severity="warning"
+            sx={{
               mb: 2,
               bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
               border: '1px solid var(--primary)',
@@ -924,7 +883,7 @@ export default function CariPage() {
           </Typography>
         </DialogContent>
         <DialogActions sx={{ p: 2 }}>
-          <Button 
+          <Button
             onClick={() => setOpenDelete(false)}
             sx={{
               textTransform: 'none',
@@ -973,4 +932,3 @@ export default function CariPage() {
     </MainLayout>
   );
 }
-

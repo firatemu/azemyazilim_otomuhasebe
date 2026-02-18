@@ -1,105 +1,65 @@
 import {
-  BadRequestException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CreateBankaHesapDto } from './dto/create-banka-hesap.dto';
 import { UpdateBankaHesapDto } from './dto/update-banka-hesap.dto';
+import { TenantContextService } from '../../common/services/tenant-context.service';
+import { BankaHesapTipi } from '@prisma/client';
 
 @Injectable()
 export class BankaHesapService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private tenantContext: TenantContextService,
+  ) { }
 
   async create(createDto: CreateBankaHesapDto) {
-    // Kasa kontrolü
-    const kasa = await this.prisma.kasa.findUnique({
-      where: { id: createDto.kasaId },
-    });
-
-    if (!kasa) {
-      throw new NotFoundException('Kasa bulunamadı');
-    }
-
-    if (kasa.kasaTipi !== 'BANKA') {
-      throw new BadRequestException(
-        'Sadece BANKA tipindeki kasalara hesap eklenebilir',
-      );
-    }
-
-    // Hesap kodu kontrolü veya otomatik üret
-    let hesapKodu = createDto.hesapKodu;
-    if (!hesapKodu || hesapKodu.trim() === '') {
-      // Otomatik kod üret: KASA_KODU-001, KASA_KODU-002...
-      const hesapSayisi = await this.prisma.bankaHesabi.count({
-        where: { kasaId: createDto.kasaId },
-      });
-      hesapKodu = `${kasa.kasaKodu}-${String(hesapSayisi + 1).padStart(3, '0')}`;
-    }
-
-    const data = {
-      kasaId: createDto.kasaId,
-      hesapKodu,
-      hesapAdi: createDto.hesapAdi?.trim() || null,
-      bankaAdi: createDto.bankaAdi,
-      subeKodu: createDto.subeKodu,
-      subeAdi: createDto.subeAdi,
-      hesapNo: createDto.hesapNo,
-      iban: createDto.iban,
-      hesapTipi: createDto.hesapTipi,
-      aktif: createDto.aktif ?? true,
-    };
-
+    // Note: createDto.kasaId should be bankaId in the new schema
     return this.prisma.bankaHesabi.create({
-      data,
-      include: {
-        kasa: true,
+      data: {
+        bankaId: createDto.kasaId,
+        hesapKodu: createDto.hesapKodu || `ACC-${Date.now()}`,
+        hesapAdi: createDto.hesapAdi,
+        hesapNo: createDto.hesapNo,
+        iban: createDto.iban,
+        hesapTipi: createDto.hesapTipi,
+        aktif: createDto.aktif ?? true,
       },
     });
   }
 
   async findAll(kasaId?: string, hesapTipi?: string) {
-    const where: any = {};
-    if (kasaId) {
-      where.kasaId = kasaId;
-    }
-    if (hesapTipi) {
-      where.hesapTipi = hesapTipi;
-    }
+    const tenantId = this.tenantContext.getTenantId();
 
     return this.prisma.bankaHesabi.findMany({
-      where,
-      include: {
-        kasa: {
-          select: {
-            id: true,
-            kasaKodu: true,
-            kasaAdi: true,
-          },
+      where: {
+        banka: {
+          tenantId: tenantId,
         },
+        bankaId: kasaId,
+        hesapTipi: hesapTipi as BankaHesapTipi,
+        aktif: true,
       },
-      orderBy: { createdAt: 'asc' },
+      include: {
+        banka: true,
+      },
+      orderBy: { createdAt: 'desc' },
     });
   }
 
   async findOne(id: string) {
-    const hesap = await this.prisma.bankaHesabi.findUnique({
-      where: { id },
-      include: {
-        kasa: true,
-        hareketler: {
-          include: {
-            cari: {
-              select: {
-                id: true,
-                cariKodu: true,
-                unvan: true,
-              },
-            },
-          },
-          orderBy: { tarih: 'desc' },
-          take: 1000, // Daha fazla hareket göstermek için limit artırıldı
+    const tenantId = this.tenantContext.getTenantId();
+    const hesap = await this.prisma.bankaHesabi.findFirst({
+      where: {
+        id,
+        banka: {
+          tenantId: tenantId,
         },
+      },
+      include: {
+        banka: true,
       },
     });
 
@@ -111,34 +71,26 @@ export class BankaHesapService {
   }
 
   async update(id: string, updateDto: UpdateBankaHesapDto) {
-    await this.findOne(id);
-
-    const updateData: any = { ...updateDto };
-    // Boş string'i null'a çevir (nullable field için)
-    if (updateDto.hesapAdi !== undefined) {
-      updateData.hesapAdi = updateDto.hesapAdi?.trim() || null;
-    }
+    await this.findOne(id); // Ensure exists and belongs to tenant
 
     return this.prisma.bankaHesabi.update({
       where: { id },
-      data: updateData,
+      data: {
+        hesapAdi: updateDto.hesapAdi,
+        hesapNo: updateDto.hesapNo,
+        iban: updateDto.iban,
+        aktif: updateDto.aktif,
+      },
     });
   }
 
   async remove(id: string) {
-    const hesap = await this.findOne(id);
+    await this.findOne(id); // Ensure exists and belongs to tenant
 
-    // Hareket kontrolü
-    const hareketSayisi = await this.prisma.bankaHesapHareket.count({
-      where: { hesapId: id },
-    });
-
-    if (hareketSayisi > 0) {
-      throw new BadRequestException('Bu hesapta hareket var, silinemez');
-    }
-
-    return this.prisma.bankaHesabi.delete({
+    return this.prisma.bankaHesabi.update({
       where: { id },
+      data: { aktif: false },
     });
   }
 }
+

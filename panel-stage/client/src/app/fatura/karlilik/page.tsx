@@ -363,18 +363,6 @@ export default function FaturaKarlilikPage() {
                             <Typography variant="body2" fontWeight="medium">
                               {item.fatura.faturaNo}
                             </Typography>
-                            <Chip
-                              label={item.fatura.durum}
-                              size="small"
-                              color={
-                                item.fatura.durum === 'ONAYLANDI'
-                                  ? 'success'
-                                  : item.fatura.durum === 'IPTAL'
-                                  ? 'error'
-                                  : 'default'
-                              }
-                              sx={{ mt: 0.5 }}
-                            />
                           </TableCell>
                           <TableCell>{formatDate(item.fatura.tarih)}</TableCell>
                           <TableCell>{item.fatura.cari.unvan}</TableCell>

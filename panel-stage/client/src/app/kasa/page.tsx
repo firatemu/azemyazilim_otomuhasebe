@@ -52,13 +52,11 @@ interface Kasa {
   id: string;
   kasaKodu: string;
   kasaAdi: string;
-  kasaTipi: 'NAKIT' | 'BANKA' | 'FIRMA_KREDI_KARTI' | 'CEK_SENET';
+  kasaTipi: 'NAKIT';
   bakiye: number;
   aktif: boolean;
   _count?: {
     hareketler: number;
-    bankaHesaplari?: number;
-    firmaKrediKartlari?: number;
   };
 }
 
@@ -72,11 +70,11 @@ export default function KasaPage() {
   const [editMode, setEditMode] = useState(false);
   const [selectedKasa, setSelectedKasa] = useState<Kasa | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
-  
+
   const [formData, setFormData] = useState({
     kasaKodu: '',
     kasaAdi: '',
-    kasaTipi: 'NAKIT' as 'NAKIT' | 'BANKA' | 'FIRMA_KREDI_KARTI' | 'CEK_SENET',
+    kasaTipi: 'NAKIT' as const,
     aktif: true,
   });
 
@@ -118,8 +116,8 @@ export default function KasaPage() {
 
   const openAddDialog = async () => {
     setEditMode(false);
-    setOpenDialog(true);
     await resetForm();
+    setOpenDialog(true);
   };
 
   const openEditDialog = (kasa: Kasa) => {
@@ -162,7 +160,7 @@ export default function KasaPage() {
 
   const handleDelete = async () => {
     if (!selectedKasa) return;
-    
+
     try {
       await axios.delete(`/kasa/${selectedKasa.id}`);
       showSnackbar('Kasa başarıyla silindi', 'success');
@@ -182,43 +180,19 @@ export default function KasaPage() {
   };
 
   const getKasaIcon = (tip: string) => {
-    switch (tip) {
-      case 'NAKIT': return <AttachMoney sx={{ color: 'var(--chart-2)' }} />;
-      case 'BANKA': return <AccountBalance sx={{ color: 'var(--chart-1)' }} />;
-      case 'FIRMA_KREDI_KARTI': return <CreditCard sx={{ color: 'var(--destructive)' }} />;
-      case 'CEK_SENET': return <AccountBalanceWallet sx={{ color: 'var(--secondary)' }} />;
-      default: return null;
-    }
+    return <AttachMoney sx={{ color: 'var(--chart-2)' }} />;
   };
 
   const getKasaColor = (tip: string) => {
-    switch (tip) {
-      case 'NAKIT': return 'var(--chart-2)';
-      case 'BANKA': return 'var(--chart-1)';
-      case 'FIRMA_KREDI_KARTI': return 'var(--destructive)';
-      case 'CEK_SENET': return 'var(--secondary)';
-      default: return 'var(--muted-foreground)';
-    }
+    return 'var(--chart-2)';
   };
 
   const getKasaTipLabel = (tip: string) => {
-    switch (tip) {
-      case 'NAKIT': return 'Nakit Kasa';
-      case 'BANKA': return 'Banka Kasası';
-      case 'FIRMA_KREDI_KARTI': return 'Firma Kredi Kartı';
-      case 'CEK_SENET': return 'Çek/Senet';
-      default: return tip;
-    }
+    return 'Nakit Kasa';
   };
 
   const getKasaAciklama = (tip: string) => {
-    switch (tip) {
-      case 'NAKIT': return 'Nakit tahsilat ve ödeme';
-      case 'BANKA': return 'Banka hesaplarını yönet (Vadesiz, POS)';
-      case 'FIRMA_KREDI_KARTI': return 'Firma kredi kartlarını yönet';
-      case 'CEK_SENET': return 'Çek ve senet takibi';
-      default: return '';
-    }
+    return 'Nakit tahsilat ve ödeme';
   };
 
   return (
@@ -227,9 +201,9 @@ export default function KasaPage() {
         {/* Header */}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography 
-              variant="h4" 
-              sx={{ 
+            <Typography
+              variant="h4"
+              sx={{
                 fontWeight: 700,
                 fontSize: '1.875rem',
                 color: 'var(--foreground)',
@@ -239,14 +213,14 @@ export default function KasaPage() {
             >
               💰 Kasa Yönetimi
             </Typography>
-            <Typography 
-              variant="body2" 
+            <Typography
+              variant="body2"
               sx={{
                 color: 'var(--muted-foreground)',
                 fontSize: '0.875rem',
               }}
             >
-              Nakit, Banka, Firma Kredi Kartı ve Çek/Senet kasalarını yönetin
+              Nakit kasalarınızı yönetin
             </Typography>
           </Box>
           <Box sx={{ display: 'flex', gap: 2 }}>
@@ -255,12 +229,12 @@ export default function KasaPage() {
               title={showInactive ? 'Kullanım İçi Kasaları Göster' : 'Kullanım Dışı Kasaları Göster'}
               sx={{
                 color: showInactive ? 'var(--primary)' : 'var(--chart-2)',
-                bgcolor: showInactive 
-                  ? 'color-mix(in srgb, var(--primary) 10%, transparent)' 
+                bgcolor: showInactive
+                  ? 'color-mix(in srgb, var(--primary) 10%, transparent)'
                   : 'color-mix(in srgb, var(--chart-2) 10%, transparent)',
                 '&:hover': {
-                  bgcolor: showInactive 
-                    ? 'color-mix(in srgb, var(--primary) 20%, transparent)' 
+                  bgcolor: showInactive
+                    ? 'color-mix(in srgb, var(--primary) 20%, transparent)'
                     : 'color-mix(in srgb, var(--chart-2) 20%, transparent)',
                 },
               }}
@@ -289,8 +263,8 @@ export default function KasaPage() {
         {/* Kasa Tipleri Bilgilendirme */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
           <Grid size={{ xs: 12, md: 3 }}>
-            <Card sx={{ 
-              bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)', 
+            <Card sx={{
+              bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)',
               borderLeft: '4px solid var(--chart-2)',
               borderRadius: 'var(--radius)',
               boxShadow: 'var(--shadow-sm)',
@@ -298,8 +272,8 @@ export default function KasaPage() {
               <CardContent>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
                   <AttachMoney sx={{ color: 'var(--chart-2)' }} />
-                  <Typography 
-                    variant="subtitle2" 
+                  <Typography
+                    variant="subtitle2"
                     sx={{
                       fontWeight: 700,
                       fontSize: '0.9375rem',
@@ -309,53 +283,14 @@ export default function KasaPage() {
                     Nakit Kasa
                   </Typography>
                 </Box>
-                <Typography 
-                  variant="caption" 
+                <Typography
+                  variant="caption"
                   sx={{
                     color: 'var(--muted-foreground)',
                     fontSize: '0.8125rem',
                   }}
                 >
                   Nakit tahsilat ve ödeme işlemleri
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <Card sx={{ bgcolor: '#eff6ff', borderLeft: '4px solid #3b82f6' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <AccountBalance sx={{ color: '#3b82f6' }} />
-                  <Typography variant="subtitle2" fontWeight="bold">Banka Kasası</Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary">
-                  Banka hesaplarını yönetir (Vadesiz + POS)
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <Card sx={{ bgcolor: '#fef2f2', borderLeft: '4px solid #ef4444' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <CreditCard sx={{ color: '#ef4444' }} />
-                  <Typography variant="subtitle2" fontWeight="bold">Firma Kredi Kartı</Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary">
-                  Firma kredi kartlarını yönetir
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid size={{ xs: 12, md: 3 }}>
-            <Card sx={{ bgcolor: '#f5f3ff', borderLeft: '4px solid #8b5cf6' }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
-                  <AccountBalanceWallet sx={{ color: '#8b5cf6' }} />
-                  <Typography variant="subtitle2" fontWeight="bold">Çek/Senet</Typography>
-                </Box>
-                <Typography variant="caption" color="text.secondary">
-                  Alınan ve verilen çek/senet takibi
                 </Typography>
               </CardContent>
             </Card>
@@ -370,7 +305,6 @@ export default function KasaPage() {
                 <TableCell sx={{ fontWeight: 600 }}>Tip</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Kasa Kodu</TableCell>
                 <TableCell sx={{ fontWeight: 600 }}>Kasa Adı</TableCell>
-                <TableCell sx={{ fontWeight: 600 }}>Alt Hesap/Kart</TableCell>
                 <TableCell align="right" sx={{ fontWeight: 600 }}>Bakiye</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 600 }}>Durum</TableCell>
                 <TableCell align="center" sx={{ fontWeight: 600 }}>İşlemler</TableCell>
@@ -417,25 +351,6 @@ export default function KasaPage() {
                       <Typography variant="body2">
                         {kasa.kasaAdi}
                       </Typography>
-                    </TableCell>
-                    <TableCell>
-                      {kasa.kasaTipi === 'BANKA' && (
-                        <Chip
-                          label={`${kasa._count?.bankaHesaplari || 0} Hesap`}
-                          size="small"
-                          color="info"
-                        />
-                      )}
-                      {kasa.kasaTipi === 'FIRMA_KREDI_KARTI' && (
-                        <Chip
-                          label={`${kasa._count?.firmaKrediKartlari || 0} Kart`}
-                          size="small"
-                          color="error"
-                        />
-                      )}
-                      {(kasa.kasaTipi === 'NAKIT' || kasa.kasaTipi === 'CEK_SENET') && (
-                        <Typography variant="caption" color="text.secondary">-</Typography>
-                      )}
                     </TableCell>
                     <TableCell align="right">
                       <Typography variant="body2" fontWeight="700" color={kasa.bakiye >= 0 ? 'success.main' : 'error.main'}>
@@ -520,63 +435,22 @@ export default function KasaPage() {
                   }
                 }}
               />
-              
+
               <TextField
                 fullWidth
                 label="Kasa Adı"
                 value={formData.kasaAdi}
                 onChange={(e) => setFormData(prev => ({ ...prev, kasaAdi: e.target.value }))}
                 required
+                autoFocus
                 placeholder="Örn: Ana Kasa, Ziraat Bankası, vb."
               />
 
-              <FormControl fullWidth required>
-                <InputLabel>Kasa Tipi</InputLabel>
-                <Select
-                  value={formData.kasaTipi}
-                  onChange={(e) => setFormData(prev => ({ ...prev, kasaTipi: e.target.value as any }))}
-                  label="Kasa Tipi"
-                  disabled={editMode}
-                >
-                  <MenuItem value="NAKIT">
-                    <Box>
-                      <Typography variant="body2">💵 Nakit Kasa</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Nakit tahsilat ve ödeme işlemleri
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="BANKA">
-                    <Box>
-                      <Typography variant="body2">🏦 Banka Kasası</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Banka hesaplarını yönetir (Vadesiz + POS hesapları)
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="FIRMA_KREDI_KARTI">
-                    <Box>
-                      <Typography variant="body2">💳 Firma Kredi Kartı</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Firma kredi kartlarını yönetir
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                  <MenuItem value="CEK_SENET">
-                    <Box>
-                      <Typography variant="body2">📄 Çek/Senet Kasası</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Alınan ve verilen çek/senet takibi
-                      </Typography>
-                    </Box>
-                  </MenuItem>
-                </Select>
-              </FormControl>
 
               {!editMode && (formData.kasaTipi === 'BANKA' || formData.kasaTipi === 'FIRMA_KREDI_KARTI') && (
                 <Alert severity="info">
                   <Typography variant="body2">
-                    {formData.kasaTipi === 'BANKA' 
+                    {formData.kasaTipi === 'BANKA'
                       ? '💡 Kasa oluşturduktan sonra banka hesaplarını (Vadesiz, POS) ekleyebilirsiniz.'
                       : '💡 Kasa oluşturduktan sonra firma kredi kartlarını ekleyebilirsiniz.'}
                   </Typography>

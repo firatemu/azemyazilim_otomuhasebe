@@ -1,7 +1,0 @@
-[00:00:03.391] Server  WARN    Warning: Reverting webpack devtool to 'false'.
-Changing the webpack devtool in development mode will cause severe performance regressions.
-Read more: https://nextjs.org/docs/messages/improper-devtool
-[00:00:03.926] Server  LOG      ✓ Ready in 3.1s
-[00:00:03.927] Server  WARN     ⚠ Cross origin request detected from staging.otomuhasebe.com to /_next/* resource. In a future major version of Next.js, you will need to explicitly configure "allowedDevOrigins" in next.config to allow this.
-Read more: https://nextjs.org/docs/app/api-reference/config/next-config-js/allowedDevOrigins
-[00:00:07.219] Server  LOG      ○ Compiling /fatura/satis ...

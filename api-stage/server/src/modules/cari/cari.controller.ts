@@ -8,15 +8,88 @@ import {
   Delete,
   Query,
   UseGuards,
+  Res,
 } from '@nestjs/common';
+import type { Response } from 'express';
 import { CariService } from './cari.service';
-import { CreateCariDto, UpdateCariDto } from './dto';
+import { CariHareketService } from '../cari-hareket/cari-hareket.service';
+import { CreateCariDto, UpdateCariDto, DebtCreditReportQueryDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 
 @UseGuards(JwtAuthGuard)
 @Controller('cari')
 export class CariController {
-  constructor(private readonly cariService: CariService) {}
+  constructor(
+    private readonly cariService: CariService,
+    private readonly cariHareketService: CariHareketService,
+  ) { }
+
+  @Get('rapor/borc-alacak')
+  getDebtCreditReport(@Query() query: DebtCreditReportQueryDto) {
+    return this.cariService.getDebtCreditReport(query);
+  }
+
+  @Get('rapor/borc-alacak/export/excel')
+  async exportDebtCreditReportExcel(@Query() query: DebtCreditReportQueryDto, @Res() res: Response) {
+    const buffer = await this.cariService.exportDebtCreditReportExcel(query);
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=borc-alacak-raporu.xlsx',
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
+  @Get('rapor/borc-alacak/export/pdf')
+  async exportDebtCreditReportPdf(@Query() query: DebtCreditReportQueryDto, @Res() res: Response) {
+    const buffer = await this.cariService.exportDebtCreditReportPdf(query);
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename=borc-alacak-raporu.pdf',
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
+  @Get(':id/ekstre/export/excel')
+  async exportEkstreExcel(
+    @Param('id') id: string,
+    @Query('baslangicTarihi') baslangicTarihi: string,
+    @Query('bitisTarihi') bitisTarihi: string,
+    @Res() res: Response
+  ) {
+    const buffer = await this.cariHareketService.exportExcel({
+      cariId: id,
+      baslangicTarihi,
+      bitisTarihi,
+    });
+    res.set({
+      'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=cari-ekstre.xlsx',
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
+
+  @Get(':id/ekstre/export/pdf')
+  async exportEkstrePdf(
+    @Param('id') id: string,
+    @Query('baslangicTarihi') baslangicTarihi: string,
+    @Query('bitisTarihi') bitisTarihi: string,
+    @Res() res: Response
+  ) {
+    const buffer = await this.cariHareketService.exportPdf({
+      cariId: id,
+      baslangicTarihi,
+      bitisTarihi,
+    });
+    res.set({
+      'Content-Type': 'application/pdf',
+      'Content-Disposition': 'attachment; filename=cari-ekstre.pdf',
+      'Content-Length': buffer.length,
+    });
+    res.end(buffer);
+  }
 
   @Post()
   create(@Body() dto: CreateCariDto) {
@@ -69,4 +142,5 @@ export class CariController {
       limit ? parseInt(limit) : 50,
     );
   }
+
 }

@@ -55,17 +55,17 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // Request'ten token'ı al
     const authHeader = req?.headers?.authorization;
     const currentToken = authHeader?.replace('Bearer ', '').trim();
-    
+
     if (currentToken) {
       const redisKey = `session:${user.id}`;
       const storedToken = await this.redisService.get(redisKey);
-      
+
       // Redis'te token varsa ve farklıysa, bu eski bir token'dır
       if (storedToken && storedToken !== currentToken) {
         console.log(`❌ [JWT] Token mismatch in Redis for user ${user.id}. Stored token differs from current token.`);
         throw new UnauthorizedException('Oturumunuz sonlandırıldı. Lütfen tekrar giriş yapın.');
       }
-      
+
       // Redis'te token yoksa, bu token geçersiz olabilir
       // Ancak Redis çalışmıyorsa, sadece DB kontrolü yeterli (fallback)
       // Bu durumda token version kontrolü zaten yapıldı, Redis kontrolü ek güvenlik sağlar
@@ -75,9 +75,9 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     const userRole = user.role?.toString() || user.role;
     const isSuperAdmin = userRole === 'SUPER_ADMIN' || userRole === 'SuperAdmin' || userRole === 'super_admin';
     const isStaging = process.env.NODE_ENV === 'staging' || process.env.NODE_ENV === 'development';
-    
+
     console.log('🔍 [JwtStrategy] Tenant validation:', { isStaging, userRole, isSuperAdmin, hasTenantId: !!user.tenantId, hasTenant: !!user.tenant });
-    
+
     // Tenant kontrolü (SUPER_ADMIN hariç ve staging hariç)
     if (user.tenantId && !isSuperAdmin && !isStaging) {
       if (!user.tenant) {
@@ -93,12 +93,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       if (user.tenant.subscription) {
         const subscription = user.tenant.subscription;
         const now = new Date();
-        
+
         // İptal edilmiş abonelik kontrolü
         if (subscription.status === 'CANCELED') {
           throw new UnauthorizedException('Aboneliğiniz iptal edilmiştir. Sisteme giriş yapabilmek için aboneliğinizin aktif olması gerekmektedir.');
         }
-        
+
         if (
           subscription.status !== 'ACTIVE' &&
           subscription.status !== 'TRIAL'
@@ -112,11 +112,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       }
     }
 
-    // Son giriş zamanını güncelle
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { lastLoginAt: new Date() },
-    });
+    // Son giriş zamanını güncelle (Throttled: 1 saatte bir)
+    const lastLogin = user.lastLoginAt ? new Date(user.lastLoginAt).getTime() : 0;
+    const oneHour = 60 * 60 * 1000;
+
+    if (Date.now() - lastLogin > oneHour) {
+      await this.prisma.user.update({
+        where: { id: user.id },
+        data: { lastLoginAt: new Date() },
+      });
+    }
 
     return {
       userId: payload.sub,

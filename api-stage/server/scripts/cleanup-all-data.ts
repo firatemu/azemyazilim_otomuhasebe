@@ -71,11 +71,11 @@ async function cleanupAllData() {
     await prisma.kasa.deleteMany({});
     await prisma.cariHareket.deleteMany({});
     await prisma.cari.deleteMany({});
-    await prisma.deletedCekSenet.deleteMany({});
-    await prisma.cekSenetLog.deleteMany({});
+    // await prisma.deletedCekSenet.deleteMany({});
+    // await prisma.cekSenetLog.deleteMany({});
     await prisma.cekSenet.deleteMany({});
-    await prisma.deletedBankaHavale.deleteMany({});
-    await prisma.bankaHavaleLog.deleteMany({});
+    // await prisma.deletedBankaHavale.deleteMany({});
+    // await prisma.bankaHavaleLog.deleteMany({});
     await prisma.bankaHavale.deleteMany({});
     await prisma.personelOdeme.deleteMany({});
     await prisma.personel.deleteMany({});
@@ -83,16 +83,16 @@ async function cleanupAllData() {
     await prisma.masrafKategori.deleteMany({});
     await prisma.arac.deleteMany({});
     await prisma.codeTemplate.deleteMany({});
-    
+
     // Payment ve subscription tabloları
     await prisma.payment.deleteMany({});
     await prisma.subscription.deleteMany({});
     await prisma.session.deleteMany({});
     await prisma.auditLog.deleteMany({});
-    
+
     // Tenant settings
     await prisma.tenantSettings.deleteMany({});
-    
+
     // Tenant'ları temizle (admin tenant'ı hariç)
     if (adminTenantId) {
       await prisma.tenant.deleteMany({
@@ -103,7 +103,7 @@ async function cleanupAllData() {
     } else {
       await prisma.tenant.deleteMany({});
     }
-    
+
     // Son olarak kullanıcıları temizle (admin hariç)
     await prisma.user.deleteMany({
       where: {
@@ -113,7 +113,7 @@ async function cleanupAllData() {
 
     console.log('\n✅ STAGING: Tüm veriler başarıyla temizlendi!');
     console.log(`✅ Admin kullanıcısı korundu: ${ADMIN_EMAIL}`);
-    
+
   } catch (error) {
     console.error('❌ Hata oluştu:', error);
     throw error;

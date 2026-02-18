@@ -9,7 +9,8 @@ export function useStoklar(search?: string, limit = 20) {
       const response = await axios.get('/stok', {
         params: { search, limit },
       });
-      return response.data.data || [];
+      const data = response.data?.data || response.data;
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 2 * 60 * 1000, // 2 dakika
   });
@@ -23,7 +24,8 @@ export function useCariler(tip?: string, limit = 1000) {
       const response = await axios.get('/cari', {
         params: { tip, limit },
       });
-      return response.data.data || [];
+      const data = response.data?.data || response.data;
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 3 * 60 * 1000, // 3 dakika
   });
@@ -51,7 +53,8 @@ export function useFaturalar(faturaTipi?: string, page = 1, limit = 50) {
       const response = await axios.get('/fatura', {
         params: { faturaTipi, page, limit },
       });
-      return response.data;
+      const data = response.data?.data || response.data;
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 60 * 1000, // 1 dakika
   });
@@ -76,23 +79,26 @@ export function useTahsilatlar(page = 1, limit = 50) {
       const response = await axios.get('/tahsilat', {
         params: { page, limit },
       });
-      return response.data;
+      const data = response.data?.data || response.data;
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 60 * 1000,
   });
 }
 
 // Stok Hareket hooks
-export function useStokHareketler(stokId?: string, hareketTipi?: string, limit = 100) {
+export function useStokHareketler(stokId?: string, hareketTipi?: string, limit = 100, enabled = true) {
   return useQuery({
     queryKey: ['stok-hareketler', stokId, hareketTipi, limit],
     queryFn: async () => {
       const response = await axios.get('/stok-hareket', {
         params: { stokId, hareketTipi, limit },
       });
-      return response.data;
+      const data = response.data?.data || response.data;
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 60 * 1000,
+    enabled: enabled,
   });
 }
 
@@ -102,7 +108,9 @@ export function usePersoneller() {
     queryKey: ['personeller'],
     queryFn: async () => {
       const response = await axios.get('/personel');
-      return response.data.data || [];
+      // Personel API returns a direct array, not wrapped in { data: [...] }
+      const data = response.data?.data || response.data;
+      return Array.isArray(data) ? data : [];
     },
     staleTime: 5 * 60 * 1000, // 5 dakika
   });
@@ -111,7 +119,7 @@ export function usePersoneller() {
 // Mutation hooks
 export function useCreateStok() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: any) => {
       const response = await axios.post('/stok', data);
@@ -125,7 +133,7 @@ export function useCreateStok() {
 
 export function useCreateCari() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: any) => {
       const response = await axios.post('/cari', data);
@@ -139,7 +147,7 @@ export function useCreateCari() {
 
 export function useCreateFatura() {
   const queryClient = useQueryClient();
-  
+
   return useMutation({
     mutationFn: async (data: any) => {
       const response = await axios.post('/fatura', data);

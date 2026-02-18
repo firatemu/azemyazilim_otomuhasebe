@@ -2,7 +2,7 @@ services:
   backend:
     image: otomuhasebe/backend:${IMAGE_TAG:-latest}
     build:
-      context: ../../api-prod
+      context: ../../api-stage
       dockerfile: server/Dockerfile
     ports:
       - "3021:3000"
@@ -18,6 +18,15 @@ services:
       retries: 12
       start_period: 30s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '1.50'
+    volumes:
+      - ../../api-stage/server/uploads:/app/server/uploads
+      - ../../api-stage/server:/app/server
+    command: npm run start:dev
+
 
   admin-panel:
     image: otomuhasebe/admin-panel:${IMAGE_TAG:-latest}
@@ -36,6 +45,10 @@ services:
       retries: 12
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
 
   landing-page:
     image: otomuhasebe/landing-page:${IMAGE_TAG:-latest}
@@ -60,6 +73,10 @@ services:
       retries: 12
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'
 
   user-panel:
     image: otomuhasebe/user-panel:${IMAGE_TAG:-latest}
@@ -84,3 +101,7 @@ services:
       retries: 12
       start_period: 15s
     restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '0.50'

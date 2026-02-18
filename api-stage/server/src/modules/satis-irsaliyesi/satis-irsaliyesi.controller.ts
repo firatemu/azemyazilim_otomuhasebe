@@ -21,7 +21,7 @@ import { FilterSatisIrsaliyesiDto } from './dto/filter-satis-irsaliyesi.dto';
 export class SatisIrsaliyesiController {
   constructor(
     private readonly satisIrsaliyesiService: SatisIrsaliyesiService,
-  ) {}
+  ) { }
 
   @Get()
   async findAll(@Query() filterDto: FilterSatisIrsaliyesiDto) {
@@ -31,6 +31,11 @@ export class SatisIrsaliyesiController {
       data: result.data,
       meta: result.meta,
     };
+  }
+
+  @Get('pending/:cariId')
+  async getPendingByCari(@Param('cariId') cariId: string) {
+    return this.satisIrsaliyesiService.getPendingByCari(cariId);
   }
 
   @Get(':id')

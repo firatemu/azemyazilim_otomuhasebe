@@ -6,7 +6,9 @@ import helmet from 'helmet';
 import compression = require('compression');
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule);
+  const app = await NestFactory.create(AppModule, {
+    logger: ['log', 'error', 'warn'],
+  });
 
   // Security Headers - Helmet
   app.use(
@@ -37,22 +39,22 @@ async function bootstrap() {
   const corsOrigins = process.env.CORS_ORIGINS
     ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
     : [
-        // Staging origins
-        'https://staging.otomuhasebe.com',
-        'https://staging-api.otomuhasebe.com',
-        
-        // Local development origins (all common ports)
-        'http://localhost:3000',
-        'http://localhost:3001',
-        'http://localhost:3010',
-        'http://localhost:3020',
-        'http://localhost:3021',
-        'http://127.0.0.1:3000',
-        'http://127.0.0.1:3001',
-        'http://127.0.0.1:3010',
-        'http://127.0.0.1:3020',
-        'http://127.0.0.1:3021',
-      ];
+      // Staging origins
+      'https://staging.otomuhasebe.com',
+      'https://staging-api.otomuhasebe.com',
+
+      // Local development origins (all common ports)
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:3010',
+      'http://localhost:3020',
+      'http://localhost:3021',
+      'http://127.0.0.1:3000',
+      'http://127.0.0.1:3001',
+      'http://127.0.0.1:3010',
+      'http://127.0.0.1:3020',
+      'http://127.0.0.1:3021',
+    ];
 
   app.enableCors({
     origin: (origin, callback) => {

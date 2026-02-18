@@ -5,6 +5,7 @@ import App from './App.tsx';
 import './utils/cacheBuster'; // Cache buster'ı import et
 import './utils/assignTenantIds'; // Tenant ID atama utility'si
 import './utils/cleanupUsers'; // Kullanıcı temizleme ve test utility'si
+import { ErrorBoundary } from './components/ErrorBoundary';
 
 // ============================================
 // CONSOLE ERROR/WARNING FILTER
@@ -56,7 +57,7 @@ const shouldFilter = (args: any[]): boolean => {
     .join(' ')
     .toLowerCase();
 
-  return filterPatterns.some(pattern => 
+  return filterPatterns.some(pattern =>
     message.includes(pattern.toLowerCase())
   );
 };
@@ -74,20 +75,20 @@ console.error = (...args: any[]) => {
     })
     .join(' ')
     .toLowerCase();
-  
+
   // feature_collector.js ile ilgili tüm hataları filtrele
-  const isFeatureCollectorError = 
+  const isFeatureCollectorError =
     fullMessage.includes('feature_collector') ||
     fullMessage.includes('feature_collector.js');
-  
+
   // installHook.js ile ilgili tüm hataları filtrele
-  const isInstallHookError = 
+  const isInstallHookError =
     fullMessage.includes('installhook') ||
     fullMessage.includes('installhook.js') ||
     fullMessage.includes('overridemethod');
-  
+
   // 500/400/404 network hatalarını filtrele (bunlar tenant ID eksikliğinden veya eksik endpoint'lerden kaynaklanıyor olabilir)
-  const isNetworkError = 
+  const isNetworkError =
     fullMessage.includes('500 (internal server error)') ||
     fullMessage.includes('400 (bad request)') ||
     fullMessage.includes('404 (not found)') ||
@@ -108,18 +109,18 @@ console.error = (...args: any[]) => {
       }
       return false;
     }) && fullMessage.includes('api.otomuhasebe.com'));
-  
+
   // Backend hata mesajlarını filtrele
-  const isBackendErrorMessage = 
+  const isBackendErrorMessage =
     fullMessage.includes('çek/senet hatırlatıcıları yüklenemedi') ||
     fullMessage.includes('hatırlatıcılar yüklenirken hata') ||
     fullMessage.includes('stok verisi alınamadı') ||
     fullMessage.includes('raf listesi alınamadı') ||
     fullMessage.includes('malzeme kaydedilemedi') ||
     fullMessage.includes('backend hatası');
-  
+
   // Henüz implement edilmemiş endpoint'ler için 404 hatalarını filtrele
-  const isUnimplementedEndpoint404 = 
+  const isUnimplementedEndpoint404 =
     fullMessage.includes('/api/analytics/') ||
     fullMessage.includes('analytics/dashboard') ||
     fullMessage.includes('analytics/revenue') ||
@@ -127,14 +128,14 @@ console.error = (...args: any[]) => {
     fullMessage.includes('/api/subscriptions') ||
     fullMessage.includes('/api/plans') ||
     fullMessage.includes('/api/users?search=');
-  
+
   // CRITICAL ERROR mesajlarını ASLA filtreleme (tenant ID sorunları için önemli)
   const isCriticalError = fullMessage.includes('[critical error]');
-  
+
   if ((isFeatureCollectorError || isInstallHookError || isNetworkError || isBackendErrorMessage || isUnimplementedEndpoint404) && !isCriticalError) {
     return; // Suppress external script errors, network errors, and unimplemented endpoint 404s, but NOT critical errors
   }
-  
+
   originalError.apply(console, args);
 };
 
@@ -151,7 +152,7 @@ console.warn = (...args: any[]) => {
     })
     .join(' ')
     .toLowerCase();
-  
+
   // feature_collector.js ile ilgili tüm uyarıları filtrele
   // Stack trace'de feature_collector.js varsa da filtrele
   const hasFeatureCollectorInStack = args.some(arg => {
@@ -166,31 +167,31 @@ console.warn = (...args: any[]) => {
     }
     return false;
   });
-  
+
   // "deprecated parameters" uyarısını her zaman filtrele (feature_collector.js'den geliyor)
   // Bu uyarı genellikle browser extension'lardan geliyor ve uygulama ile ilgili değil
-  const isDeprecatedParamsWarning = 
-    fullMessage.includes('deprecated parameters') || 
+  const isDeprecatedParamsWarning =
+    fullMessage.includes('deprecated parameters') ||
     fullMessage.includes('using deprecated') ||
     fullMessage.includes('pass a single object') ||
     fullMessage.includes('initialization function');
-  
-  const isFeatureCollectorWarning = 
+
+  const isFeatureCollectorWarning =
     fullMessage.includes('feature_collector') ||
     fullMessage.includes('feature_collector.js') ||
     hasFeatureCollectorInStack ||
     isDeprecatedParamsWarning; // Tüm deprecated parameters uyarılarını filtrele
-  
+
   // installHook.js ile ilgili tüm uyarıları filtrele
-  const isInstallHookWarning = 
+  const isInstallHookWarning =
     fullMessage.includes('installhook') ||
     fullMessage.includes('installhook.js') ||
     fullMessage.includes('overridemethod');
-  
+
   if (isFeatureCollectorWarning || isInstallHookWarning) {
     return; // Suppress external script warnings
   }
-  
+
   originalWarn.apply(console, args);
 };
 
@@ -200,21 +201,21 @@ window.onerror = (message, source, lineno, colno, error) => {
   const errorMessage = String(message || '').toLowerCase();
   const sourceFile = String(source || '').toLowerCase();
   const errorStack = error?.stack?.toLowerCase() || '';
-  
+
   // feature_collector.js ile ilgili tüm hataları filtrele
-  const isFeatureCollectorError = 
+  const isFeatureCollectorError =
     errorMessage.includes('feature_collector') ||
     sourceFile.includes('feature_collector') ||
     errorStack.includes('feature_collector');
-  
+
   // installHook.js ile ilgili tüm hataları filtrele
-  const isInstallHookError = 
+  const isInstallHookError =
     errorMessage.includes('installhook') ||
     sourceFile.includes('installhook') ||
     errorStack.includes('installhook');
-  
+
   // Henüz implement edilmemiş endpoint'ler için 404 hatalarını filtrele
-  const isUnimplementedEndpoint404 = 
+  const isUnimplementedEndpoint404 =
     errorMessage.includes('/api/analytics/') ||
     errorMessage.includes('analytics/dashboard') ||
     errorMessage.includes('analytics/revenue') ||
@@ -225,20 +226,20 @@ window.onerror = (message, source, lineno, colno, error) => {
     sourceFile.includes('/api/analytics/') ||
     sourceFile.includes('/api/subscriptions') ||
     sourceFile.includes('/api/plans');
-  
+
   // Network hatalarını filtrele (404, 400, 500)
-  const isNetworkError = 
+  const isNetworkError =
     errorMessage.includes('404') ||
     errorMessage.includes('400') ||
     errorMessage.includes('500') ||
     errorMessage.includes('not found') ||
     errorMessage.includes('bad request') ||
     errorMessage.includes('internal server error');
-  
+
   if (isFeatureCollectorError || isInstallHookError || isUnimplementedEndpoint404 || isNetworkError) {
     return true; // Error handled, don't show in console
   }
-  
+
   // Orijinal handler'ı çağır
   if (originalWindowError) {
     return originalWindowError(message, source, lineno, colno, error);
@@ -252,20 +253,20 @@ window.addEventListener('unhandledrejection', (event) => {
   const message = reason?.message || String(reason || '').toLowerCase();
   const stack = reason?.stack?.toLowerCase() || '';
   const fullMessage = (message + ' ' + stack).toLowerCase();
-  
+
   // feature_collector.js ile ilgili tüm rejection'ları filtrele
-  const isFeatureCollectorError = 
+  const isFeatureCollectorError =
     fullMessage.includes('feature_collector') ||
     fullMessage.includes('feature_collector.js');
-  
+
   // installHook.js ile ilgili tüm rejection'ları filtrele
-  const isInstallHookError = 
+  const isInstallHookError =
     fullMessage.includes('installhook') ||
     fullMessage.includes('installhook.js') ||
     fullMessage.includes('overridemethod');
-  
+
   // Henüz implement edilmemiş endpoint'ler için 404 hatalarını filtrele
-  const isUnimplementedEndpoint404 = 
+  const isUnimplementedEndpoint404 =
     fullMessage.includes('/api/analytics/') ||
     fullMessage.includes('analytics/dashboard') ||
     fullMessage.includes('analytics/revenue') ||
@@ -273,21 +274,21 @@ window.addEventListener('unhandledrejection', (event) => {
     fullMessage.includes('/api/subscriptions') ||
     fullMessage.includes('/api/plans') ||
     fullMessage.includes('/api/users?search=');
-  
+
   // Network hatalarını filtrele (404, 400, 500)
-  const isNetworkError = 
+  const isNetworkError =
     fullMessage.includes('404') ||
     fullMessage.includes('400') ||
     fullMessage.includes('500') ||
     fullMessage.includes('not found') ||
     fullMessage.includes('bad request') ||
     fullMessage.includes('internal server error');
-  
+
   if (isFeatureCollectorError || isInstallHookError || isUnimplementedEndpoint404 || isNetworkError) {
     event.preventDefault(); // Prevent default console error
     return;
   }
-  
+
   // Uygulama hatalarını göster (React Query, API hataları vb.)
 });
 
@@ -354,9 +355,9 @@ window.getCurrentTenantId = async () => {
   try {
     const { useAuthStore } = await import('@/stores/authStore');
     const { ensureTenantId, fetchTenantIdFromBackend } = await import('@/utils/tenantUtils');
-    
+
     const authState = useAuthStore.getState();
-    
+
     // Eğer kullanıcı giriş yapmışsa tenant ID'yi kontrol et
     if (authState.isAuthenticated && authState.accessToken) {
       // Önce mevcut tenant ID'yi kontrol et
@@ -375,6 +376,8 @@ window.getCurrentTenantId = async () => {
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <App />
+    <ErrorBoundary>
+      <App />
+    </ErrorBoundary>
   </StrictMode>,
 );

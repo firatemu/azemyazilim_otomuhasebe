@@ -1,0 +1,23 @@
+{
+    "name": "@otomuhasebe/docker-ops-mcp",
+    "version": "1.0.0",
+    "description": "MCP server for Docker operations and container management",
+    "main": "dist/index.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+        "watch": "tsc --watch",
+        "start": "node dist/index.js"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
+        "dockerode": "^4.0.2"
+    },
+    "devDependencies": {
+        "@types/dockerode": "^3.3.31",
+        "@types/estree": "^1.0.8",
+        "@types/json-schema": "^7.0.15",
+        "@types/node": "^22.10.2",
+        "typescript": "^5.7.2"
+    }
+}

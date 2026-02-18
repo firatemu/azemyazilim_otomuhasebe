@@ -1,9 +1,9 @@
 'use client';
 
 import React, { useState, useEffect } from 'react';
-import { 
-  Box, 
-  Typography, 
+import {
+  Box,
+  Typography,
   Paper,
   Table,
   TableBody,
@@ -59,12 +59,13 @@ export default function DuzenleAlisFaturasiPage() {
   const router = useRouter();
   const params = useParams();
   const faturaId = params.id as string;
-  
+
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     faturaNo: '',
     faturaTipi: 'ALIS' as 'SATIS' | 'ALIS',
@@ -75,24 +76,40 @@ export default function DuzenleAlisFaturasiPage() {
     genelIskontoOran: 0,
     genelIskontoTutar: 0,
     aciklama: '',
+    warehouseId: '',
     kalemler: [] as FaturaKalemi[],
   });
-  
+
   const [originalDurum, setOriginalDurum] = useState<'ACIK' | 'ONAYLANDI' | 'IPTAL'>('ACIK');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
 
   useEffect(() => {
     fetchCariler();
     fetchStoklar();
+    fetchWarehouses();
     fetchFatura();
   }, [faturaId]);
+
+  const fetchWarehouses = async () => {
+    try {
+      const response = await axios.get('/warehouse?active=true');
+      const warehouseList = response.data || [];
+      setWarehouses(warehouseList);
+
+      if (warehouseList.length === 0) {
+        showSnackbar('Sistemde tanımlı ambar bulunamadı! Lütfen önce bir ambar tanımlayın.', 'error');
+      }
+    } catch (error) {
+      console.error('Ambar listesi alınamadı:', error);
+    }
+  };
 
   const fetchFatura = async () => {
     try {
       setLoading(true);
       const response = await axios.get(`/fatura/${faturaId}`);
       const fatura = response.data;
-      
+
       const durumValue = fatura.durum || 'ACIK';
       setOriginalDurum(durumValue);
       setFormData({
@@ -105,6 +122,7 @@ export default function DuzenleAlisFaturasiPage() {
         genelIskontoOran: 0,
         genelIskontoTutar: fatura.iskonto || 0,
         aciklama: fatura.aciklama || '',
+        warehouseId: fatura.warehouseId || '',
         kalemler: fatura.kalemler.map((k: any) => ({
           stokId: k.stokId,
           miktar: k.miktar,
@@ -166,7 +184,7 @@ export default function DuzenleAlisFaturasiPage() {
     setFormData(prev => {
       const newKalemler = [...prev.kalemler];
       const kalem = { ...newKalemler[index] };
-      
+
       if (field === 'stokId') {
         const stok = stoklar.find(s => s.id === value);
         if (stok) {
@@ -189,7 +207,7 @@ export default function DuzenleAlisFaturasiPage() {
       } else {
         kalem[field] = value;
       }
-      
+
       newKalemler[index] = kalem;
       return { ...prev, kalemler: newKalemler };
     });
@@ -206,32 +224,32 @@ export default function DuzenleAlisFaturasiPage() {
     let araToplam = 0;
     let toplamKalemIskontosu = 0;
     let toplamKdv = 0;
-    
+
     formData.kalemler.forEach(kalem => {
       const kalemAraToplam = kalem.miktar * kalem.birimFiyat;
       araToplam += kalemAraToplam;
       toplamKalemIskontosu += kalem.iskontoTutar;
-      
+
       const netTutar = kalemAraToplam - kalem.iskontoTutar;
       const kdv = (netTutar * kalem.kdvOrani) / 100;
       toplamKdv += kdv;
     });
-    
+
     const genelIskonto = formData.genelIskontoTutar || 0;
     const toplamIskonto = toplamKalemIskontosu + genelIskonto;
     const netToplam = araToplam - toplamKalemIskontosu - genelIskonto;
     const genelToplam = netToplam + toplamKdv;
-    
+
     return { araToplam, toplamKalemIskontosu, genelIskonto, toplamIskonto, toplamKdv, netToplam, genelToplam };
   };
-  
+
   const handleGenelIskontoOranChange = (value: string) => {
     const oran = parseFloat(value) || 0;
     const araToplam = formData.kalemler.reduce((sum, k) => sum + (k.miktar * k.birimFiyat - k.iskontoTutar), 0);
     const tutar = (araToplam * oran) / 100;
     setFormData(prev => ({ ...prev, genelIskontoOran: oran, genelIskontoTutar: tutar }));
   };
-  
+
   const handleGenelIskontoTutarChange = (value: string) => {
     const tutar = parseFloat(value) || 0;
     const araToplam = formData.kalemler.reduce((sum, k) => sum + (k.miktar * k.birimFiyat - k.iskontoTutar), 0);
@@ -245,33 +263,41 @@ export default function DuzenleAlisFaturasiPage() {
         showSnackbar('Cari seçimi zorunludur', 'error');
         return;
       }
-      
+
+      if (!formData.warehouseId) {
+        showSnackbar('Ambar seçimi zorunludur. Lütfen bir ambar seçiniz.', 'error');
+        return;
+      }
+
       if (formData.kalemler.length === 0) {
         showSnackbar('En az bir kalem eklemelisiniz', 'error');
         return;
       }
 
       setSaving(true);
-      
+
       // Önce faturayı güncelle
       await axios.put(`/fatura/${faturaId}`, {
         tarih: new Date(formData.tarih).toISOString(),
         vade: formData.vade ? new Date(formData.vade).toISOString() : null,
         iskonto: Number(formData.genelIskontoTutar) || 0,
         aciklama: formData.aciklama || null,
+        warehouseId: formData.warehouseId || null,
         kalemler: formData.kalemler.map(k => ({
           stokId: k.stokId,
           miktar: Number(k.miktar),
           birimFiyat: Number(k.birimFiyat),
           kdvOrani: Number(k.kdvOrani),
+          iskontoOrani: Number(k.iskontoOran) || 0,
+          iskontoTutari: Number(k.iskontoTutar) || 0,
         })),
       });
-      
+
       // Durum değişikliği varsa SADECE O ZAMAN ayrı endpoint'e istek at
       if (formData.durum !== originalDurum) {
         await axios.put(`/fatura/${faturaId}/durum`, { durum: formData.durum });
       }
-      
+
       showSnackbar('Fatura başarıyla güncellendi', 'success');
       setTimeout(() => {
         router.push('/fatura/alis');
@@ -284,9 +310,9 @@ export default function DuzenleAlisFaturasiPage() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('tr-TR', { 
-      style: 'currency', 
-      currency: 'TRY' 
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: 'TRY'
     }).format(amount);
   };
 
@@ -306,7 +332,7 @@ export default function DuzenleAlisFaturasiPage() {
     <MainLayout>
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <IconButton 
+          <IconButton
             onClick={() => router.push('/fatura/alis')}
             sx={{
               bgcolor: '#f3f4f6',
@@ -338,6 +364,11 @@ export default function DuzenleAlisFaturasiPage() {
               Fatura Bilgileri
             </Typography>
             <Divider sx={{ mb: 2 }} />
+            {warehouses.length === 0 && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                Sistemde tanımlı ambar bulunmamaktadır. İşlem yapabilmek için lütfen önce ambar tanımlayınız.
+              </Alert>
+            )}
           </Box>
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -367,6 +398,20 @@ export default function DuzenleAlisFaturasiPage() {
               InputLabelProps={{ shrink: true }}
             />
             <FormControl sx={{ flex: '1 1 200px' }} required>
+              <InputLabel>Ambar</InputLabel>
+              <Select
+                value={formData.warehouseId}
+                onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                label="Ambar"
+              >
+                {warehouses.map((warehouse) => (
+                  <MenuItem key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name} {warehouse.isDefault && '(Varsayılan)'}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+            <FormControl sx={{ flex: '1 1 200px' }} required>
               <InputLabel>Durum</InputLabel>
               <Select
                 value={formData.durum}
@@ -379,7 +424,7 @@ export default function DuzenleAlisFaturasiPage() {
               </Select>
             </FormControl>
           </Box>
-          
+
           <Autocomplete
             fullWidth
             value={cariler.find(c => c.id === formData.cariId) || null}
@@ -419,10 +464,10 @@ export default function DuzenleAlisFaturasiPage() {
           <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" fontWeight="bold">Fatura Kalemleri</Typography>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 onClick={handleAddKalem}
-                sx={{ 
+                sx={{
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                 }}
               >
@@ -430,7 +475,7 @@ export default function DuzenleAlisFaturasiPage() {
               </Button>
             </Box>
             <Divider sx={{ mb: 2 }} />
-            
+
             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
               <Table stickyHeader size="small">
                 <TableHead>
@@ -528,9 +573,9 @@ export default function DuzenleAlisFaturasiPage() {
                             size="small"
                             value={kalem.iskontoOran || ''}
                             onChange={(e) => handleKalemChange(index, 'iskontoOran', e.target.value)}
-                            inputProps={{ 
-                              min: 0, 
-                              max: 100, 
+                            inputProps={{
+                              min: 0,
+                              max: 100,
                               step: 0.01,
                             }}
                             sx={{
@@ -555,8 +600,8 @@ export default function DuzenleAlisFaturasiPage() {
                             size="small"
                             value={kalem.iskontoTutar || ''}
                             onChange={(e) => handleKalemChange(index, 'iskontoTutar', e.target.value)}
-                            inputProps={{ 
-                              min: 0, 
+                            inputProps={{
+                              min: 0,
                               step: 0.01,
                             }}
                             sx={{
@@ -580,8 +625,8 @@ export default function DuzenleAlisFaturasiPage() {
                           </Typography>
                         </TableCell>
                         <TableCell align="center">
-                          <IconButton 
-                            size="small" 
+                          <IconButton
+                            size="small"
                             color="error"
                             onClick={() => handleRemoveKalem(index)}
                           >
@@ -663,68 +708,68 @@ export default function DuzenleAlisFaturasiPage() {
             </Typography>
             <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Box sx={{ flex: '1 1 300px' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Ara Toplam:</Typography>
-                    <Typography variant="body1" fontWeight="600">{formatCurrency(totals.araToplam)}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Kalem İndirimleri:</Typography>
-                    <Typography variant="body1" fontWeight="600" color={totals.toplamKalemIskontosu > 0 ? "error" : "inherit"}>
-                      {totals.toplamKalemIskontosu > 0 ? '- ' : ''}{formatCurrency(totals.toplamKalemIskontosu)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Genel İskonto:</Typography>
-                    <Typography variant="body1" fontWeight="600" color={totals.genelIskonto > 0 ? "error" : "inherit"}>
-                      {totals.genelIskonto > 0 ? '- ' : ''}{formatCurrency(totals.genelIskonto)}
-                    </Typography>
-                  </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Ara Toplam:</Typography>
+                  <Typography variant="body1" fontWeight="600">{formatCurrency(totals.araToplam)}</Typography>
                 </Box>
-                <Box sx={{ flex: '1 1 300px' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1" fontWeight="bold">Toplam İndirim:</Typography>
-                    <Typography variant="body1" fontWeight="bold" color={totals.toplamIskonto > 0 ? "error" : "inherit"}>
-                      {totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">KDV Toplamı:</Typography>
-                    <Typography variant="body1" fontWeight="600">{formatCurrency(totals.toplamKdv)}</Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
-                    <Typography 
-                      variant="h6" 
-                      fontWeight="bold"
-                      sx={{ 
-                        color: '#f59e0b',
-                      }}
-                    >
-                      {formatCurrency(totals.genelToplam)}
-                    </Typography>
-                  </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Kalem İndirimleri:</Typography>
+                  <Typography variant="body1" fontWeight="600" color={totals.toplamKalemIskontosu > 0 ? "error" : "inherit"}>
+                    {totals.toplamKalemIskontosu > 0 ? '- ' : ''}{formatCurrency(totals.toplamKalemIskontosu)}
+                  </Typography>
                 </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Genel İskonto:</Typography>
+                  <Typography variant="body1" fontWeight="600" color={totals.genelIskonto > 0 ? "error" : "inherit"}>
+                    {totals.genelIskonto > 0 ? '- ' : ''}{formatCurrency(totals.genelIskonto)}
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ flex: '1 1 300px' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1" fontWeight="bold">Toplam İndirim:</Typography>
+                  <Typography variant="body1" fontWeight="bold" color={totals.toplamIskonto > 0 ? "error" : "inherit"}>
+                    {totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">KDV Toplamı:</Typography>
+                  <Typography variant="body1" fontWeight="600">{formatCurrency(totals.toplamKdv)}</Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
+                  <Typography
+                    variant="h6"
+                    fontWeight="bold"
+                    sx={{
+                      color: '#f59e0b',
+                    }}
+                  >
+                    {formatCurrency(totals.genelToplam)}
+                  </Typography>
+                </Box>
+              </Box>
             </Box>
           </Paper>
 
           {/* Action Buttons */}
           <Box>
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button 
-                variant="outlined" 
+              <Button
+                variant="outlined"
                 size="large"
                 onClick={() => router.push('/fatura/alis')}
               >
                 İptal
               </Button>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 size="large"
                 startIcon={<Save />}
                 onClick={handleSave}
                 disabled={saving}
-                sx={{ 
+                sx={{
                   background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
                   minWidth: 150,
                 }}
@@ -743,8 +788,8 @@ export default function DuzenleAlisFaturasiPage() {
         onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+        <Alert
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
           severity={snackbar.severity}
           sx={{ width: '100%' }}
         >

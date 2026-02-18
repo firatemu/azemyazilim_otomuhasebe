@@ -1,10 +1,15 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { HareketTipi, Prisma } from '@prisma/client';
 
 @Injectable()
 export class StokHareketService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private tenantResolver: TenantResolverService,
+  ) { }
 
   async findAll(
     page = 1,
@@ -13,8 +18,16 @@ export class StokHareketService {
     hareketTipi?: HareketTipi,
   ) {
     const skip = (page - 1) * limit;
+    const tenantId = await this.tenantResolver.resolveForQuery();
 
     const where: Prisma.StokHareketWhereInput = {};
+
+    // Tenant filtresi (Stok üzerinden)
+    if (tenantId) {
+      where.stok = {
+        tenantId: tenantId
+      };
+    }
 
     if (stokId) {
       where.stokId = stokId;

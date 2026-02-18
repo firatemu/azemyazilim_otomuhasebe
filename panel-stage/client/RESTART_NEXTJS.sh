@@ -1,34 +1,17 @@
 #!/bin/bash
 
-# Next.js Dev Server Restart Script
-# Bu script Next.js cache'ini temizler ve dev server'ı restart eder
+# Next.js Developer Mode info
+# Bu ortamda HMR (Hot Module Replacement) aktiftir. 
+# Değişiklikleriniz anında yansır, 'npm run build' yapmanıza gerek yoktur.
 
-echo "🔄 Next.js cache temizleniyor ve restart ediliyor..."
+echo "🚀 Developer Mode / HMR Aktif!"
+echo "----------------------------"
+echo "✅ Kod değişiklikleriniz kaydedildiği an (Ctrl+S) tarayıcıya yansır."
+echo "✅ Manuel build (npm run build) yapmanıza gerek YOKTUR."
+echo "✅ STAGING_DEV_MODE=true ile detaylı loglar ve Source Maps açıktır."
+echo "----------------------------"
 
-cd /var/www/panel-stage/client || exit 1
-
-# .next cache'ini temizle
-echo "🗑️  .next cache temizleniyor..."
-rm -rf .next
-
-# Node modules kontrolü
-if [ ! -d "node_modules" ]; then
-    echo "📦 node_modules bulunamadı, npm install çalıştırılıyor..."
-    npm install
-fi
-
-echo ""
-echo "✅ Cache temizlendi!"
-echo ""
-echo "🚀 Next.js dev server'ı başlatmak için:"
-echo "   npm run dev"
-echo ""
-echo "🧪 Route'ları test etmek için:"
-echo "   curl http://localhost:3000/api/hizli/test"
-echo "   curl http://localhost:3000/api/hizli/token-status"
-echo "   curl http://localhost:3000/api/hizli/incoming"
-echo ""
-echo "💡 Eğer production build kullanıyorsanız:"
-echo "   npm run build"
-echo "   npm run start"
+# Eğer konteynerleri komple restart etmek isterseniz:
+# cd /var/www/docker/compose
+# docker compose -f docker-compose.base.yml -f docker-compose.staging.dev.yml restart
 

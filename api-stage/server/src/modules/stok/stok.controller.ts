@@ -8,15 +8,40 @@ import {
   Delete,
   Query,
   UseGuards,
+  Res,
 } from '@nestjs/common';
+import { StokExportService } from './stok-export.service';
+import type { Response } from 'express';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
 import { StokService } from './stok.service';
-import { CreateStokDto, UpdateStokDto } from './dto';
+import { CreateStokDto, UpdateStokDto, FindAllStokDto } from './dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-
 @UseGuards(JwtAuthGuard)
 @Controller('stok')
 export class StokController {
-  constructor(private readonly stokService: StokService) {}
+  constructor(
+    private readonly stokService: StokService,
+    private readonly stokExportService: StokExportService,
+    private readonly tenantResolver: TenantResolverService,
+  ) { }
+
+  @Get('export/eslesme')
+  async exportEslesme(@Res() res: Response) {
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    if (!tenantId) {
+      throw new Error('Tenant ID not found');
+    }
+    const buffer = await this.stokExportService.generateEslesmeExcel(tenantId);
+
+    res.set({
+      'Content-Type':
+        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      'Content-Disposition': 'attachment; filename=urun-eslesmeleri.xlsx',
+      'Content-Length': buffer.length,
+    });
+
+    res.end(buffer);
+  }
 
   // Parametresiz route'lar
   @Post()
@@ -53,18 +78,10 @@ export class StokController {
   }
 
   @Get()
-  findAll(
-    @Query('page') page?: string,
-    @Query('limit') limit?: string,
-    @Query('search') search?: string,
-  ) {
+  findAll(@Query() query: FindAllStokDto) {
     try {
-      console.log('🔍 [Stok Controller] findAll çağrıldı', { page, limit, search });
-      return this.stokService.findAll(
-        page ? parseInt(page) : 1,
-        limit ? parseInt(limit) : 50,
-        search,
-      );
+      console.log('🔍 [Stok Controller] findAll çağrıldı', query);
+      return this.stokService.findAll(query.page, query.limit, query.search);
     } catch (error: any) {
       console.error('❌ [Stok Controller] findAll hatası:', error);
       throw error;

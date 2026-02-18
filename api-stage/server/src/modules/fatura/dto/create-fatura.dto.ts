@@ -28,6 +28,16 @@ export class CreateFaturaKalemiDto {
   @IsNumber()
   @Min(0)
   kdvOrani: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  iskontoOrani?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  iskontoTutari?: number;
 }
 
 export class CreateFaturaDto {
@@ -70,8 +80,25 @@ export class CreateFaturaDto {
   @IsOptional()
   irsaliyeId?: string; // İrsaliye ID (irsaliye faturalandırıldığında)
 
+  @IsString()
+  @IsOptional()
+  warehouseId?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateFaturaKalemiDto)
   kalemler: CreateFaturaKalemiDto[];
+
+  @IsString()
+  @IsOptional()
+  satisElemaniId?: string;
+
+  @IsString()
+  @IsOptional()
+  dovizCinsi?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  dovizKuru?: number;
 }

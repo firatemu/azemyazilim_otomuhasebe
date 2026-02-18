@@ -14,9 +14,9 @@ export class EmailService {
       secure: false, // STARTTLS kullanıyoruz
       auth: process.env.SMTP_USER
         ? {
-            user: process.env.SMTP_USER,
-            pass: process.env.SMTP_PASS,
-          }
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        }
         : undefined,
       tls: {
         rejectUnauthorized: false, // Localhost için self-signed cert kabul et
@@ -227,6 +227,81 @@ Bu otomatik bir e-postadır. Lütfen bu e-postaya yanıt vermeyiniz.
     } catch (error: any) {
       this.logger.error(`Davet maili gönderilemedi: ${to} - Hata: ${error.message}`);
       throw error; // Davet emaili gönderilemezse hata fırlat
+    }
+  }
+  async sendMaturityReminderEmail(
+    to: string,
+    userName: string,
+    items: any[],
+  ): Promise<void> {
+    this.logger.log(`📧 Vade hatırlatma maili gönderiliyor: ${to}`);
+    const subject = 'Vade Hatırlatması - Oto Muhasebe';
+
+    const itemsHtml = items.map(item => `
+      <tr style="border-bottom: 1px solid #eee;">
+        <td style="padding: 10px;">${item.cekNo || item.seriNo}</td>
+        <td style="padding: 10px;">${item.cari?.unvan}</td>
+        <td style="padding: 10px;">${new Date(item.vade).toLocaleDateString('tr-TR')}</td>
+        <td style="padding: 10px; text-align: right;">₺${Number(item.kalanTutar).toLocaleString('tr-TR')}</td>
+      </tr>
+    `).join('');
+
+    const htmlTemplate = `
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <title>Vade Hatırlatması</title>
+</head>
+<body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 20px;">
+    <div style="background-color: #191970; color: white; padding: 20px; text-align: center; border-radius: 10px 10px 0 0;">
+        <h1 style="margin: 0; font-size: 24px;">Vade Hatırlatması</h1>
+    </div>
+    
+    <div style="background-color: #f9f9f9; padding: 25px; border-radius: 0 0 10px 10px; border: 1px solid #ddd; border-top: none;">
+        <p>Sayın ${userName},</p>
+        <p>Aşağıdaki evrakların vadeleri yaklaşmaktadır. Lütfen gerekli kontrolleri yapınız.</p>
+        
+        <table style="width: 100%; border-collapse: collapse; margin-top: 20px; background-color: white;">
+            <thead>
+                <tr style="background-color: #f2f2f2; border-bottom: 2px solid #191970;">
+                  <th style="padding: 10px; text-align: left;">Evrak No</th>
+                  <th style="padding: 10px; text-align: left;">Cari Unvan</th>
+                  <th style="padding: 10px; text-align: left;">Vade</th>
+                  <th style="padding: 10px; text-align: right;">Kalan Tutar</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${itemsHtml}
+            </tbody>
+        </table>
+        
+        <div style="text-align: center; margin: 30px 0;">
+            <a href="${process.env.FRONTEND_URL || 'https://panel.otomuhasebe.com'}/cek-senet" 
+               style="display: inline-block; background-color: #191970; color: white; padding: 10px 25px; text-decoration: none; border-radius: 5px; font-weight: bold;">
+                Detayları Gör
+            </a>
+        </div>
+        
+        <p style="color: #666; font-size: 13px; margin-top: 30px; border-top: 1px solid #ddd; padding-top: 15px;">
+            Sisteme giriş yaparak tüm vadelerinizi takip edebilirsiniz.<br>
+            <strong>Destek:</strong> mail@otomuhasebe.com
+        </p>
+    </div>
+</body>
+</html>
+    `.trim();
+
+    try {
+      await this.transporter.sendMail({
+        from: process.env.SMTP_FROM || 'Oto Muhasebe <mail@otomuhasebe.com>',
+        to,
+        subject,
+        html: htmlTemplate,
+      });
+      this.logger.log(`Vade hatırlatma maili gönderildi: ${to}`);
+    } catch (error: any) {
+      this.logger.error(`Vade hatırlatma maili gönderilemedi: ${to} - Hata: ${error.message}`);
     }
   }
 }

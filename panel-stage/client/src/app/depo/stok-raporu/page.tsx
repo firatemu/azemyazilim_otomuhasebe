@@ -1,315 +1,277 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
   Box,
   Typography,
   Paper,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
   TextField,
   Button,
-  Chip,
+  Grid,
+  Card,
+  CardContent,
+  IconButton,
+  CircularProgress,
+  Breadcrumbs,
+  Link,
+  Divider,
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { Warehouse as WarehouseIcon, Download } from '@mui/icons-material';
+import { Search, Download, CalendarToday, Warehouse as WarehouseIcon } from '@mui/icons-material';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
+import * as XLSX from 'xlsx';
 
-interface Warehouse {
+interface WarehouseInfo {
   id: string;
-  code: string;
   name: string;
-  isDefault: boolean;
+  code: string;
 }
 
-interface StockItem {
-  id: string;
+interface UniversalStockRow {
+  productId: string;
   stokKodu: string;
   stokAdi: string;
   birim: string;
-  qtyOnHand: number;
-  qtyReserved: number;
-  qtyAvailable: number;
-  locations?: Array<{
-    locationCode: string;
-    locationName: string;
-    quantity: number;
-  }>;
+  warehouseStocks: Record<string, number>;
+  total: number;
 }
 
 export default function AmbarStokRaporuPage() {
-  const [warehouses, setWarehouses] = useState<Warehouse[]>([]);
-  const [selectedWarehouse, setSelectedWarehouse] = useState('');
-  const [stockData, setStockData] = useState<StockItem[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [date, setDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [reportData, setReportData] = useState<UniversalStockRow[]>([]);
+  const [warehouses, setWarehouses] = useState<WarehouseInfo[]>([]);
+  const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    fetchWarehouses();
-  }, []);
-
-  useEffect(() => {
-    if (selectedWarehouse) {
-      fetchStockReport();
-    }
-  }, [selectedWarehouse]);
-
-  const fetchWarehouses = async () => {
-    try {
-      const response = await axios.get('/warehouse?active=true');
-      const warehouseList = response.data;
-      setWarehouses(warehouseList);
-      
-      // Varsayılan ambarı otomatik seç
-      const defaultWarehouse = warehouseList.find((w: Warehouse) => w.isDefault);
-      if (defaultWarehouse) {
-        setSelectedWarehouse(defaultWarehouse.id);
-      }
-    } catch (error) {
-      console.error('Ambar listesi alınamadı:', error);
-    }
-  };
-
-  const fetchStockReport = async () => {
-    if (!selectedWarehouse) return;
-
+  const fetchReport = async () => {
     try {
       setLoading(true);
-      const response = await axios.get(`/warehouse/${selectedWarehouse}/stock-report`);
-      setStockData(response.data);
+      const response = await axios.get('/warehouse/all/universal-stock-report', {
+        params: { date }
+      });
+      setReportData(response.data.report);
+      setWarehouses(response.data.warehouses);
     } catch (error) {
-      console.error('Stok raporu alınamadı:', error);
-      setStockData([]);
+      console.error('Evrensel stok raporu alınamadı:', error);
     } finally {
       setLoading(false);
     }
   };
 
-  const columns: GridColDef[] = [
-    {
-      field: 'stokKodu',
-      headerName: 'Stok Kodu',
-      width: 150,
-      renderCell: (params) => (
-        <Typography sx={{ fontWeight: 600, color: 'var(--primary)' }}>
-          {params.value}
-        </Typography>
-      ),
-    },
-    {
-      field: 'stokAdi',
-      headerName: 'Stok Adı',
-      width: 300,
-    },
-    {
-      field: 'birim',
-      headerName: 'Birim',
-      width: 100,
-    },
-    {
-      field: 'qtyOnHand',
-      headerName: 'Eldeki Miktar',
-      width: 150,
-      type: 'number',
-      renderCell: (params) => (
-        <Typography sx={{ fontWeight: 600 }}>
-          {params.value || 0}
-        </Typography>
-      ),
-    },
-    {
-      field: 'qtyReserved',
-      headerName: 'Rezerve',
-      width: 120,
-      type: 'number',
-      renderCell: (params) => (
-        <Typography sx={{ color: '#f59e0b' }}>
-          {params.value || 0}
-        </Typography>
-      ),
-    },
-    {
-      field: 'qtyAvailable',
-      headerName: 'Kullanılabilir',
-      width: 150,
-      type: 'number',
-      renderCell: (params) => (
-        <Typography sx={{ fontWeight: 600, color: '#10b981' }}>
-          {params.value || 0}
-        </Typography>
-      ),
-    },
-    {
-      field: 'locations',
-      headerName: 'Lokasyonlar',
-      width: 250,
-      renderCell: (params) => {
-        const locations = params.value as StockItem['locations'];
-        if (!locations || locations.length === 0) return '-';
-        
-        return (
-          <Box sx={{ display: 'flex', gap: 0.5, flexWrap: 'wrap' }}>
-            {locations.slice(0, 2).map((loc, idx) => (
-              <Chip
-                key={idx}
-                label={`${loc.locationCode}: ${loc.quantity}`}
-                size="small"
-                sx={{ fontSize: '0.75rem' }}
-              />
-            ))}
-            {locations.length > 2 && (
-              <Chip
-                label={`+${locations.length - 2}`}
-                size="small"
-                sx={{ fontSize: '0.75rem' }}
-              />
-            )}
-          </Box>
-        );
-      },
-    },
-  ];
+  useEffect(() => {
+    fetchReport();
+  }, [date]);
 
-  const filteredData = stockData.filter((item) => {
-    if (!searchTerm) return true;
-    const search = searchTerm.toLowerCase();
-    return (
-      item.stokKodu.toLowerCase().includes(search) ||
-      item.stokAdi.toLowerCase().includes(search)
+  const filteredData = useMemo(() => {
+    if (!searchTerm) return reportData;
+    const lowerSearch = searchTerm.toLowerCase();
+    return reportData.filter(
+      (item) =>
+        item.stokKodu.toLowerCase().includes(lowerSearch) ||
+        item.stokAdi.toLowerCase().includes(lowerSearch)
     );
-  });
+  }, [reportData, searchTerm]);
+
+  const columns = useMemo(() => {
+    const baseColumns: GridColDef[] = [
+      {
+        field: 'stokKodu',
+        headerName: 'Stok Kodu',
+        width: 150,
+        renderCell: (params) => (
+          <Typography sx={{ fontWeight: 600, color: 'var(--primary)' }}>
+            {params.value}
+          </Typography>
+        ),
+      },
+      {
+        field: 'stokAdi',
+        headerName: 'Ürün Adı',
+        minWidth: 250,
+        flex: 1,
+      },
+    ];
+
+    // Dinamik ambar sütunları
+    const warehouseColumns: GridColDef[] = warehouses.map((w) => ({
+      field: `warehouse_${w.id}`,
+      headerName: `${w.name} (${w.code})`,
+      width: 140,
+      align: 'right',
+      headerAlign: 'right',
+      valueGetter: (params, row) => row.warehouseStocks[w.id] || 0,
+      renderCell: (params) => (
+        <Typography sx={{
+          fontWeight: 500,
+          color: params.value > 0 ? 'var(--chart-2)' : params.value < 0 ? 'var(--destructive)' : 'var(--muted-foreground)'
+        }}>
+          {params.value.toLocaleString('tr-TR')}
+        </Typography>
+      ),
+    }));
+
+    const totalColumn: GridColDef = {
+      field: 'total',
+      headerName: 'Genel Toplam',
+      width: 150,
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: (params) => (
+        <Box sx={{
+          bgcolor: 'var(--primary-foreground)',
+          px: 1.5,
+          py: 0.5,
+          borderRadius: 1,
+          border: '1px solid var(--border)',
+          width: '100%',
+          textAlign: 'right'
+        }}>
+          <Typography sx={{ fontWeight: 700, color: 'var(--primary)' }}>
+            {params.value.toLocaleString('tr-TR')} {params.row.birim}
+          </Typography>
+        </Box>
+      ),
+    };
+
+    return [...baseColumns, ...warehouseColumns, totalColumn];
+  }, [warehouses]);
 
   const handleExport = () => {
-    // CSV export fonksiyonu
-    const headers = ['Stok Kodu', 'Stok Adı', 'Birim', 'Eldeki Miktar', 'Rezerve', 'Kullanılabilir'];
-    const csvData = filteredData.map(item => [
-      item.stokKodu,
-      item.stokAdi,
-      item.birim,
-      item.qtyOnHand,
-      item.qtyReserved,
-      item.qtyAvailable,
-    ]);
+    const exportData = filteredData.map(item => {
+      const row: any = {
+        'Stok Kodu': item.stokKodu,
+        'Stok Adı': item.stokAdi,
+        'Birim': item.birim
+      };
+      warehouses.forEach(w => {
+        row[`${w.name} (${w.code})`] = item.warehouseStocks[w.id] || 0;
+      });
+      row['Genel Toplam'] = item.total;
+      return row;
+    });
 
-    const csvContent = [
-      headers.join(','),
-      ...csvData.map(row => row.join(','))
-    ].join('\n');
-
-    const blob = new Blob(['\ufeff' + csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    link.href = URL.createObjectURL(blob);
-    link.download = `ambar-stok-raporu-${new Date().toISOString().split('T')[0]}.csv`;
-    link.click();
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Stok Raporu');
+    XLSX.writeFile(workbook, `Evrensel_Stok_Raporu_${date}.xlsx`);
   };
-
-  const selectedWarehouseName = warehouses.find(w => w.id === selectedWarehouse)?.name || '';
 
   return (
     <MainLayout>
-      <Box sx={{ p: 3 }}>
-        {/* Header */}
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="h4" sx={{ fontWeight: 700, color: 'var(--foreground)', mb: 0.5 }}>
+      <Box sx={{ mb: 3 }}>
+        <Breadcrumbs sx={{ mb: 2 }}>
+          <Link color="inherit" href="/" sx={{ textDecoration: 'none' }}>
+            Panel
+          </Link>
+          <Typography color="text.primary">Ambar Yönetimi</Typography>
+          <Typography color="text.primary">Stok Raporu</Typography>
+        </Breadcrumbs>
+
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Typography variant="h4" fontWeight="bold" sx={{ color: 'var(--foreground)' }}>
             Ambar Stok Raporu
           </Typography>
-          <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
-            Ambar bazlı detaylı stok durumunu görüntüleyin
-          </Typography>
+          <Button
+            variant="outline"
+            startIcon={<Download />}
+            onClick={handleExport}
+            sx={{
+              borderRadius: '999px',
+              border: '1px solid var(--border)',
+              '&:hover': { bgcolor: 'var(--accent)' }
+            }}
+          >
+            Excel'e Aktar
+          </Button>
         </Box>
 
-        {/* Filters */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <FormControl sx={{ minWidth: 300 }}>
-              <InputLabel>Ambar Seçin</InputLabel>
-              <Select
-                value={selectedWarehouse}
-                onChange={(e) => setSelectedWarehouse(e.target.value)}
-                label="Ambar Seçin"
-              >
-                {warehouses.map((warehouse) => (
-                  <MenuItem key={warehouse.id} value={warehouse.id}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <WarehouseIcon fontSize="small" />
-                      {warehouse.name} {warehouse.isDefault && '(Varsayılan)'}
-                    </Box>
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
+        <Card sx={{ bgcolor: 'var(--card)', mb: 3, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)' }}>
+          <CardContent>
+            <Grid container spacing={3} alignItems="center">
+              <Grid size={{ xs: 12, md: 4 }}>
+                <TextField
+                  fullWidth
+                  placeholder="Ürün adı veya kodu ile ara..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  InputProps={{
+                    startAdornment: <Search sx={{ mr: 1, color: 'var(--muted-foreground)' }} />,
+                  }}
+                  sx={{ '& .MuiInputBase-root': { borderRadius: 'var(--radius)' } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 3 }}>
+                <TextField
+                  fullWidth
+                  type="date"
+                  label="Rapor Tarihi"
+                  value={date}
+                  onChange={(e) => setDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                  InputProps={{
+                    startAdornment: <CalendarToday fontSize="small" sx={{ mr: 1, color: 'var(--muted-foreground)' }} />
+                  }}
+                  sx={{ '& .MuiInputBase-root': { borderRadius: 'var(--radius)' } }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, md: 5 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, justifyContent: 'flex-end' }}>
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="caption" color="var(--muted-foreground)" display="block">
+                      Toplam Ürün Çeşidi
+                    </Typography>
+                    <Typography variant="h6" fontWeight="bold">
+                      {filteredData.length}
+                    </Typography>
+                  </Box>
+                  <Divider orientation="vertical" flexItem />
+                  <Box sx={{ textAlign: 'right' }}>
+                    <Typography variant="caption" color="var(--muted-foreground)" display="block">
+                      Etkin Ambar Sayısı
+                    </Typography>
+                    <Typography variant="h6" fontWeight="bold">
+                      {warehouses.length}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Grid>
+            </Grid>
+          </CardContent>
+        </Card>
 
-            <TextField
-              label="Ara..."
-              placeholder="Stok kodu veya adı..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              sx={{ flex: 1 }}
-            />
-
-            <Button
-              variant="outlined"
-              startIcon={<Download />}
-              onClick={handleExport}
-              disabled={!selectedWarehouse || filteredData.length === 0}
-            >
-              Dışa Aktar
-            </Button>
-          </Box>
-        </Paper>
-
-        {/* Summary Cards */}
-        {selectedWarehouse && (
-          <Box sx={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 2, mb: 3 }}>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="body2" color="text.secondary">Toplam Ürün</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>
-                {filteredData.length}
-              </Typography>
-            </Paper>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="body2" color="text.secondary">Toplam Stok</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mt: 1 }}>
-                {filteredData.reduce((sum, item) => sum + (item.qtyOnHand || 0), 0)}
-              </Typography>
-            </Paper>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="body2" color="text.secondary">Rezerve</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mt: 1, color: '#f59e0b' }}>
-                {filteredData.reduce((sum, item) => sum + (item.qtyReserved || 0), 0)}
-              </Typography>
-            </Paper>
-            <Paper sx={{ p: 2 }}>
-              <Typography variant="body2" color="text.secondary">Kullanılabilir</Typography>
-              <Typography variant="h5" sx={{ fontWeight: 700, mt: 1, color: '#10b981' }}>
-                {filteredData.reduce((sum, item) => sum + (item.qtyAvailable || 0), 0)}
-              </Typography>
-            </Paper>
-          </Box>
-        )}
-
-        {/* Data Grid */}
-        <Paper sx={{ height: 600 }}>
+        <Paper sx={{ width: '100%', height: 600, bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
           <DataGrid
             rows={filteredData}
             columns={columns}
+            getRowId={(row) => row.productId}
             loading={loading}
+            disableRowSelectionOnClick
             pageSizeOptions={[10, 25, 50, 100]}
             initialState={{
               pagination: { paginationModel: { pageSize: 25 } },
             }}
-            disableRowSelectionOnClick
             sx={{
               border: 'none',
-              '& .MuiDataGrid-cell:focus': {
-                outline: 'none',
+              '& .MuiDataGrid-cell': {
+                borderBottom: '1px solid var(--border)',
+                color: 'var(--foreground)',
+              },
+              '& .MuiDataGrid-columnHeaders': {
+                bgcolor: 'var(--muted)',
+                color: 'var(--muted-foreground)',
+                borderBottom: '2px solid var(--border)',
+              },
+              '& .MuiDataGrid-footerContainer': {
+                borderTop: '2px solid var(--border)',
+                bgcolor: 'var(--card)',
               },
             }}
           />
         </Paper>
+        <Typography variant="caption" sx={{ mt: 2, display: 'block', color: 'var(--muted-foreground)' }}>
+          * Rapor seçilen tarihin sonu (23:59:59) itibariyle hesaplanmıştır. Sütunlar ambar bazlı stok miktarlarını, "Genel Toplam" ise tüm ambarların toplamını ifade eder.
+        </Typography>
       </Box>
     </MainLayout>
   );

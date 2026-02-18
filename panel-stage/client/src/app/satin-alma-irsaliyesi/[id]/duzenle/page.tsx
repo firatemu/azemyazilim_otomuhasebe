@@ -66,6 +66,7 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
 
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -78,7 +79,9 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
     kaynakId: '',
     genelIskontoOran: 0,
     genelIskontoTutar: 0,
+    genelIskontoTutar: 0,
     aciklama: '',
+    warehouseId: '',
     kalemler: [] as IrsaliyeKalemi[],
   });
 
@@ -88,6 +91,9 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
   useEffect(() => {
     fetchCariler();
     fetchStoklar();
+    fetchCariler();
+    fetchStoklar();
+    fetchWarehouses();
     fetchIrsaliye();
   }, [irsaliyeId]);
 
@@ -113,6 +119,20 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
     }
   };
 
+  const fetchWarehouses = async () => {
+    try {
+      const response = await axios.get('/warehouse?active=true');
+      const warehouseList = response.data || [];
+      setWarehouses(warehouseList);
+
+      if (warehouseList.length === 0) {
+        showSnackbar('Sistemde tanımlı ambar bulunamadı! Lütfen önce bir ambar tanımlayın.', 'error');
+      }
+    } catch (error) {
+      console.error('Ambar listesi alınamadı:', error);
+    }
+  };
+
   const fetchIrsaliye = async () => {
     try {
       setLoading(true);
@@ -129,6 +149,7 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
         genelIskontoOran: 0,
         genelIskontoTutar: irsaliye.iskonto || 0,
         aciklama: irsaliye.aciklama || '',
+        warehouseId: irsaliye.warehouseId || '',
         kalemler: (irsaliye.kalemler || []).map((k: any) => ({
           stokId: k.stokId,
           stok: k.stok ? {
@@ -312,6 +333,11 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
         return;
       }
 
+      if (!formData.warehouseId) {
+        showSnackbar('Ambar seçimi zorunludur. Lütfen bir ambar seçiniz.', 'error');
+        return;
+      }
+
       const validKalemler = formData.kalemler.filter(k => k.stokId && k.stokId.trim() !== '');
 
       if (validKalemler.length === 0) {
@@ -342,11 +368,14 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
         durum: formData.durum,
         iskonto: toplamIskonto,
         aciklama: formData.aciklama || null,
+        warehouseId: formData.warehouseId || null,
         kalemler: validKalemler.map(k => ({
           stokId: k.stokId,
           miktar: Number(k.miktar),
           birimFiyat: Number(k.birimFiyat),
           kdvOrani: Number(k.kdvOrani),
+          iskontoOrani: Number(k.iskontoOran) || 0,
+          iskontoTutari: Number(k.iskontoTutar) || 0,
         })),
       });
 
@@ -415,6 +444,11 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
                 İrsaliye Bilgileri
               </Typography>
               <Divider sx={{ mb: 2 }} />
+              {warehouses.length === 0 && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  Sistemde tanımlı ambar bulunmamaktadır. İşlem yapabilmek için lütfen önce ambar tanımlayınız.
+                </Alert>
+              )}
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -434,6 +468,20 @@ export default function DuzenleSatinAlmaIrsaliyesiPage() {
                 InputLabelProps={{ shrink: true }}
                 required
               />
+              <FormControl sx={{ flex: '1 1 200px' }} className="form-control-select" required>
+                <InputLabel>Ambar</InputLabel>
+                <Select
+                  value={formData.warehouseId}
+                  onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                  label="Ambar"
+                >
+                  {warehouses.map((warehouse) => (
+                    <MenuItem key={warehouse.id} value={warehouse.id}>
+                      {warehouse.name} {warehouse.isDefault && '(Varsayılan)'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <FormControl sx={{ flex: '1 1 200px' }} required>
                 <InputLabel>Durum</InputLabel>
                 <Select

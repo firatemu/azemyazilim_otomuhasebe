@@ -9,6 +9,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Chip,
   Divider,
   FormControl,
   IconButton,
@@ -45,6 +46,7 @@ interface Stok {
   satisFiyati: number;
   kdvOrani: number;
   barkod?: string;
+  miktar: number;
 }
 
 interface IrsaliyeKalemi {
@@ -66,6 +68,7 @@ function YeniSatisIrsaliyesiPageContent() {
 
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSiparis, setLoadingSiparis] = useState(false);
 
@@ -79,6 +82,7 @@ function YeniSatisIrsaliyesiPageContent() {
     genelIskontoOran: 0,
     genelIskontoTutar: 0,
     aciklama: '',
+    warehouseId: '',
     kalemler: [] as IrsaliyeKalemi[],
   });
 
@@ -87,7 +91,9 @@ function YeniSatisIrsaliyesiPageContent() {
 
   useEffect(() => {
     fetchCariler();
+    fetchCariler();
     fetchStoklar();
+    fetchWarehouses();
 
     if (siparisId) {
       fetchSiparisBilgileri(siparisId);
@@ -119,6 +125,28 @@ function YeniSatisIrsaliyesiPageContent() {
     }
   };
 
+  const fetchWarehouses = async () => {
+    try {
+      const response = await axios.get('/warehouse?active=true');
+      const warehouseList = response.data || [];
+      setWarehouses(warehouseList);
+
+      if (warehouseList.length === 0) {
+        showSnackbar('Sistemde tanımlı ambar bulunamadı! Lütfen önce bir ambar tanımlayın.', 'error');
+        return;
+      }
+
+      const defaultWarehouse = warehouseList.find((w: any) => w.isDefault);
+      if (defaultWarehouse && !formData.warehouseId) {
+        setFormData(prev => ({ ...prev, warehouseId: defaultWarehouse.id }));
+      } else if (warehouseList.length === 1 && !formData.warehouseId) {
+        setFormData(prev => ({ ...prev, warehouseId: warehouseList[0].id }));
+      }
+    } catch (error) {
+      console.error('Ambar listesi alınamadı:', error);
+    }
+  };
+
   const fetchSiparisBilgileri = async (id: string) => {
     try {
       setLoadingSiparis(true);
@@ -133,6 +161,7 @@ function YeniSatisIrsaliyesiPageContent() {
           aciklama: siparis.aciklama || prev.aciklama,
           kaynakTip: 'SIPARIS',
           kaynakId: siparis.id,
+          warehouseId: siparis.warehouseId || prev.warehouseId,
         }));
       }
 
@@ -388,6 +417,12 @@ function YeniSatisIrsaliyesiPageContent() {
         return;
       }
 
+      if (!formData.warehouseId) {
+        showSnackbar('Ambar seçimi zorunludur. Lütfen bir ambar seçiniz.', 'error');
+        return;
+      }
+
+      // Boş stok satırlarını filtrele (stokId boş olanları sil)
       const validKalemler = formData.kalemler.filter(k => k.stokId && k.stokId.trim() !== '');
 
       if (validKalemler.length === 0) {
@@ -418,11 +453,14 @@ function YeniSatisIrsaliyesiPageContent() {
         durum: formData.durum,
         iskonto: toplamIskonto,
         aciklama: formData.aciklama || null,
+        warehouseId: formData.warehouseId || null,
         kalemler: validKalemler.map(k => ({
           stokId: k.stokId,
           miktar: Number(k.miktar),
           birimFiyat: Number(k.birimFiyat),
           kdvOrani: Number(k.kdvOrani),
+          iskontoOrani: Number(k.iskontoOran) || 0,
+          iskontoTutari: Number(k.iskontoTutar) || 0,
         })),
       });
 
@@ -455,7 +493,7 @@ function YeniSatisIrsaliyesiPageContent() {
             sx={{
               bgcolor: 'var(--muted)',
               color: 'var(--foreground)',
-              '&:hover': { 
+              '&:hover': {
                 bgcolor: 'var(--accent)',
                 transform: 'translateX(-2px)',
               },
@@ -465,8 +503,8 @@ function YeniSatisIrsaliyesiPageContent() {
             <ArrowBack />
           </IconButton>
           <Box>
-            <Typography 
-              variant="h4" 
+            <Typography
+              variant="h4"
               sx={{
                 fontWeight: 700,
                 fontSize: '1.875rem',
@@ -477,8 +515,8 @@ function YeniSatisIrsaliyesiPageContent() {
             >
               Yeni Satış İrsaliyesi
             </Typography>
-            <Typography 
-              variant="body2" 
+            <Typography
+              variant="body2"
               sx={{
                 color: 'var(--muted-foreground)',
                 fontSize: '0.875rem',
@@ -500,23 +538,23 @@ function YeniSatisIrsaliyesiPageContent() {
           </Box>
         </Box>
       ) : (
-        <Paper sx={{ 
-          p: 3, 
+        <Paper sx={{
+          p: 3,
           borderRadius: 'var(--radius)',
           boxShadow: 'var(--shadow-sm)',
           bgcolor: 'var(--card)',
         }}>
           <Stack spacing={3}>
             {siparisId && (
-              <Box sx={{ 
-                p: 2, 
-                bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)', 
-                borderRadius: 'var(--radius)', 
+              <Box sx={{
+                p: 2,
+                bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+                borderRadius: 'var(--radius)',
                 border: '1px solid color-mix(in srgb, var(--primary) 30%, transparent)',
               }}>
-                <Typography 
-                  variant="body2" 
-                  sx={{ 
+                <Typography
+                  variant="body2"
+                  sx={{
                     color: 'var(--primary)',
                     fontWeight: 600,
                   }}
@@ -526,9 +564,9 @@ function YeniSatisIrsaliyesiPageContent() {
               </Box>
             )}
             <Box>
-              <Typography 
-                variant="h6" 
-                sx={{ 
+              <Typography
+                variant="h6"
+                sx={{
                   fontWeight: 700,
                   color: 'var(--foreground)',
                   mb: 2,
@@ -537,12 +575,16 @@ function YeniSatisIrsaliyesiPageContent() {
                 İrsaliye Bilgileri
               </Typography>
               <Divider sx={{ mb: 2, borderColor: 'var(--border)' }} />
+              {warehouses.length === 0 && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  Sistemde tanımlı ambar bulunmamaktadır. İşlem yapabilmek için lütfen önce ambar tanımlayınız.
+                </Alert>
+              )}
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
               <TextField
                 sx={{ flex: '1 1 200px' }}
-                className="form-control-textfield"
                 label="İrsaliye No"
                 value={formData.irsaliyeNo}
                 onChange={(e) => setFormData(prev => ({ ...prev, irsaliyeNo: e.target.value }))}
@@ -558,6 +600,20 @@ function YeniSatisIrsaliyesiPageContent() {
                 InputLabelProps={{ shrink: true }}
                 required
               />
+              <FormControl sx={{ flex: '1 1 200px' }} className="form-control-select" required>
+                <InputLabel>Ambar</InputLabel>
+                <Select
+                  value={formData.warehouseId}
+                  onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                  label="Ambar"
+                >
+                  {warehouses.map((warehouse) => (
+                    <MenuItem key={warehouse.id} value={warehouse.id}>
+                      {warehouse.name} {warehouse.isDefault && '(Varsayılan)'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
               <FormControl sx={{ flex: '1 1 200px' }} className="form-control-select" required>
                 <InputLabel>Durum</InputLabel>
                 <Select
@@ -612,9 +668,9 @@ function YeniSatisIrsaliyesiPageContent() {
             {/* Kalemler */}
             <Box>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-                <Typography 
-                  variant="h6" 
-                  sx={{ 
+                <Typography
+                  variant="h6"
+                  sx={{
                     fontWeight: 700,
                     color: 'var(--foreground)',
                   }}
@@ -642,10 +698,10 @@ function YeniSatisIrsaliyesiPageContent() {
               </Box>
               <Divider sx={{ mb: 2, borderColor: 'var(--border)' }} />
 
-              <TableContainer 
-                component={Paper} 
-                variant="outlined" 
-                sx={{ 
+              <TableContainer
+                component={Paper}
+                variant="outlined"
+                sx={{
                   maxHeight: 400,
                   borderRadius: 'var(--radius)',
                   borderColor: 'var(--border)',
@@ -702,12 +758,29 @@ function YeniSatisIrsaliyesiPageContent() {
                               }}
                               renderOption={(props, option) => {
                                 const { key, ...otherProps } = props;
+                                let stockColor = 'var(--success)';
+                                if (option.miktar <= 0) stockColor = 'var(--destructive)';
+                                else if (option.miktar < 10) stockColor = 'var(--warning)';
+
                                 return (
                                   <Box component="li" key={key} {...otherProps}>
-                                    <Box>
-                                      <Typography variant="body2" fontWeight="600">
-                                        {option.stokAdi}
-                                      </Typography>
+                                    <Box sx={{ width: '100%' }}>
+                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Typography variant="body2" fontWeight="600">
+                                          {option.stokAdi}
+                                        </Typography>
+                                        <Chip
+                                          label={`Stok: ${option.miktar}`}
+                                          size="small"
+                                          sx={{
+                                            height: 20,
+                                            fontSize: '0.7rem',
+                                            bgcolor: `color-mix(in srgb, ${stockColor} 10%, transparent)`,
+                                            color: stockColor,
+                                            border: `1px solid ${stockColor}`,
+                                          }}
+                                        />
+                                      </Box>
                                       <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
                                         <Typography variant="caption" color="text.secondary">
                                           Kod: {option.stokKodu}
@@ -798,8 +871,8 @@ function YeniSatisIrsaliyesiPageContent() {
                               sx={{
                                 color: kalem.cokluIskonto ? 'var(--chart-2)' : 'var(--muted-foreground)',
                                 '&:hover': {
-                                  bgcolor: kalem.cokluIskonto 
-                                    ? 'color-mix(in srgb, var(--chart-2) 10%, transparent)' 
+                                  bgcolor: kalem.cokluIskonto
+                                    ? 'color-mix(in srgb, var(--chart-2) 10%, transparent)'
                                     : 'var(--muted)',
                                 }
                               }}
@@ -892,9 +965,9 @@ function YeniSatisIrsaliyesiPageContent() {
                             />
                           </TableCell>
                           <TableCell align="right">
-                            <Typography 
-                              variant="body2" 
-                              sx={{ 
+                            <Typography
+                              variant="body2"
+                              sx={{
                                 fontWeight: 700,
                                 color: 'var(--primary)',
                               }}
@@ -983,18 +1056,18 @@ function YeniSatisIrsaliyesiPageContent() {
             </Box>
 
             {/* Toplam Bilgileri */}
-            <Paper 
-              variant="outlined" 
-              sx={{ 
-                p: 3, 
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 3,
                 bgcolor: 'color-mix(in srgb, var(--muted) 50%, transparent)',
                 borderRadius: 'var(--radius)',
                 borderColor: 'var(--border)',
               }}
             >
-              <Typography 
-                variant="h6" 
-                sx={{ 
+              <Typography
+                variant="h6"
+                sx={{
                   fontWeight: 700,
                   color: 'var(--foreground)',
                   mb: 2,
@@ -1034,9 +1107,9 @@ function YeniSatisIrsaliyesiPageContent() {
                   </Box>
                   <Divider sx={{ my: 1, borderColor: 'var(--border)' }} />
                   <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography 
-                      variant="h6" 
-                      sx={{ 
+                    <Typography
+                      variant="h6"
+                      sx={{
                         fontWeight: 700,
                         color: 'var(--foreground)',
                       }}

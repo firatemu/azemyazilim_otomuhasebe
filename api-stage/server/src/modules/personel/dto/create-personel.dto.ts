@@ -85,7 +85,13 @@ export class CreatePersonelDto {
   @IsOptional()
   @IsNumber()
   @Min(0)
+  prim?: number;
+
+  @IsOptional()
+  @IsNumber()
+  @Min(0)
   maasGunu?: number; // 0 = Ay sonu, 1-31 = Ayın günü
+
 
   @IsOptional()
   @IsString()

@@ -26,6 +26,10 @@ import {
   Card,
   CardContent,
   Divider,
+  Tabs,
+  Tab,
+  Tooltip,
+  Badge,
 } from '@mui/material';
 import {
   Search,
@@ -34,6 +38,11 @@ import {
   Delete,
   Add,
   ArrowBack,
+  CheckCircleOutline,
+  HighlightOff,
+  InfoOutlined,
+  FilterList,
+  FileDownload,
 } from '@mui/icons-material';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
@@ -70,6 +79,7 @@ export default function UrunEslestirmePage() {
   const [totalPages, setTotalPages] = useState(1);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' });
   const [oemEslestirmeLoading, setOemEslestirmeLoading] = useState(false);
+  const [activeTab, setActiveTab] = useState(0); // 0: Tümü, 1: Eşleşenler, 2: Eşleşmeyenler
 
   // Eşleştirme dialog state
   const [eslesmeDialog, setEslesmeDialog] = useState(false);
@@ -105,7 +115,7 @@ export default function UrunEslestirmePage() {
   const handleOpenEslestirme = async (urun: Malzeme) => {
     setSecilenUrun(urun);
     setSecilenEslestirmeler(urun.eslesikUrunler || []);
-    
+
     // Tüm ürünleri getir (eşleştirme için)
     try {
       const response = await axios.get('/stok', {
@@ -128,7 +138,7 @@ export default function UrunEslestirmePage() {
         anaUrunId: secilenUrun.id,
         esUrunIds: secilenEslestirmeler,
       });
-      
+
       showSnackbar('Eşleştirme başarıyla kaydedildi', 'success');
       setEslesmeDialog(false);
       fetchStoklar();
@@ -173,168 +183,266 @@ export default function UrunEslestirmePage() {
     setSnackbar({ open: true, message, severity });
   };
 
-  const getEslesikUrunIsimler = (urun: Malzeme): string => {
-    if (!urun.eslesikUrunler || urun.eslesikUrunler.length === 0) return '-';
-    
-    return urun.eslesikUrunler
-      .map((id) => {
-        const eslesikUrun = stoklar.find((s) => s.id === id);
-        return eslesikUrun ? eslesikUrun.stokKodu : id;
-      })
-      .join(', ');
-  };
+  // Filtreleme mantığı
+  const filteredStoklar = stoklar.filter((stok) => {
+    const isMatched = stok.eslesikUrunler && stok.eslesikUrunler.length > 0;
+    if (activeTab === 1) return isMatched;
+    if (activeTab === 2) return !isMatched;
+    return true;
+  });
 
   return (
     <MainLayout>
-      <Box sx={{ p: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3 }}>
-          <IconButton onClick={() => router.back()}>
-            <ArrowBack />
-          </IconButton>
-          <Box sx={{ ml: 2, flex: 1 }}>
-            <Typography variant="h5" fontWeight="bold" sx={{
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}>
-              Ürün Eşleştirme
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Eşdeğer ürünleri birbirine bağlayın
-            </Typography>
-          </Box>
-        </Box>
-
-        {/* Bilgi Kartı */}
-        <Card sx={{ mb: 3, bgcolor: '#f0f9ff', border: '1px solid #3b82f6' }}>
-          <CardContent>
-            <Box sx={{ display: 'flex', alignItems: 'flex-start', gap: 2 }}>
-              <LinkIcon sx={{ color: '#3b82f6', mt: 0.5 }} />
-              <Box>
-                <Typography variant="subtitle2" fontWeight="bold" color="#1e40af" gutterBottom>
-                  Ürün Eşleştirme Nedir?
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • Birbirine alternatif olabilecek ürünleri eşleştirerek stok yönetimini kolaylaştırın
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • Eşleştirilen ürünler, satış ve sipariş işlemlerinde birbirinin yerine önerilebilir
-                </Typography>
-                <Typography variant="body2" color="text.secondary">
-                  • Bir ürün tükendiğinde sistem otomatik olarak eşdeğer ürünleri gösterir
-                </Typography>
-              </Box>
+      <Box sx={{ p: 3, maxWidth: '1600px', mx: 'auto' }}>
+        {/* Header Section */}
+        <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, justifyContent: 'space-between' }}>
+          <Box sx={{ display: 'flex', alignItems: 'center' }}>
+            <IconButton onClick={() => router.back()} sx={{ mr: 2, bgcolor: 'background.paper', border: '1px solid var(--border)' }}>
+              <ArrowBack />
+            </IconButton>
+            <Box>
+              <Typography variant="h5" fontWeight="800" sx={{
+                background: 'linear-gradient(135deg, var(--primary) 0%, var(--chart-1) 100%)',
+                WebkitBackgroundClip: 'text',
+                WebkitTextFillColor: 'transparent',
+                mb: 0.5
+              }}>
+                Ürün Eşleştirme Yönetimi
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                Alternatif ürünleri bağlayın ve stok yönetimini optimize edin
+              </Typography>
             </Box>
-          </CardContent>
-        </Card>
+          </Box>
 
-        {/* Arama ve OEM Eşleştirme */}
-        <Paper sx={{ p: 2, mb: 2 }}>
-          <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
-            <TextField
-              fullWidth
-              placeholder="Ürün ara (Stok Kodu, Stok Adı, Barkod, OEM)"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              InputProps={{
-                startAdornment: (
-                  <InputAdornment position="start">
-                    <Search />
-                  </InputAdornment>
-                ),
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <Button
+              variant="outlined"
+              onClick={async () => {
+                try {
+                  const response = await axios.get('/stok/export/eslesme', {
+                    responseType: 'blob',
+                  });
+                  const url = window.URL.createObjectURL(new Blob([response.data]));
+                  const link = document.createElement('a');
+                  link.href = url;
+                  link.setAttribute('download', 'urun-eslesmeleri.xlsx');
+                  document.body.appendChild(link);
+                  link.click();
+                  link.remove();
+                } catch (error) {
+                  showSnackbar('Excel indirilirken hata oluştu', 'error');
+                }
               }}
-            />
+              startIcon={<FileDownload />}
+              sx={{
+                whiteSpace: 'nowrap',
+                bgcolor: 'var(--background)',
+                border: '1px solid var(--border)',
+                color: 'text.primary',
+                '&:hover': { bgcolor: 'var(--muted)' },
+                textTransform: 'none',
+                fontWeight: 600
+              }}
+            >
+              Excel İndir
+            </Button>
+
             <Button
               variant="contained"
               color="primary"
               onClick={handleOemIleEslestir}
               disabled={oemEslestirmeLoading}
               startIcon={<LinkIcon />}
-              sx={{ whiteSpace: 'nowrap', minWidth: '180px' }}
+              sx={{
+                whiteSpace: 'nowrap',
+                minWidth: '180px',
+                bgcolor: 'var(--primary)',
+                '&:hover': { bgcolor: 'var(--primary-dark)' },
+                boxShadow: 'var(--shadow-md)',
+                textTransform: 'none',
+                fontWeight: 600
+              }}
             >
-              {oemEslestirmeLoading ? 'Eşleştiriliyor...' : 'OEM ile Eşleştir'}
+              {oemEslestirmeLoading ? 'İşleniyor...' : 'Otomatik OEM Eşleştir'}
             </Button>
+          </Box>
+        </Box>
+
+        {/* Info Card - Minimal */}
+        <Card sx={{ mb: 3, bgcolor: 'rgba(59, 130, 246, 0.05)', border: '1px solid rgba(59, 130, 246, 0.2)', boxShadow: 'none' }}>
+          <CardContent sx={{ py: 2, '&:last-child': { pb: 2 } }}>
+            <Box sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+              <InfoOutlined color="primary" />
+              <Typography variant="body2" color="text.primary">
+                Eşleştirilen ürünler, satış ve sipariş işlemlerinde birbirinin yerine önerilir. Stok tükendiğinde sistem otomatik olarak bu eşdeğerleri sunar.
+              </Typography>
+            </Box>
+          </CardContent>
+        </Card>
+
+        {/* Filters & Search */}
+        <Paper sx={{ mb: 3, borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', overflow: 'hidden' }}>
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', px: 2, bgcolor: 'var(--muted)' }}>
+            <Tabs
+              value={activeTab}
+              onChange={(_, v) => setActiveTab(v)}
+              textColor="primary"
+              indicatorColor="primary"
+              sx={{ minHeight: '48px' }}
+            >
+              <Tab label="Tüm Ürünler" sx={{ textTransform: 'none', fontWeight: 600 }} />
+              <Tab label="Eşleşenler" icon={<Badge color="success" variant="dot" invisible={activeTab !== 1}><span /></Badge>} iconPosition="end" sx={{ textTransform: 'none', fontWeight: 600 }} />
+              <Tab label="Eşleşmeyenler" sx={{ textTransform: 'none', fontWeight: 600 }} />
+            </Tabs>
+          </Box>
+
+          <Box sx={{ p: 2, display: 'flex', gap: 2, alignItems: 'center' }}>
+            <TextField
+              fullWidth
+              size="small"
+              placeholder="Ürün Ara (Kod, Ad, Barkod, OEM)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search color="action" />
+                  </InputAdornment>
+                ),
+                sx: { borderRadius: 'var(--radius-md)' }
+              }}
+            />
           </Box>
         </Paper>
 
-        {/* Tablo */}
-        <TableContainer component={Paper}>
+        {/* Main Table */}
+        <TableContainer component={Paper} sx={{ borderRadius: 'var(--radius-lg)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
           <Table>
             <TableHead>
-              <TableRow sx={{ bgcolor: '#f9fafb' }}>
-                <TableCell>Stok Kodu</TableCell>
-                <TableCell>Stok Adı</TableCell>
-                <TableCell>Marka</TableCell>
-                <TableCell>OEM</TableCell>
-                <TableCell>Eşdeğer Ürünler</TableCell>
-                <TableCell align="center">İşlemler</TableCell>
+              <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: '15%' }}>Stok Kodu</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: '20%' }}>Stok Adı</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: '10%' }}>Marka</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: '10%' }}>OEM</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: '15%' }}>Durum</TableCell>
+                <TableCell sx={{ fontWeight: 700, color: 'text.primary', width: '20%' }}>Eşdeğer Ürünler</TableCell>
+                <TableCell align="center" sx={{ fontWeight: 700, color: 'text.primary', width: '10%' }}>İşlem</TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {loading ? (
-                <TableSkeleton rows={5} columns={6} />
-              ) : stoklar.length === 0 ? (
+                <TableSkeleton rows={8} columns={7} />
+              ) : filteredStoklar.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center" sx={{ py: 4 }}>
-                    <Typography color="text.secondary">Stok bulunamadı</Typography>
+                  <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
+                    <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2 }}>
+                      <Typography variant="h6" color="text.secondary">Kriterlere uygun ürün bulunamadı</Typography>
+                      <Typography variant="body2" color="text.disabled">Arama terimini değiştirmeyi veya filtreleri temizlemeyi deneyin.</Typography>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ) : (
-                stoklar.map((stok) => (
-                  <TableRow key={stok.id} hover>
-                    <TableCell>
-                      <Typography variant="body2" fontWeight="600">
-                        {stok.stokKodu}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>{stok.stokAdi}</TableCell>
-                    <TableCell>{stok.marka || '-'}</TableCell>
-                    <TableCell>
-                      <Typography variant="body2" color="text.secondary">
-                        {stok.oem || '-'}
-                      </Typography>
-                    </TableCell>
-                    <TableCell>
-                      {stok.eslesikUrunler && stok.eslesikUrunler.length > 0 ? (
-                        <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
-                          {(stok.eslesikUrunDetaylari && stok.eslesikUrunDetaylari.length > 0
-                            ? stok.eslesikUrunDetaylari.map((eslesik) => (
-                                <Chip
-                                  key={eslesik.id}
-                                  label={eslesik.stokKodu}
-                                  size="small"
-                                  onDelete={() => handleRemoveEslestirme(stok.id, eslesik.id)}
-                                  deleteIcon={<LinkOff />}
-                                  sx={{ fontSize: '0.75rem' }}
-                                />
-                              ))
-                            : stok.eslesikUrunler.map((eslesikId) => (
-                                <Chip
-                                  key={eslesikId}
-                                  label={eslesikId}
-                                  size="small"
-                                  onDelete={() => handleRemoveEslestirme(stok.id, eslesikId)}
-                                  deleteIcon={<LinkOff />}
-                                  sx={{ fontSize: '0.75rem' }}
-                                />
-                              )))}
-                        </Box>
-                      ) : (
-                        <Typography variant="body2" color="text.secondary">-</Typography>
-                      )}
-                    </TableCell>
-                    <TableCell align="center">
-                      <IconButton
-                        size="small"
-                        color="primary"
-                        onClick={() => handleOpenEslestirme(stok)}
-                        title="Eşleştir"
-                      >
-                        <LinkIcon />
-                      </IconButton>
-                    </TableCell>
-                  </TableRow>
-                ))
+                filteredStoklar.map((stok) => {
+                  const isMatched = stok.eslesikUrunler && stok.eslesikUrunler.length > 0;
+
+                  return (
+                    <TableRow key={stok.id} hover sx={{ '&:last-child td, &:last-child th': { border: 0 } }}>
+                      <TableCell>
+                        <Typography variant="body2" fontWeight="700" color="primary">
+                          {stok.stokKodu}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" noWrap title={stok.stokAdi}>
+                          {stok.stokAdi}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        <Chip label={stok.marka || '-'} size="small" variant="outlined" sx={{ borderRadius: '4px', bgcolor: 'var(--background)' }} />
+                      </TableCell>
+                      <TableCell>
+                        <Typography variant="body2" color="text.secondary" fontFamily="monospace">
+                          {stok.oem || '-'}
+                        </Typography>
+                      </TableCell>
+                      <TableCell>
+                        {isMatched ? (
+                          <Chip
+                            icon={<CheckCircleOutline style={{ color: '#10b981' }} />}
+                            label="Eşleşti"
+                            size="small"
+                            sx={{
+                              bgcolor: 'rgba(16, 185, 129, 0.1)',
+                              color: '#059669',
+                              fontWeight: 700,
+                              border: '1px solid rgba(16, 185, 129, 0.2)',
+                              borderRadius: '6px'
+                            }}
+                          />
+                        ) : (
+                          <Chip
+                            icon={<HighlightOff style={{ color: '#9ca3af' }} />}
+                            label="Eşleşme Yok"
+                            size="small"
+                            sx={{
+                              bgcolor: 'rgba(243, 244, 246, 0.5)',
+                              color: '#6b7280',
+                              border: '1px solid #e5e7eb',
+                              borderRadius: '6px'
+                            }}
+                          />
+                        )}
+                      </TableCell>
+                      <TableCell>
+                        {isMatched ? (
+                          <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 0.5 }}>
+                            {stok.eslesikUrunler?.map((eslesikId) => {
+                              // Backend'den gelen detayları kullan, yoksa listeden bul
+                              const detay = stok.eslesikUrunDetaylari?.find(d => d.id === eslesikId) ||
+                                stoklar.find(s => s.id === eslesikId);
+
+                              const label = detay ? detay.stokKodu : eslesikId.substring(0, 8);
+                              const title = detay ? `${detay.stokKodu} - ${detay.stokAdi}` : 'Detay yükleniyor...';
+
+                              return (
+                                <Tooltip key={eslesikId} title={title} arrow placement="top">
+                                  <Chip
+                                    label={label}
+                                    size="small"
+                                    onDelete={() => handleRemoveEslestirme(stok.id, eslesikId)}
+                                    deleteIcon={<LinkOff sx={{ fontSize: '14px !important' }} />}
+                                    sx={{
+                                      fontSize: '0.75rem',
+                                      height: '24px',
+                                      bgcolor: 'var(--background)',
+                                      border: '1px solid var(--border)',
+                                      '&:hover': { bgcolor: 'var(--muted)' }
+                                    }}
+                                  />
+                                </Tooltip>
+                              );
+                            })}
+                          </Box>
+                        ) : (
+                          <Typography variant="caption" color="text.secondary">-</Typography>
+                        )}
+                      </TableCell>
+                      <TableCell align="center">
+                        <Button
+                          size="small"
+                          variant={isMatched ? "text" : "outlined"}
+                          color="primary"
+                          onClick={() => handleOpenEslestirme(stok)}
+                          startIcon={<LinkIcon />}
+                          sx={{ textTransform: 'none', borderRadius: '6px' }}
+                        >
+                          {isMatched ? 'Düzenle' : 'Eşleştir'}
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })
               )}
             </TableBody>
           </Table>
@@ -347,16 +455,18 @@ export default function UrunEslestirmePage() {
               variant="outlined"
               disabled={page === 1}
               onClick={() => setPage(page - 1)}
+              sx={{ textTransform: 'none' }}
             >
               Önceki
             </Button>
-            <Typography sx={{ mx: 2, display: 'flex', alignItems: 'center' }}>
+            <Typography sx={{ mx: 2, display: 'flex', alignItems: 'center', fontWeight: 600, color: 'text.secondary' }}>
               Sayfa {page} / {totalPages}
             </Typography>
             <Button
               variant="outlined"
               disabled={page === totalPages}
               onClick={() => setPage(page + 1)}
+              sx={{ textTransform: 'none' }}
             >
               Sonraki
             </Button>
@@ -364,16 +474,27 @@ export default function UrunEslestirmePage() {
         )}
 
         {/* Eşleştirme Dialog */}
-        <Dialog open={eslesmeDialog} onClose={() => setEslesmeDialog(false)} maxWidth="md" fullWidth>
-        <DialogTitle>
-          <Typography component="span" variant="h6">Ürün Eşleştirme</Typography>
-          {secilenUrun && (
-            <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-              {secilenUrun.stokKodu} - {secilenUrun.stokAdi}
-            </Typography>
-          )}
-        </DialogTitle>
-          <DialogContent>
+        <Dialog
+          open={eslesmeDialog}
+          onClose={() => setEslesmeDialog(false)}
+          maxWidth="md"
+          fullWidth
+          PaperProps={{ sx: { borderRadius: 'var(--radius-lg)' } }}
+        >
+          <DialogTitle sx={{ borderBottom: '1px solid var(--border)', pb: 2 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <LinkIcon color="primary" />
+              <Box>
+                <Typography variant="h6" fontWeight="700">Ürün Eşleştirme</Typography>
+                {secilenUrun && (
+                  <Typography variant="body2" color="text.secondary">
+                    Ana Ürün: <span style={{ fontWeight: 600, color: 'var(--primary)' }}>{secilenUrun.stokKodu}</span> - {secilenUrun.stokAdi}
+                  </Typography>
+                )}
+              </Box>
+            </Box>
+          </DialogTitle>
+          <DialogContent sx={{ py: 3 }}>
             <Autocomplete
               multiple
               options={eslestirilebilirUrunler}
@@ -387,38 +508,53 @@ export default function UrunEslestirmePage() {
                   {...params}
                   label="Eşdeğer Ürünler"
                   placeholder="Ürün seçin..."
-                  helperText="Bu ürünle eşdeğer olan ürünleri seçin"
+                  helperText="Bu ürünle eşdeğer olan alternatif ürünleri seçin"
+                  InputProps={{
+                    ...params.InputProps,
+                    sx: { borderRadius: 'var(--radius-md)' }
+                  }}
                 />
               )}
-            renderTags={(value, getTagProps) =>
-              value.map((option, index) => {
-                const { key, ...tagProps } = getTagProps({ index });
-                return (
-                  <Chip
-                    key={key}
-                    label={`${option.stokKodu} - ${option.stokAdi}`}
-                    size="small"
-                    {...tagProps}
-                  />
-                );
-              })
-            }
+              renderTags={(value, getTagProps) =>
+                value.map((option, index) => {
+                  const { key, ...tagProps } = getTagProps({ index });
+                  return (
+                    <Chip
+                      key={key}
+                      label={`${option.stokKodu}`}
+                      size="small"
+                      {...tagProps}
+                      sx={{ borderRadius: '4px' }}
+                    />
+                  );
+                })
+              }
             />
 
             {secilenEslestirmeler.length > 0 && (
-              <Box sx={{ mt: 3 }}>
-                <Divider sx={{ mb: 2 }} />
-                <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                  Seçili Eşleştirmeler ({secilenEslestirmeler.length})
+              <Box sx={{ mt: 4 }}>
+                <Typography variant="subtitle2" color="text.secondary" gutterBottom fontWeight="700" sx={{ mb: 2 }}>
+                  SEÇİLİ EŞLEŞTİRMELER ({secilenEslestirmeler.length})
                 </Typography>
                 <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
                   {secilenEslestirmeler.map((id) => {
                     const urun = eslestirilebilirUrunler.find((u) => u.id === id);
                     return urun ? (
-                      <Paper key={id} sx={{ p: 1.5, display: 'flex', alignItems: 'center', gap: 2 }}>
-                        <LinkIcon color="primary" />
+                      <Paper
+                        key={id}
+                        variant="outlined"
+                        sx={{
+                          p: 1.5,
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 2,
+                          borderColor: 'var(--border)',
+                          bgcolor: 'var(--background)'
+                        }}
+                      >
+                        <CheckCircleOutline color="success" fontSize="small" />
                         <Box sx={{ flex: 1 }}>
-                          <Typography variant="body2" fontWeight="600">
+                          <Typography variant="body2" fontWeight="700">
                             {urun.stokKodu}
                           </Typography>
                           <Typography variant="caption" color="text.secondary">
@@ -430,8 +566,18 @@ export default function UrunEslestirmePage() {
                             label={`OEM: ${urun.oem}`}
                             size="small"
                             variant="outlined"
+                            sx={{ height: 20, fontSize: '0.65rem' }}
                           />
                         )}
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => {
+                            setSecilenEslestirmeler(prev => prev.filter(p => p !== id));
+                          }}
+                        >
+                          <HighlightOff fontSize="small" />
+                        </IconButton>
                       </Paper>
                     ) : null;
                   })}
@@ -439,12 +585,13 @@ export default function UrunEslestirmePage() {
               </Box>
             )}
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setEslesmeDialog(false)}>İptal</Button>
+          <DialogActions sx={{ px: 3, pb: 3, borderTop: '1px solid var(--border)', pt: 2 }}>
+            <Button onClick={() => setEslesmeDialog(false)} sx={{ textTransform: 'none', color: 'text.secondary' }}>İptal</Button>
             <Button
               variant="contained"
               onClick={handleSaveEslestirme}
               startIcon={<LinkIcon />}
+              sx={{ textTransform: 'none', fontWeight: 600, px: 3 }}
             >
               Eşleştirmeyi Kaydet
             </Button>
@@ -456,8 +603,9 @@ export default function UrunEslestirmePage() {
           open={snackbar.open}
           autoHideDuration={6000}
           onClose={() => setSnackbar({ ...snackbar, open: false })}
+          anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
         >
-          <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })}>
+          <Alert severity={snackbar.severity} onClose={() => setSnackbar({ ...snackbar, open: false })} variant="filled" sx={{ width: '100%' }}>
             {snackbar.message}
           </Alert>
         </Snackbar>
@@ -465,4 +613,3 @@ export default function UrunEslestirmePage() {
     </MainLayout>
   );
 }
-

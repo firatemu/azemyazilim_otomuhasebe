@@ -88,7 +88,7 @@ export default function FaturaKapatmaPage() {
     try {
       setLoading(true);
       const response = await axios.get('/fatura', {
-        params: { 
+        params: {
           cariId,
           page: 1,
           limit: 100,
@@ -103,9 +103,9 @@ export default function FaturaKapatmaPage() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('tr-TR', { 
-      style: 'currency', 
-      currency: 'TRY' 
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: 'TRY'
     }).format(amount);
   };
 
@@ -138,8 +138,7 @@ export default function FaturaKapatmaPage() {
       NAKIT: 'Nakit',
       KREDI_KARTI: 'Kredi Kartı',
       BANKA_HAVALESI: 'Havale',
-      CEK: 'Çek',
-      SENET: 'Senet',
+      BANKA_HAVALESI: 'Havale',
     };
     return types[tip] || tip;
   };
@@ -334,13 +333,13 @@ export default function FaturaKapatmaPage() {
                       const genelToplam = Number(fatura.genelToplam || 0);
                       const odenenTutar = Number(fatura.odenenTutar || 0);
                       const odenecekTutar = Number(fatura.odenecekTutar || 0);
-                      const odemOrani = genelToplam > 0 
-                        ? (odenenTutar / genelToplam) * 100 
+                      const odemOrani = genelToplam > 0
+                        ? (odenenTutar / genelToplam) * 100
                         : 0;
 
                       return (
-                        <TableRow 
-                          key={fatura.id} 
+                        <TableRow
+                          key={fatura.id}
                           hover
                           sx={{
                             bgcolor: fatura.durum === 'KAPALI' ? '#f0fdf4' : 'inherit',
@@ -382,9 +381,9 @@ export default function FaturaKapatmaPage() {
                             </Typography>
                           </TableCell>
                           <TableCell align="right">
-                            <Typography 
-                              variant="body2" 
-                              fontWeight="600" 
+                            <Typography
+                              variant="body2"
+                              fontWeight="600"
                               color={odenecekTutar > 0 ? 'error.main' : 'text.secondary'}
                             >
                               {formatCurrency(odenecekTutar)}
@@ -505,7 +504,7 @@ export default function FaturaKapatmaPage() {
                           textShadow: '0 1px 2px rgba(0,0,0,0.5)',
                         }}
                       >
-                        {formatCurrency(ozet.toplamOdenen)} / {formatCurrency(ozet.toplamFatura)} 
+                        {formatCurrency(ozet.toplamOdenen)} / {formatCurrency(ozet.toplamFatura)}
                         ({((ozet.toplamOdenen / ozet.toplamFatura) * 100).toFixed(1)}%)
                       </Typography>
                     </Box>

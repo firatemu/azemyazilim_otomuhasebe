@@ -19,7 +19,7 @@ export class SatisIrsaliyesiService {
     private prisma: PrismaService,
     private tenantResolver: TenantResolverService,
     private codeTemplateService: CodeTemplateService,
-  ) {}
+  ) { }
 
   private async createLog(
     irsaliyeId: string,
@@ -111,6 +111,7 @@ export class SatisIrsaliyesiService {
               siparisNo: true,
             },
           },
+          kalemler: true,
           createdByUser: {
             select: {
               id: true,
@@ -526,6 +527,33 @@ export class SatisIrsaliyesiService {
         userAgent,
         prisma,
       );
+    });
+  }
+
+  async getPendingByCari(cariId: string) {
+    const tenantId = await this.tenantResolver.resolveForQuery();
+
+    return this.prisma.satisIrsaliyesi.findMany({
+      where: {
+        cariId,
+        durum: { not: IrsaliyeDurum.FATURALANDI },
+        deletedAt: null,
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
+      include: {
+        kalemler: {
+          include: {
+            stok: {
+              select: {
+                id: true,
+                stokKodu: true,
+                stokAdi: true,
+              }
+            }
+          }
+        }
+      },
+      orderBy: { irsaliyeTarihi: 'desc' },
     });
   }
 }

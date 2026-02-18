@@ -9,14 +9,14 @@ export class SystemParameterService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly tenantResolver: TenantResolverService,
-  ) {}
+  ) { }
 
   /**
    * Parametre değerini getir (varsayılan değer ile birlikte)
    */
   async getParameter(key: string, defaultValue?: any): Promise<any> {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    
+
     if (!tenantId) {
       const parameter = await this.prisma.systemParameter.findFirst({
         where: {
@@ -42,6 +42,18 @@ export class SystemParameterService {
     });
 
     if (!parameter) {
+      // Fallback to global parameter
+      const globalParameter = await this.prisma.systemParameter.findFirst({
+        where: {
+          key,
+          tenantId: null,
+        },
+      });
+
+      if (globalParameter) {
+        return globalParameter.value;
+      }
+
       return defaultValue;
     }
 
@@ -123,7 +135,7 @@ export class SystemParameterService {
    */
   async getAllParameters(): Promise<any[]> {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    
+
     // tenantId null ise tenantId null olan parametreleri getir
     if (!tenantId) {
       const parameters = await this.prisma.systemParameter.findMany({
@@ -174,7 +186,7 @@ export class SystemParameterService {
    */
   async getParametersByCategory(category: string): Promise<any[]> {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    
+
     // tenantId null ise tenantId null olan parametreleri getir
     if (!tenantId) {
       const parameters = await this.prisma.systemParameter.findMany({
@@ -252,7 +264,7 @@ export class SystemParameterService {
    */
   async update(key: string, updateParameterDto: UpdateParameterDto): Promise<any> {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    
+
     // tenantId null ise findFirst kullan, yoksa unique constraint kullan
     if (!tenantId) {
       const existing = await this.prisma.systemParameter.findFirst({
@@ -304,7 +316,7 @@ export class SystemParameterService {
         };
       }
     }
-    
+
     // tenantId varsa normal upsert kullan
     const updated = await this.prisma.systemParameter.upsert({
       where: {

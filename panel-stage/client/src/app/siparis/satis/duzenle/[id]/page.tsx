@@ -2,9 +2,9 @@
 
 import React, { useState, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { 
-  Box, 
-  Typography, 
+import {
+  Box,
+  Typography,
   Paper,
   Table,
   TableBody,
@@ -60,7 +60,7 @@ export default function DuzenleSatisSiparisiPage() {
   const [stoklar, setStoklar] = useState<Stok[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  
+
   const [formData, setFormData] = useState({
     siparisTipi: 'SATIS' as 'SATIS' | 'SATIN_ALMA',
     cariId: '',
@@ -71,7 +71,7 @@ export default function DuzenleSatisSiparisiPage() {
     aciklama: '',
     kalemler: [] as SiparisKalemi[],
   });
-  
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
 
   useEffect(() => {
@@ -84,7 +84,7 @@ export default function DuzenleSatisSiparisiPage() {
     try {
       const response = await axios.get(`/siparis/${params.id}`);
       const siparis = response.data;
-      
+
       setFormData({
         siparisTipi: siparis.siparisTipi,
         cariId: siparis.cariId,
@@ -139,34 +139,34 @@ export default function DuzenleSatisSiparisiPage() {
 
   const calculateMultiDiscount = (baseAmount: number, formula: string): { finalAmount: number; totalDiscount: number; effectiveRate: number } => {
     const discounts = formula.split('+').map(d => parseFloat(d.trim())).filter(d => !isNaN(d) && d > 0);
-    
+
     if (discounts.length === 0) {
       return { finalAmount: baseAmount, totalDiscount: 0, effectiveRate: 0 };
     }
-    
+
     let currentAmount = baseAmount;
     let totalDiscount = 0;
-    
+
     for (const discount of discounts) {
       const discountAmount = (currentAmount * discount) / 100;
       currentAmount -= discountAmount;
       totalDiscount += discountAmount;
     }
-    
+
     const effectiveRate = baseAmount > 0 ? (totalDiscount / baseAmount) * 100 : 0;
-    
+
     return { finalAmount: currentAmount, totalDiscount, effectiveRate };
   };
 
   const handleAddKalem = () => {
     setFormData(prev => ({
       ...prev,
-      kalemler: [...prev.kalemler, { 
-        stokId: '', 
-        miktar: 1, 
-        birimFiyat: 0, 
+      kalemler: [...prev.kalemler, {
+        stokId: '',
+        miktar: 1,
+        birimFiyat: 0,
         kdvOrani: 20,
-        iskontoOran: 0, 
+        iskontoOran: 0,
         iskontoTutar: 0,
         cokluIskonto: false,
         iskontoFormula: '',
@@ -185,7 +185,7 @@ export default function DuzenleSatisSiparisiPage() {
     setFormData(prev => {
       const newKalemler = [...prev.kalemler];
       const kalem = { ...newKalemler[index] };
-      
+
       if (field === 'stokId') {
         const stok = stoklar.find(s => s.id === value);
         if (stok) {
@@ -241,7 +241,7 @@ export default function DuzenleSatisSiparisiPage() {
       } else {
         kalem[field] = value;
       }
-      
+
       newKalemler[index] = kalem;
       return { ...prev, kalemler: newKalemler };
     });
@@ -259,32 +259,32 @@ export default function DuzenleSatisSiparisiPage() {
     let araToplam = 0;
     let toplamKalemIskontosu = 0;
     let toplamKdv = 0;
-    
+
     formData.kalemler.forEach(kalem => {
       const kalemAraToplam = kalem.miktar * kalem.birimFiyat;
       araToplam += kalemAraToplam;
       toplamKalemIskontosu += kalem.iskontoTutar;
-      
+
       const netTutar = kalemAraToplam - kalem.iskontoTutar;
       const kdv = (netTutar * kalem.kdvOrani) / 100;
       toplamKdv += kdv;
     });
-    
+
     const genelIskonto = formData.genelIskontoTutar || 0;
     const toplamIskonto = toplamKalemIskontosu + genelIskonto;
     const netToplam = araToplam - toplamKalemIskontosu - genelIskonto;
     const genelToplam = netToplam + toplamKdv;
-    
+
     return { araToplam, toplamKalemIskontosu, genelIskonto, toplamIskonto, toplamKdv, netToplam, genelToplam };
   };
-  
+
   const handleGenelIskontoOranChange = (value: string) => {
     const oran = parseFloat(value) || 0;
     const araToplam = formData.kalemler.reduce((sum, k) => sum + (k.miktar * k.birimFiyat - k.iskontoTutar), 0);
     const tutar = (araToplam * oran) / 100;
     setFormData(prev => ({ ...prev, genelIskontoOran: oran, genelIskontoTutar: tutar }));
   };
-  
+
   const handleGenelIskontoTutarChange = (value: string) => {
     const tutar = parseFloat(value) || 0;
     const araToplam = formData.kalemler.reduce((sum, k) => sum + (k.miktar * k.birimFiyat - k.iskontoTutar), 0);
@@ -298,12 +298,12 @@ export default function DuzenleSatisSiparisiPage() {
         showSnackbar('Cari seçimi zorunludur', 'error');
         return;
       }
-      
+
       if (formData.kalemler.length === 0) {
         showSnackbar('En az bir kalem eklemelisiniz', 'error');
         return;
       }
-      
+
       setSaving(true);
       await axios.put(`/siparis/${params.id}`, {
         siparisTipi: formData.siparisTipi,
@@ -317,8 +317,8 @@ export default function DuzenleSatisSiparisiPage() {
           miktar: Number(k.miktar),
           birimFiyat: Number(k.birimFiyat),
           kdvOrani: Number(k.kdvOrani),
-          iskontoOran: Number(k.iskontoOran) || 0,
-          iskontoTutar: Number(k.iskontoTutar) || 0,
+          iskontoOrani: Number(k.iskontoOran) || 0,
+          iskontoTutari: Number(k.iskontoTutar) || 0,
         })),
       });
       showSnackbar('Sipariş başarıyla güncellendi', 'success');
@@ -353,7 +353,7 @@ export default function DuzenleSatisSiparisiPage() {
     <MainLayout>
       <Box sx={{ mb: 3 }}>
         <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <IconButton 
+          <IconButton
             onClick={() => router.back()}
             sx={{
               bgcolor: '#f3f4f6',
@@ -406,7 +406,7 @@ export default function DuzenleSatisSiparisiPage() {
               InputLabelProps={{ shrink: true }}
             />
           </Box>
-          
+
           <Box>
             <Autocomplete
               fullWidth
@@ -448,10 +448,10 @@ export default function DuzenleSatisSiparisiPage() {
           <Box>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
               <Typography variant="h6" fontWeight="bold">Sipariş Kalemleri</Typography>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 onClick={handleAddKalem}
-                sx={{ 
+                sx={{
                   background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
                 }}
               >
@@ -459,7 +459,7 @@ export default function DuzenleSatisSiparisiPage() {
               </Button>
             </Box>
             <Divider sx={{ mb: 2 }} />
-            
+
             <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
               <Table stickyHeader size="small">
                 <TableHead>
@@ -611,8 +611,8 @@ export default function DuzenleSatisSiparisiPage() {
                         </Typography>
                       </TableCell>
                       <TableCell align="center">
-                        <IconButton 
-                          size="small" 
+                        <IconButton
+                          size="small"
                           color="error"
                           onClick={() => handleRemoveKalem(index)}
                         >
@@ -667,66 +667,66 @@ export default function DuzenleSatisSiparisiPage() {
             </Typography>
             <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Box sx={{ flex: '1 1 300px' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Ara Toplam:</Typography>
-                    <Typography variant="body1" fontWeight="600">{formatCurrency(totals.araToplam)}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Kalem İndirimleri:</Typography>
-                    <Typography variant="body1" fontWeight="600" color={totals.toplamKalemIskontosu > 0 ? "error" : "inherit"}>
-                      {totals.toplamKalemIskontosu > 0 ? '- ' : ''}{formatCurrency(totals.toplamKalemIskontosu)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Genel İskonto:</Typography>
-                    <Typography variant="body1" fontWeight="600" color={totals.genelIskonto > 0 ? "error" : "inherit"}>
-                      {totals.genelIskonto > 0 ? '- ' : ''}{formatCurrency(totals.genelIskonto)}
-                    </Typography>
-                  </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Ara Toplam:</Typography>
+                  <Typography variant="body1" fontWeight="600">{formatCurrency(totals.araToplam)}</Typography>
                 </Box>
-                <Box sx={{ flex: '1 1 300px' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1" fontWeight="bold">Toplam İndirim:</Typography>
-                    <Typography variant="body1" fontWeight="bold" color={totals.toplamIskonto > 0 ? "error" : "inherit"}>
-                      {totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">KDV Toplamı:</Typography>
-                    <Typography variant="body1" fontWeight="600">{formatCurrency(totals.toplamKdv)}</Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
-                    <Typography 
-                      variant="h6" 
-                      fontWeight="bold"
-                      sx={{ color: '#0891b2' }}
-                    >
-                      {formatCurrency(totals.genelToplam)}
-                    </Typography>
-                  </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Kalem İndirimleri:</Typography>
+                  <Typography variant="body1" fontWeight="600" color={totals.toplamKalemIskontosu > 0 ? "error" : "inherit"}>
+                    {totals.toplamKalemIskontosu > 0 ? '- ' : ''}{formatCurrency(totals.toplamKalemIskontosu)}
+                  </Typography>
                 </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Genel İskonto:</Typography>
+                  <Typography variant="body1" fontWeight="600" color={totals.genelIskonto > 0 ? "error" : "inherit"}>
+                    {totals.genelIskonto > 0 ? '- ' : ''}{formatCurrency(totals.genelIskonto)}
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ flex: '1 1 300px' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1" fontWeight="bold">Toplam İndirim:</Typography>
+                  <Typography variant="body1" fontWeight="bold" color={totals.toplamIskonto > 0 ? "error" : "inherit"}>
+                    {totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">KDV Toplamı:</Typography>
+                  <Typography variant="body1" fontWeight="600">{formatCurrency(totals.toplamKdv)}</Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
+                  <Typography
+                    variant="h6"
+                    fontWeight="bold"
+                    sx={{ color: '#0891b2' }}
+                  >
+                    {formatCurrency(totals.genelToplam)}
+                  </Typography>
+                </Box>
+              </Box>
             </Box>
           </Paper>
 
           {/* Action Buttons */}
           <Box>
             <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button 
-                variant="outlined" 
+              <Button
+                variant="outlined"
                 size="large"
                 onClick={() => router.back()}
               >
                 İptal
               </Button>
-              <Button 
-                variant="contained" 
+              <Button
+                variant="contained"
                 size="large"
                 startIcon={<Save />}
                 onClick={handleSave}
                 disabled={saving}
-                sx={{ 
+                sx={{
                   background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
                   minWidth: 150,
                 }}
@@ -745,8 +745,8 @@ export default function DuzenleSatisSiparisiPage() {
         onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
         anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
       >
-        <Alert 
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} 
+        <Alert
+          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
           severity={snackbar.severity}
           sx={{ width: '100%' }}
         >

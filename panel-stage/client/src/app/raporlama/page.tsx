@@ -60,6 +60,15 @@ interface FinancialSummary {
   netCashFlow: number;
 }
 
+interface SalespersonPerformance {
+  satisElemaniId: string;
+  adSoyad: string;
+  toplamSatis: number;
+  satisAdedi: number;
+  toplamTahsilat: number;
+  tahsilatAdedi: number;
+}
+
 interface OverviewResponse {
   range: {
     startDate: string;
@@ -100,6 +109,7 @@ interface OverviewResponse {
     kritikStokMiktari: number;
     acik: number;
   }>;
+  salespersonPerformance?: SalespersonPerformance[];
 }
 
 const currencyFormatter = new Intl.NumberFormat('tr-TR', {
@@ -348,7 +358,7 @@ export default function RaporlamaPage() {
       ))}
     </Grid>
   );
-  
+
   return (
     <MainLayout>
       <Box ref={reportRef}>
@@ -585,10 +595,10 @@ export default function RaporlamaPage() {
                       label={
                         data.financialSummary.payments > 0
                           ? `${Math.round(
-                              (data.financialSummary.collections /
-                                data.financialSummary.payments) *
-                                100,
-                            )}%`
+                            (data.financialSummary.collections /
+                              data.financialSummary.payments) *
+                            100,
+                          )}%`
                           : '—'
                       }
                       size="small"
@@ -712,6 +722,52 @@ export default function RaporlamaPage() {
             <Grid size={{ xs: 12 }}>
               <Paper sx={{ p: 3, borderRadius: 3 }}>
                 <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
+                  Satış Elemanı Performansı
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Satış elemanlarının toplam satış ve tahsilat performansları
+                </Typography>
+
+                {!data.salespersonPerformance || data.salespersonPerformance.length === 0 ? (
+                  <Typography variant="body2" color="text.secondary">
+                    Kayıt bulunamadı.
+                  </Typography>
+                ) : (
+                  <TableContainer>
+                    <Table size="small">
+                      <TableHead>
+                        <TableRow>
+                          <TableCell>Satış Elemanı</TableCell>
+                          <TableCell align="right">Satış Adedi</TableCell>
+                          <TableCell align="right">Toplam Satış</TableCell>
+                          <TableCell align="right">Tahsilat Adedi</TableCell>
+                          <TableCell align="right">Toplam Tahsilat</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {data.salespersonPerformance.map((item) => (
+                          <TableRow key={item.satisElemaniId} hover>
+                            <TableCell>
+                              <Typography variant="body2" fontWeight={600}>
+                                {item.adSoyad}
+                              </Typography>
+                            </TableCell>
+                            <TableCell align="right">{formatNumber(item.satisAdedi)}</TableCell>
+                            <TableCell align="right">{formatCurrency(item.toplamSatis)}</TableCell>
+                            <TableCell align="right">{formatNumber(item.tahsilatAdedi)}</TableCell>
+                            <TableCell align="right">{formatCurrency(item.toplamTahsilat)}</TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                )}
+              </Paper>
+            </Grid>
+
+            <Grid size={{ xs: 12 }}>
+              <Paper sx={{ p: 3, borderRadius: 3 }}>
+                <Typography variant="h6" fontWeight="bold" sx={{ mb: 1 }}>
                   Kritik Stok Uyarıları
                 </Typography>
                 <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
@@ -744,7 +800,7 @@ export default function RaporlamaPage() {
                               <Box sx={{ flex: 1 }}>
                                 <Typography variant="caption" color="text.secondary">
                                   Stok Seviyesi
-      </Typography>
+                                </Typography>
                                 <LinearProgress
                                   variant="determinate"
                                   value={progress}
@@ -753,7 +809,7 @@ export default function RaporlamaPage() {
                                 />
                                 <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mt: 0.5 }}>
                                   Mevcut: {formatNumber(item.miktar)} {item.birim} • Kritik: {formatNumber(item.kritikStokMiktari)} {item.birim}
-        </Typography>
+                                </Typography>
                               </Box>
                               <Chip
                                 icon={<Inventory2 />}
@@ -767,7 +823,7 @@ export default function RaporlamaPage() {
                     })}
                   </Stack>
                 )}
-      </Paper>
+              </Paper>
             </Grid>
           </Grid>
         )}

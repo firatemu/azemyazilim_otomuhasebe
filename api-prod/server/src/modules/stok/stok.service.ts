@@ -82,77 +82,110 @@ export class StokService {
       ];
     }
 
+    // ✅ Performance limit cap
+    const MAX_LIMIT = 1000;
+    const actualLimit = Math.min(limit, MAX_LIMIT);
+
     try {
-      const [initialData, total] = await Promise.all([
+      // ✅ Single aggregate query instead of per-row queries
+      const [stoklar, stokHareketAggregate, total] = await Promise.all([
+        // Fetch stock items with select (faster than include)
         this.prisma.stok.findMany({
           where,
           skip,
-          take: limit,
-          orderBy: { createdAt: 'desc' },
-          include: {
+          take: actualLimit,
+          select: {
+            id: true,
+            stokKodu: true,
+            stokAdi: true,
+            barkod: true,
+            marka: true,
+            kategori: true,
+            anaKategori: true,
+            altKategori: true,
+            birim: true,
+            oem: true,
+            olcu: true,
+            raf: true,
+            alisFiyati: true,
+            satisFiyati: true,
+            kdvOrani: true,
+            kritikStokMiktari: true,
+            aracMarka: true,
+            aracModel: true,
+            createdAt: true,
+            updatedAt: true,
             productLocationStocks: {
               take: 1,
-              include: {
-                location: true,
+              select: {
+                location: {
+                  select: {
+                    code: true,
+                  },
+                },
               },
             },
           },
+          orderBy: { createdAt: 'desc' },
         }),
+        // ✅ GroupBy aggregate - ONE query for ALL stocks!
+        this.prisma.$queryRaw<Array<{
+          stok_id: string;
+          mevcut_miktar: bigint;
+        }>>`
+          SELECT
+            sh.stok_id,
+            SUM(CASE
+              WHEN sh.hareket_tipi IN ('GIRIS', 'IADE', 'SAYIM_FAZLA')
+                THEN sh.miktar
+              ELSE 0
+            END) -
+            SUM(CASE
+              WHEN sh.hareket_tipi IN ('CIKIS', 'SATIS', 'SAYIM_EKSIK')
+                THEN sh.miktar
+              ELSE 0
+            END) as mevcut_miktar
+          FROM stok_hareketleri sh
+          INNER JOIN stoklar s ON s.id = sh.stok_id
+          ${tenantId ? Prisma.sql`WHERE s.tenant_id = ${tenantId}` : Prisma.empty}
+          GROUP BY sh.stok_id
+        `,
         this.prisma.stok.count({ where }),
       ]);
 
-
-      // Eğer raf field'ı boşsa, productLocationStocks'ten al ve miktar hesapla
-      const dataWithDetails = await Promise.all(
-        initialData.map(async (stok) => {
-          // Stok hareketlerinden toplam miktarı hesapla
-          const stokHareketler = await this.prisma.stokHareket.findMany({
-            where: { stokId: stok.id },
-          });
-
-          let miktar = 0;
-          stokHareketler.forEach((hareket) => {
-            if (
-              hareket.hareketTipi === 'GIRIS' ||
-              hareket.hareketTipi === 'SAYIM_FAZLA'
-            ) {
-              miktar += hareket.miktar;
-            } else if (
-              hareket.hareketTipi === 'CIKIS' ||
-              hareket.hareketTipi === 'SATIS' ||
-              hareket.hareketTipi === 'SAYIM_EKSIK'
-            ) {
-              miktar -= hareket.miktar;
-            }
-          });
-
-          return {
-            ...stok,
-            raf:
-              stok.raf ||
-              (stok.productLocationStocks?.[0]?.location?.code ?? null),
-            miktar,
-          };
-        }),
+      // ✅ Build quantity map in memory (very fast)
+      const miktarMap = new Map<string, number>(
+        stokHareketAggregate.map(item => [
+          item.stok_id,
+          Number(item.mevcut_miktar)
+        ])
       );
 
+      // ✅ Transform data with map (no additional queries)
+      const data = stoklar.map(stok => ({
+        ...stok,
+        miktar: miktarMap.get(stok.id) || 0,
+        raf: stok.raf || stok.productLocationStocks?.[0]?.location?.code || null,
+        productLocationStocks: undefined, // Remove nested relation
+      }));
+
       return {
-        data: dataWithDetails,
+        data,
         meta: {
           total,
           page,
-          limit,
-          totalPages: Math.ceil(total / limit),
+          limit: actualLimit,
+          totalPages: Math.ceil(total / actualLimit),
         },
       };
     } catch (error: any) {
-      console.error('❌ [Stok Service] findAll hatası:', error);
-      console.error('❌ [Stok Service] Hata detayları:', {
-        message: error?.message,
-        code: error?.code,
-        meta: error?.meta,
-        stack: error?.stack,
-      });
+      // ✅ Professional error logging
+      if (process.env.NODE_ENV === 'development') {
+        console.error('[StokService] findAll error:', {
+          message: error?.message,
+          code: error?.code,
+        });
+      }
       throw new BadRequestException(
         error?.message || 'Stok verileri alınırken hata oluştu'
       );

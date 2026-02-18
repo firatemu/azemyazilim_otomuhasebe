@@ -9,4 +9,8 @@ import { PrismaModule } from '../../common/prisma.module';
   imports: [PrismaModule],
   exports: [PostalCodeService],
 })
-export class PostalCodeModule {}
+export class PostalCodeModule {
+    constructor() {
+      console.log('🚀 [PostalCodeModule] initialized');
+    }
+}

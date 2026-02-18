@@ -4,7 +4,7 @@ import type { NextConfig } from 'next';
 const apiProxyTarget = (process.env.API_PROXY_TARGET || 'https://staging-api.otomuhasebe.com').replace(/\/$/, '');
 const isDevelopment = process.env.NODE_ENV === 'development';
 const isProduction = process.env.NODE_ENV === 'production';
-const isStaging = process.env.NODE_ENV === 'staging' || process.env.STAGING_DEV_MODE === 'true';
+const isStaging = (process.env.NODE_ENV as string) === 'staging' || process.env.STAGING_DEV_MODE === 'true';
 
 const nextConfig: NextConfig = {
   reactStrictMode: true,
@@ -35,20 +35,6 @@ const nextConfig: NextConfig = {
     ],
   },
 
-  // Modularize imports - ağaç sarsma için
-  modularizeImports: {
-    '@mui/material': {
-      transform: '@mui/material/{{member}}',
-    },
-    '@mui/icons-material': {
-      transform: '@mui/icons-material/{{member}}',
-      skipDefaultConversion: true,
-    },
-    'lodash': {
-      transform: 'lodash/{{member}}',
-    },
-  },
-
   // Compiler optimizasyonları
   compiler: {
     // Staging'de console log'ları göster (developer modu)
@@ -71,7 +57,7 @@ const nextConfig: NextConfig = {
     // Source maps staging'de açık
     productionBrowserSourceMaps: true,
     // React strict mode staging'de açık
-    reactStrictMode: true,
+    reactStrictMode: false,
   }),
 
   // Turbopack config (Next.js 16 default)
@@ -85,70 +71,7 @@ const nextConfig: NextConfig = {
     minimumCacheTTL: 60,
   },
 
-  // Headers - cache'i devre dışı bırak (development için)
-  async headers() {
-    return [
-      {
-        source: '/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-          },
-          {
-            key: 'Pragma',
-            value: 'no-cache',
-          },
-          {
-            key: 'Expires',
-            value: '0',
-          },
-          {
-            key: 'X-DNS-Prefetch-Control',
-            value: 'on',
-          },
-          {
-            key: 'X-Frame-Options',
-            value: 'SAMEORIGIN',
-          },
-        ],
-      },
-      {
-        source: '/_next/static/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-          },
-          {
-            key: 'Pragma',
-            value: 'no-cache',
-          },
-          {
-            key: 'Expires',
-            value: '0',
-          },
-        ],
-      },
-      {
-        source: '/_next/image/:path*',
-        headers: [
-          {
-            key: 'Cache-Control',
-            value: 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
-          },
-          {
-            key: 'Pragma',
-            value: 'no-cache',
-          },
-          {
-            key: 'Expires',
-            value: '0',
-          },
-        ],
-      },
-    ];
-  },
+
 
   // Developer modu ayarları
   ...(isDevelopment && {
@@ -165,8 +88,13 @@ const nextConfig: NextConfig = {
         config.devtool = 'eval-cheap-module-source-map';
       }
 
-      // Development modunda cache'i tamamen devre dışı bırak (değişiklikleri anında görmek için)
-      config.cache = false;
+      // Development modunda filesystem cache'i aktif et (re-build hızını artırır)
+      config.cache = {
+        type: 'filesystem',
+        buildDependencies: {
+          config: [__filename],
+        },
+      };
 
       if (config.resolve) {
         config.resolve.symlinks = false;
@@ -208,6 +136,16 @@ const nextConfig: NextConfig = {
       {
         source: '/api/:path*',
         destination: `${apiProxyTarget}/api/:path*`,
+      },
+    ];
+  },
+
+  async redirects() {
+    return [
+      {
+        source: '/ik/bordro',
+        destination: '/ik/maas-yonetimi',
+        permanent: true,
       },
     ];
   },

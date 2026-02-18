@@ -69,10 +69,11 @@ export default function MalzemeHareketleriPage() {
   const { data: hareketData, isLoading: hareketlerLoading } = useStokHareketler(
     selectedStok?.id,
     hareketTipi || undefined,
-    100
+    100,
+    true
   );
 
-  const hareketler = hareketData?.data || [];
+  const hareketler = hareketData || [];
 
   // İstatistikleri hesapla
   const stats: Stats = {

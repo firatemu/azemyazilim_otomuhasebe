@@ -13,6 +13,10 @@ export class CreateWarehouseDto {
   @IsOptional()
   active?: boolean;
 
+  @IsBoolean()
+  @IsOptional()
+  isDefault?: boolean;
+
   @IsString()
   @IsOptional()
   address?: string;

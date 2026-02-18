@@ -25,6 +25,7 @@ const DEFAULT_TEMPLATES: Partial<Record<ModuleType, { name: string; prefix: stri
   [ModuleType.TEKLIF]: { name: 'Teklif No', prefix: 'TK', digitCount: 5 },
   [ModuleType.DELIVERY_NOTE_SALES]: { name: 'Satış İrsaliyesi No', prefix: 'Sİ', digitCount: 5 },
   [ModuleType.DELIVERY_NOTE_PURCHASE]: { name: 'Alış İrsaliyesi No', prefix: 'Aİ', digitCount: 5 },
+  [ModuleType.TECHNICIAN]: { name: 'Teknisyen Kodu', prefix: 'T', digitCount: 3 },
 };
 
 @Injectable()
@@ -32,12 +33,17 @@ export class CodeTemplateService {
   constructor(
     private prisma: PrismaService,
     private tenantResolver: TenantResolverService,
-  ) {}
+  ) { }
 
   async create(createDto: CreateCodeTemplateDto) {
-    // Check if template already exists for this module
-    const existing = await this.prisma.codeTemplate.findFirst({
-      where: { module: createDto.module },
+    const tenantId = await this.tenantResolver.resolveForCreate();
+
+    // Check if template already exists for this module and tenant
+    const existing = await (this.prisma.codeTemplate as any).findFirst({
+      where: {
+        module: createDto.module,
+        tenantId
+      } as any,
     });
 
     if (existing) {
@@ -46,8 +52,9 @@ export class CodeTemplateService {
       );
     }
 
-    return this.prisma.codeTemplate.create({
+    return (this.prisma.codeTemplate as any).create({
       data: {
+        tenantId,
         module: createDto.module,
         name: createDto.name,
         prefix: createDto.prefix,
@@ -55,19 +62,22 @@ export class CodeTemplateService {
         currentValue: createDto.currentValue || 0,
         includeYear: createDto.includeYear !== undefined ? createDto.includeYear : false,
         isActive: createDto.isActive !== undefined ? createDto.isActive : true,
-      },
+      } as any,
     });
   }
 
   async findAll() {
-    return this.prisma.codeTemplate.findMany({
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    return (this.prisma.codeTemplate as any).findMany({
+      where: { tenantId } as any,
       orderBy: { module: 'asc' },
     });
   }
 
   async findOne(id: string) {
-    const template = await this.prisma.codeTemplate.findUnique({
-      where: { id },
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    const template = await (this.prisma.codeTemplate as any).findFirst({
+      where: { id, tenantId } as any,
     });
 
     if (!template) {
@@ -78,8 +88,9 @@ export class CodeTemplateService {
   }
 
   async findByModule(module: ModuleType) {
-    const template = await this.prisma.codeTemplate.findUnique({
-      where: { module },
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    const template = await (this.prisma.codeTemplate as any).findFirst({
+      where: { module, tenantId } as any,
     });
 
     if (!template) {
@@ -90,38 +101,35 @@ export class CodeTemplateService {
   }
 
   async update(id: string, updateDto: UpdateCodeTemplateDto) {
-    await this.findOne(id); // Check if exists
+    await this.findOne(id); // Check if exists and belongs to tenant
 
-    return this.prisma.codeTemplate.update({
-      where: { id },
+    return (this.prisma.codeTemplate as any).update({
+      where: { id } as any,
       data: updateDto,
     });
   }
 
   async remove(id: string) {
-    await this.findOne(id); // Check if exists
+    await this.findOne(id); // Check if exists and belongs to tenant
 
-    return this.prisma.codeTemplate.delete({
-      where: { id },
+    return (this.prisma.codeTemplate as any).delete({
+      where: { id } as any,
     });
   }
 
-  /**
-   * Verilen modül için bir sonraki kodu üretir ve sayacı artırır
-   * Örnek: module=WAREHOUSE, prefix="D", digitCount=3, currentValue=5 → "D006"
-   * Şablon yoksa varsayılan oluşturulur (seed çalışmamış ortamlar için).
-   */
   async getNextCode(module: ModuleType): Promise<string> {
+    const tenantId = await this.tenantResolver.resolveForQuery();
     try {
-      let template = await this.prisma.codeTemplate.findUnique({
-        where: { module },
+      let template = await (this.prisma.codeTemplate as any).findFirst({
+        where: { module, tenantId } as any,
       });
 
       if (!template) {
         const defaults = DEFAULT_TEMPLATES[module];
         if (defaults) {
-          template = await this.prisma.codeTemplate.create({
+          template = await (this.prisma.codeTemplate as any).create({
             data: {
+              tenantId,
               module,
               name: defaults.name,
               prefix: defaults.prefix,
@@ -129,7 +137,7 @@ export class CodeTemplateService {
               currentValue: 0,
               includeYear: false,
               isActive: true,
-            },
+            } as any,
           });
         } else {
           throw new NotFoundException(
@@ -144,38 +152,26 @@ export class CodeTemplateService {
         );
       }
 
-      // Sayacı artır (transaction ile)
-      const updated = await this.prisma.codeTemplate.update({
-        where: { id: template.id },
+      // Increment counter
+      const updated = await (this.prisma.codeTemplate as any).update({
+        where: { id: template.id } as any,
         data: { currentValue: template.currentValue + 1 },
       });
 
-      // Kodu oluştur
       const nextNumber = updated.currentValue;
       const paddedNumber = String(nextNumber).padStart(template.digitCount, '0');
 
       let nextCode: string;
       if (template.includeYear) {
-        // Format: PREFIX + YIL + PADDED_NUMBER
-        // Örnek: AZM2025000000001
         const currentYear = new Date().getFullYear();
         nextCode = `${template.prefix}${currentYear}${paddedNumber}`;
       } else {
-        // Format: PREFIX + PADDED_NUMBER (eski format)
-        // Örnek: D001, K002
         nextCode = `${template.prefix}${paddedNumber}`;
       }
 
       return nextCode;
     } catch (error: any) {
       console.error('❌ [CodeTemplate Service] getNextCode hatası:', error);
-      console.error('❌ [CodeTemplate Service] Hata detayları:', {
-        message: error?.message,
-        code: error?.code,
-        module,
-        stack: error?.stack,
-      });
-      // Eğer NotFoundException veya BadRequestException ise olduğu gibi fırlat
       if (error instanceof NotFoundException || error instanceof BadRequestException) {
         throw error;
       }
@@ -185,22 +181,15 @@ export class CodeTemplateService {
     }
   }
 
-  /**
-   * Verilen modül için sayacı sıfırlar (veya belirtilen değere ayarlar)
-   */
   async resetCounter(module: ModuleType, newValue: number = 0) {
     const template = await this.findByModule(module);
 
-    return this.prisma.codeTemplate.update({
-      where: { id: template.id },
+    return (this.prisma.codeTemplate as any).update({
+      where: { id: template.id } as any,
       data: { currentValue: newValue },
     });
   }
 
-  /**
-   * Kod var mı kontrol eder (herhangi bir modül için)
-   * Örneğin warehouse create'te kullanıcı kod girerse, önce bu metotla kontrol edilir
-   */
   async isCodeUnique(module: ModuleType, code: string): Promise<boolean> {
     const tenantId = await this.tenantResolver.resolveForQuery();
     if (!tenantId) return true;
@@ -208,60 +197,51 @@ export class CodeTemplateService {
     const tenantWhere = buildTenantWhereClause(tenantId);
     switch (module) {
       case 'WAREHOUSE': {
-        const w = await this.prisma.warehouse.findFirst({
-          where: { code, ...tenantWhere },
-        });
-        return !w;
+        return !(await this.prisma.warehouse.findFirst({
+          where: { code, ...tenantWhere } as any,
+        }));
       }
       case 'CASHBOX': {
-        const k = await this.prisma.kasa.findFirst({
-          where: { kasaKodu: code, ...tenantWhere },
-        });
-        return !k;
+        return !(await this.prisma.kasa.findFirst({
+          where: { kasaKodu: code, ...tenantWhere } as any,
+        }));
       }
       case 'PERSONNEL': {
-        const p = await this.prisma.personel.findFirst({
-          where: { personelKodu: code, ...tenantWhere },
-        });
-        return !p;
+        return !(await this.prisma.personel.findFirst({
+          where: { personelKodu: code, ...tenantWhere } as any,
+        }));
       }
       case 'PRODUCT': {
-        const s = await this.prisma.stok.findFirst({
-          where: { stokKodu: code, ...tenantWhere },
-        });
-        return !s;
+        return !(await this.prisma.stok.findFirst({
+          where: { stokKodu: code, ...tenantWhere } as any,
+        }));
       }
       case 'CUSTOMER': {
-        const c = await this.prisma.cari.findFirst({
-          where: { cariKodu: code, ...tenantWhere },
-        });
-        return !c;
+        return !(await this.prisma.cari.findFirst({
+          where: { cariKodu: code, ...tenantWhere } as any,
+        }));
       }
       case 'INVOICE_SALES':
       case 'INVOICE_PURCHASE': {
-        const i = await this.prisma.fatura.findFirst({
-          where: { faturaNo: code, ...tenantWhere },
-        });
-        return !i;
+        return !(await this.prisma.fatura.findFirst({
+          where: { faturaNo: code, ...tenantWhere } as any,
+        }));
       }
       case 'ORDER_SALES':
       case 'ORDER_PURCHASE': {
-        const o = await this.prisma.siparis.findFirst({
-          where: { siparisNo: code, ...tenantWhere },
-        });
-        return !o;
+        return !(await this.prisma.siparis.findFirst({
+          where: { siparisNo: code, ...tenantWhere } as any,
+        }));
       }
       case 'INVENTORY_COUNT': {
-        const sy = await this.prisma.sayim.findFirst({
-          where: { sayimNo: code, ...tenantWhere },
-        });
-        return !sy;
+        return !(await this.prisma.sayim.findFirst({
+          where: { sayimNo: code, ...tenantWhere } as any,
+        }));
       }
       case 'TEKLIF': {
-        const t = await this.prisma.teklif.findFirst({
-          where: { teklifNo: code, ...tenantWhere },
-        });
-        return !t;
+        return !(await this.prisma.teklif.findFirst({
+          where: { teklifNo: code, ...tenantWhere } as any,
+        }));
       }
       default:
         return true;

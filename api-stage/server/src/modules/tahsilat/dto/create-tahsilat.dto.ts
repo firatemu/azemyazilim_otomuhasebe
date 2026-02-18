@@ -30,7 +30,7 @@ export class CreateTahsilatDto {
   tarih?: string;
 
   @IsEnum(OdemeTipi)
-  odemeTipi: OdemeTipi; // NAKIT, KREDI_KARTI, BANKA_HAVALESI, CEK, SENET
+  odemeTipi: OdemeTipi; // NAKIT, KREDI_KARTI, BANKA_HAVALESI
 
   @IsString()
   @IsOptional()
@@ -60,4 +60,8 @@ export class CreateTahsilatDto {
   @IsString()
   @IsOptional()
   bankaAdi?: string;
+
+  @IsString()
+  @IsOptional()
+  satisElemaniId?: string;
 }

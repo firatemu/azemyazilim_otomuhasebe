@@ -17,6 +17,7 @@ import {
   Snackbar,
   Alert,
   Select,
+  Chip,
   MenuItem,
   FormControl,
   InputLabel,
@@ -35,6 +36,12 @@ interface Cari {
   cariKodu: string;
   unvan: string;
   tip: string;
+  satisElemaniId?: string;
+}
+
+interface SatisElemani {
+  id: string;
+  adSoyad: string;
 }
 
 interface Stok {
@@ -43,6 +50,8 @@ interface Stok {
   stokAdi: string;
   satisFiyati: number;
   kdvOrani: number;
+  barkod?: string;
+  miktar: number;
 }
 
 interface FaturaKalemi {
@@ -62,6 +71,8 @@ export default function DuzenleSatisFaturasiPage() {
 
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
+  const [satisElemanlari, setSatisElemanlari] = useState<SatisElemani[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -77,6 +88,8 @@ export default function DuzenleSatisFaturasiPage() {
     aciklama: '',
     irsaliyeNo: '',
     siparisNo: '',
+    warehouseId: '',
+    satisElemaniId: '',
     kalemler: [] as FaturaKalemi[],
   });
 
@@ -86,8 +99,24 @@ export default function DuzenleSatisFaturasiPage() {
   useEffect(() => {
     fetchCariler();
     fetchStoklar();
+    fetchSatisElemanlari();
+    fetchWarehouses();
     fetchFatura();
   }, [faturaId]);
+
+  const fetchWarehouses = async () => {
+    try {
+      const response = await axios.get('/warehouse?active=true');
+      const warehouseList = response.data || [];
+      setWarehouses(warehouseList);
+
+      if (warehouseList.length === 0) {
+        showSnackbar('Sistemde tanımlı ambar bulunamadı! Lütfen önce bir ambar tanımlayın.', 'error');
+      }
+    } catch (error) {
+      console.error('Ambar listesi alınamadı:', error);
+    }
+  };
 
   const fetchFatura = async () => {
     try {
@@ -109,8 +138,18 @@ export default function DuzenleSatisFaturasiPage() {
         aciklama: fatura.aciklama || '',
         irsaliyeNo: fatura.irsaliye?.irsaliyeNo || '',
         siparisNo: fatura.irsaliye?.kaynakSiparis?.siparisNo || fatura.siparisNo || '',
+        warehouseId: fatura.warehouseId || '',
+        satisElemaniId: fatura.satisElemaniId || '',
         kalemler: fatura.kalemler.map((k: any) => ({
           stokId: k.stokId,
+          stok: k.stok ? {
+            id: k.stok.id,
+            stokKodu: k.stok.stokKodu,
+            stokAdi: k.stok.stokAdi,
+            satisFiyati: k.stok.satisFiyati,
+            kdvOrani: k.stok.kdvOrani,
+            miktar: 0, // Added miktar: 0 to the nested stok object
+          } : undefined,
           miktar: k.miktar,
           birimFiyat: k.birimFiyat,
           kdvOrani: k.kdvOrani,
@@ -134,6 +173,15 @@ export default function DuzenleSatisFaturasiPage() {
       setCariler(response.data.data || []);
     } catch (error) {
       console.error('Cariler yüklenirken hata:', error);
+    }
+  };
+
+  const fetchSatisElemanlari = async () => {
+    try {
+      const response = await axios.get('/satis-elemani');
+      setSatisElemanlari(response.data || []);
+    } catch (error) {
+      console.error('Satış elemanları yüklenirken hata:', error);
     }
   };
 
@@ -251,6 +299,11 @@ export default function DuzenleSatisFaturasiPage() {
         return;
       }
 
+      if (!formData.warehouseId) {
+        showSnackbar('Ambar seçimi zorunludur. Lütfen bir ambar seçiniz.', 'error');
+        return;
+      }
+
       if (formData.kalemler.length === 0) {
         showSnackbar('En az bir kalem eklemelisiniz', 'error');
         return;
@@ -264,11 +317,15 @@ export default function DuzenleSatisFaturasiPage() {
         vade: formData.vade ? new Date(formData.vade).toISOString() : null,
         iskonto: Number(formData.genelIskontoTutar) || 0,
         aciklama: formData.aciklama || null,
+        warehouseId: formData.warehouseId || null,
+        satisElemaniId: formData.satisElemaniId || null,
         kalemler: formData.kalemler.map(k => ({
           stokId: k.stokId,
           miktar: Number(k.miktar),
           birimFiyat: Number(k.birimFiyat),
           kdvOrani: Number(k.kdvOrani),
+          iskontoOrani: Number(k.iskontoOran) || 0,
+          iskontoTutari: Number(k.iskontoTutar) || 0,
         })),
       });
 
@@ -343,6 +400,11 @@ export default function DuzenleSatisFaturasiPage() {
               Fatura Bilgileri
             </Typography>
             <Divider sx={{ mb: 2 }} />
+            {warehouses.length === 0 && (
+              <Alert severity="error" sx={{ mb: 2 }}>
+                Sistemde tanımlı ambar bulunmamaktadır. İşlem yapabilmek için lütfen önce ambar tanımlayınız.
+              </Alert>
+            )}
           </Box>
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -371,6 +433,21 @@ export default function DuzenleSatisFaturasiPage() {
               onChange={(e) => setFormData(prev => ({ ...prev, vade: e.target.value }))}
               InputLabelProps={{ shrink: true }}
             />
+
+            <FormControl sx={{ flex: '1 1 200px' }} required>
+              <InputLabel>Ambar</InputLabel>
+              <Select
+                value={formData.warehouseId}
+                onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                label="Ambar"
+              >
+                {warehouses.map((warehouse) => (
+                  <MenuItem key={warehouse.id} value={warehouse.id}>
+                    {warehouse.name} {warehouse.isDefault && '(Varsayılan)'}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
             <FormControl sx={{ flex: '1 1 200px' }} required>
               <InputLabel>Durum</InputLabel>
               <Select
@@ -402,40 +479,77 @@ export default function DuzenleSatisFaturasiPage() {
             />
           </Box>
 
-          <Autocomplete
-            fullWidth
-            value={cariler.find(c => c.id === formData.cariId) || null}
-            onChange={(_, newValue) => {
-              setFormData(prev => ({ ...prev, cariId: newValue?.id || '' }));
-            }}
-            options={cariler}
-            getOptionLabel={(option) => `${option.cariKodu} - ${option.unvan}`}
-            renderOption={(props, option) => {
-              const { key, ...otherProps } = props;
-              return (
-                <Box component="li" key={key} {...otherProps}>
-                  <Box>
-                    <Typography variant="body1" fontWeight="600">
-                      {option.unvan}
-                    </Typography>
-                    <Typography variant="caption" color="text.secondary">
-                      {option.cariKodu} - {option.tip === 'MUSTERI' ? 'Müşteri' : 'Tedarikçi'}
-                    </Typography>
-                  </Box>
-                </Box>
-              );
-            }}
-            renderInput={(params) => (
-              <TextField
-                {...params}
-                label="Cari Seçiniz"
-                placeholder="Cari kodu veya ünvanı ile ara..."
-                required
+          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+            <Box sx={{ flex: '2 1 400px' }}>
+              <Autocomplete
+                fullWidth
+                value={cariler.find(c => c.id === formData.cariId) || null}
+                onChange={(_, newValue) => {
+                  setFormData(prev => ({
+                    ...prev,
+                    cariId: newValue?.id || '',
+                    satisElemaniId: newValue?.satisElemaniId || prev.satisElemaniId
+                  }));
+                }}
+                options={cariler}
+                getOptionLabel={(option) => `${option.cariKodu} - ${option.unvan}`}
+                renderOption={(props, option) => {
+                  const { key, ...otherProps } = props;
+                  return (
+                    <Box component="li" key={key} {...otherProps}>
+                      <Box>
+                        <Typography variant="body1" fontWeight="600">
+                          {option.unvan}
+                        </Typography>
+                        <Typography variant="caption" color="text.secondary">
+                          {option.cariKodu} - {option.tip === 'MUSTERI' ? 'Müşteri' : 'Tedarikçi'}
+                        </Typography>
+                      </Box>
+                    </Box>
+                  );
+                }}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Cari Seçiniz"
+                    placeholder="Cari kodu veya ünvanı ile ara..."
+                    required
+                  />
+                )}
+                noOptionsText="Cari bulunamadı"
+                isOptionEqualToValue={(option, value) => option.id === value.id}
               />
-            )}
-            noOptionsText="Cari bulunamadı"
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-          />
+            </Box>
+
+            <Box sx={{ flex: '1 1 200px' }}>
+              <Autocomplete
+                fullWidth
+                value={satisElemanlari.find(s => s.id === formData.satisElemaniId) || null}
+                onChange={(_, newValue) => {
+                  setFormData(prev => ({ ...prev, satisElemaniId: newValue?.id || '' }));
+                }}
+                options={satisElemanlari}
+                getOptionLabel={(option) => option.adSoyad}
+                renderInput={(params) => (
+                  <TextField
+                    {...params}
+                    label="Satış Elemanı"
+                    placeholder="Satış Elemanı Seçiniz"
+                  />
+                )}
+                renderOption={(props, option) => {
+                  const { key, ...otherProps } = props;
+                  return (
+                    <li key={option.id} {...otherProps}>
+                      <Typography variant="body2">{option.adSoyad}</Typography>
+                    </li>
+                  );
+                }}
+                noOptionsText="Satış elemanı bulunamadı"
+                isOptionEqualToValue={(option, value) => option.id === value.id}
+              />
+            </Box>
+          </Box>
 
           {/* Kalemler */}
           <Box>
@@ -490,15 +604,39 @@ export default function DuzenleSatisFaturasiPage() {
                             getOptionLabel={(option) => `${option.stokKodu} - ${option.stokAdi}`}
                             renderOption={(props, option) => {
                               const { key, ...otherProps } = props;
+                              let stockColor = 'var(--success)';
+                              if (option.miktar <= 0) stockColor = 'var(--destructive)';
+                              else if (option.miktar < 10) stockColor = 'var(--warning)';
+
                               return (
                                 <Box component="li" key={key} {...otherProps}>
-                                  <Box>
-                                    <Typography variant="body2" fontWeight="600">
-                                      {option.stokAdi}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {option.stokKodu}
-                                    </Typography>
+                                  <Box sx={{ width: '100%' }}>
+                                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                      <Typography variant="body2" fontWeight="600">
+                                        {option.stokAdi}
+                                      </Typography>
+                                      <Chip
+                                        label={`Stok: ${option.miktar}`}
+                                        size="small"
+                                        sx={{
+                                          height: 20,
+                                          fontSize: '0.7rem',
+                                          bgcolor: `color-mix(in srgb, ${stockColor} 10%, transparent)`,
+                                          color: stockColor,
+                                          border: `1px solid ${stockColor}`,
+                                        }}
+                                      />
+                                    </Box>
+                                    <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
+                                      <Typography variant="caption" color="text.secondary">
+                                        Kod: {option.stokKodu}
+                                      </Typography>
+                                      {option.barkod && (
+                                        <Typography variant="caption" color="text.secondary">
+                                          | Barkod: {option.barkod}
+                                        </Typography>
+                                      )}
+                                    </Box>
                                   </Box>
                                 </Box>
                               );
@@ -506,7 +644,7 @@ export default function DuzenleSatisFaturasiPage() {
                             renderInput={(params) => (
                               <TextField
                                 {...params}
-                                placeholder="Stok kodu veya adı ile ara..."
+                                placeholder="Stok kodu, adı veya barkod ile ara..."
                               />
                             )}
                             noOptionsText="Stok bulunamadı"
@@ -685,48 +823,48 @@ export default function DuzenleSatisFaturasiPage() {
             </Typography>
             <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
               <Box sx={{ flex: '1 1 300px' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Ara Toplam:</Typography>
-                    <Typography variant="body1" fontWeight="600">{formatCurrency(totals.araToplam)}</Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Kalem İndirimleri:</Typography>
-                    <Typography variant="body1" fontWeight="600" color={totals.toplamKalemIskontosu > 0 ? "error" : "inherit"}>
-                      {totals.toplamKalemIskontosu > 0 ? '- ' : ''}{formatCurrency(totals.toplamKalemIskontosu)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">Genel İskonto:</Typography>
-                    <Typography variant="body1" fontWeight="600" color={totals.genelIskonto > 0 ? "error" : "inherit"}>
-                      {totals.genelIskonto > 0 ? '- ' : ''}{formatCurrency(totals.genelIskonto)}
-                    </Typography>
-                  </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Ara Toplam:</Typography>
+                  <Typography variant="body1" fontWeight="600">{formatCurrency(totals.araToplam)}</Typography>
                 </Box>
-                <Box sx={{ flex: '1 1 300px' }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1" fontWeight="bold">Toplam İndirim:</Typography>
-                    <Typography variant="body1" fontWeight="bold" color={totals.toplamIskonto > 0 ? "error" : "inherit"}>
-                      {totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}
-                    </Typography>
-                  </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                    <Typography variant="body1">KDV Toplamı:</Typography>
-                    <Typography variant="body1" fontWeight="600">{formatCurrency(totals.toplamKdv)}</Typography>
-                  </Box>
-                  <Divider sx={{ my: 1 }} />
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
-                    <Typography
-                      variant="h6"
-                      fontWeight="bold"
-                      sx={{
-                        color: '#8b5cf6',
-                      }}
-                    >
-                      {formatCurrency(totals.genelToplam)}
-                    </Typography>
-                  </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Kalem İndirimleri:</Typography>
+                  <Typography variant="body1" fontWeight="600" color={totals.toplamKalemIskontosu > 0 ? "error" : "inherit"}>
+                    {totals.toplamKalemIskontosu > 0 ? '- ' : ''}{formatCurrency(totals.toplamKalemIskontosu)}
+                  </Typography>
                 </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">Genel İskonto:</Typography>
+                  <Typography variant="body1" fontWeight="600" color={totals.genelIskonto > 0 ? "error" : "inherit"}>
+                    {totals.genelIskonto > 0 ? '- ' : ''}{formatCurrency(totals.genelIskonto)}
+                  </Typography>
+                </Box>
+              </Box>
+              <Box sx={{ flex: '1 1 300px' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1" fontWeight="bold">Toplam İndirim:</Typography>
+                  <Typography variant="body1" fontWeight="bold" color={totals.toplamIskonto > 0 ? "error" : "inherit"}>
+                    {totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}
+                  </Typography>
+                </Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
+                  <Typography variant="body1">KDV Toplamı:</Typography>
+                  <Typography variant="body1" fontWeight="600">{formatCurrency(totals.toplamKdv)}</Typography>
+                </Box>
+                <Divider sx={{ my: 1 }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
+                  <Typography
+                    variant="h6"
+                    fontWeight="bold"
+                    sx={{
+                      color: '#8b5cf6',
+                    }}
+                  >
+                    {formatCurrency(totals.genelToplam)}
+                  </Typography>
+                </Box>
+              </Box>
             </Box>
           </Paper>
 

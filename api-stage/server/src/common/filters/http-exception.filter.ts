@@ -23,8 +23,8 @@ export class AllExceptionsFilter implements ExceptionFilter {
       exception instanceof HttpException
         ? exception.getResponse()
         : exception instanceof Error
-        ? exception.message
-        : 'Internal server error';
+          ? exception.message
+          : 'Internal server error';
 
     const errorDetails = {
       statusCode: status,
@@ -32,7 +32,6 @@ export class AllExceptionsFilter implements ExceptionFilter {
       path: request.url,
       method: request.method,
       message: typeof message === 'string' ? message : (message as any).message || message,
-      error: exception instanceof Error ? exception.stack : String(exception),
     };
 
     // Detaylı log - PM2 log'larına yazmak için process.stderr.write kullan
@@ -46,7 +45,7 @@ export class AllExceptionsFilter implements ExceptionFilter {
       error: exception instanceof Error ? exception.message : String(exception),
       stack: exception instanceof Error ? exception.stack : undefined,
     }, null, 2);
-    
+
     process.stderr.write(logMessage + '\n');
     console.error('❌ [Global Exception Filter] Hata yakalandı:', {
       status,

@@ -20,12 +20,12 @@ export class AuthService {
     private emailService: EmailService,
     private redisService: RedisService,
     private licenseService: LicenseService,
-  ) {}
+  ) { }
 
   async register(dto: RegisterDto) {
     // Username yoksa email'den oluştur
     const username = dto.username || dto.email.split('@')[0];
-    
+
     // FullName yoksa firstName ve lastName'den oluştur
     const fullName = dto.fullName || `${dto.firstName} ${dto.lastName}`;
 
@@ -63,12 +63,12 @@ export class AuthService {
 
       // Plan ücretsiz (trial) mi kontrol et
       const isTrialPlan = planSlug === 'trial' || Number(plan.price) === 0;
-      
+
       // Tenant status belirleme:
       // - Deneme paketi (trial) ise → PENDING (admin onay bekliyor)
       // - Ücretli plan ise → PENDING (ödeme bekliyor, ödeme başarılı olursa ACTIVE olacak)
       const tenantStatus = TenantStatus.PENDING;
-      
+
       // Subscription status belirleme:
       // - Deneme paketi ise → PENDING (admin onay bekliyor)
       // - Ücretli plan ise → PENDING (ödeme bekliyor)
@@ -83,7 +83,7 @@ export class AuthService {
               planId: plan.id,
               status: subscriptionStatus,
               startDate: new Date(),
-              trialEndsAt: isTrialPlan 
+              trialEndsAt: isTrialPlan
                 ? new Date(Date.now() + 14 * 24 * 60 * 60 * 1000) // 14 gün deneme
                 : null,
               endDate: isTrialPlan
@@ -139,8 +139,8 @@ export class AuthService {
           requiresApproval: dto.planSlug === 'trial' || !dto.planSlug,
           message: tenant.subscription?.status === SubscriptionStatus.PENDING
             ? (dto.planSlug === 'trial' || !dto.planSlug
-                ? 'Deneme paketiniz admin onayı bekliyor. Onaylandıktan sonra giriş yapabileceksiniz.'
-                : 'Ödeme işlemini tamamlamanız gerekiyor. Ödeme başarılı olduktan sonra giriş yapabileceksiniz.')
+              ? 'Deneme paketiniz admin onayı bekliyor. Onaylandıktan sonra giriş yapabileceksiniz.'
+              : 'Ödeme işlemini tamamlamanız gerekiyor. Ödeme başarılı olduktan sonra giriş yapabileceksiniz.')
             : 'Hesabınız aktifleştiriliyor...',
         };
       }
@@ -148,7 +148,7 @@ export class AuthService {
 
     // Token version'ı artır (yeni kayıt = yeni token version)
     const newTokenVersion = (user.tokenVersion || 0) + 1;
-    
+
     await this.prisma.user.update({
       where: { id: user.id },
       data: { tokenVersion: newTokenVersion },
@@ -243,7 +243,7 @@ export class AuthService {
             where: { id: subscription.planId },
           });
           const isTrialPlan = plan && (plan.slug === 'trial' || Number(plan.price) === 0);
-          
+
           throw new UnauthorizedException(
             isTrialPlan
               ? 'Deneme paketiniz henüz admin onayı bekliyor. Lütfen daha sonra tekrar deneyin.'
@@ -281,18 +281,13 @@ export class AuthService {
       }
     }
 
-    // Token version'ı artır (yeni giriş = yeni token version)
-    const newTokenVersion = (user.tokenVersion || 0) + 1;
-    
-    // Eski token'ı Redis'ten sil (varsa)
-    const redisKey = `session:${user.id}`;
-    await this.redisService.del(redisKey);
-    
-    // Token version'ı güncelle
-    await this.prisma.user.update({
-      where: { id: user.id },
-      data: { tokenVersion: newTokenVersion },
-    });
+    // Token version'ı güncelleme (artık her girişte artırmıyoruz - çoklu oturum desteği)
+    // Sadece şifre değişikliği veya manuel logout-all durumunda artırılabilir
+    const currentTokenVersion = user.tokenVersion || 0;
+
+    // Eski token'ı Redis'ten silmeye gerek yok (set overwrites it)
+    // Ama eğer çoklu oturum istiyorsak Redis key modelini değiştirmemiz gerekirdi.
+    // Şimdilik sadece JWT süresine ve tokenVersion'a güveniyoruz.
 
     const tokens = await this.generateTokens(
       user.id,
@@ -300,13 +295,20 @@ export class AuthService {
       user.role,
       user.tenantId || undefined,
       [],
-      newTokenVersion,
+      currentTokenVersion,
     );
     await this.updateRefreshToken(user.id, tokens.refreshToken);
 
-    // Yeni token'ı Redis'e kaydet (7 gün TTL - refresh token süresi kadar)
-    const tokenExpiry = 7 * 24 * 60 * 60; // 7 gün (saniye cinsinden)
+    // Redis'e son girişi kaydet (audit için, ama JWTStrategy'den kaldırdık)
+    const redisKey = `session:${user.id}`;
+    const tokenExpiry = 7 * 24 * 60 * 60; // 7 gün
     await this.redisService.set(redisKey, tokens.accessToken, tokenExpiry);
+
+    // Son giriş zamanını sadece login anında güncelle (performans için)
+    await this.prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     return {
       user: this.sanitizeUser(user),
@@ -335,7 +337,7 @@ export class AuthService {
     // Refresh token sırasında token version kontrolü yap
     // Eğer token version değiştiyse, refresh token geçersizdir
     const currentTokenVersion = user.tokenVersion || 0;
-    
+
     const tokens = await this.generateTokens(
       user.id,
       user.email,
@@ -358,7 +360,7 @@ export class AuthService {
     // Token version'ı artır (logout = token geçersiz)
     await this.prisma.user.update({
       where: { id: userId },
-      data: { 
+      data: {
         refreshToken: null,
         tokenVersion: { increment: 1 },
       },
@@ -401,6 +403,7 @@ export class AuthService {
       tokenVersion: tokenVersion ?? user?.tokenVersion ?? 0,
       ...(tenantId && { tenantId }),
       ...(permissions.length > 0 && { permissions }),
+      isSuperAdmin: role === 'SUPER_ADMIN',
     };
 
     const refreshPayload = {

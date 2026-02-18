@@ -7,7 +7,7 @@ import { TahsilatTip, OdemeTipi } from '@prisma/client';
 
 @Injectable()
 export class TahsilatExportService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async generateExcel(
     tip?: TahsilatTip,
@@ -19,7 +19,13 @@ export class TahsilatExportService {
     bankaHesapId?: string,
     firmaKrediKartiId?: string,
   ): Promise<Buffer> {
-    const where: any = {};
+    const where: any = {
+      deletedAt: null,
+      OR: [
+        { faturaId: null },
+        { fatura: { deletedAt: null } }
+      ]
+    };
 
     if (tip) {
       where.tip = tip;
@@ -60,7 +66,11 @@ export class TahsilatExportService {
       include: {
         cari: true,
         kasa: true,
-        bankaHesap: true,
+        bankaHesap: {
+          include: {
+            banka: true,
+          },
+        },
         firmaKrediKarti: true,
       },
       orderBy: {
@@ -150,7 +160,7 @@ export class TahsilatExportService {
         : '-';
       const banka =
         tahsilat.firmaKrediKarti?.bankaAdi ||
-        tahsilat.bankaHesap?.bankaAdi ||
+        tahsilat.bankaHesap?.banka?.ad ||
         '-';
       const kartAdi =
         tahsilat.firmaKrediKarti?.kartAdi ||
@@ -252,7 +262,13 @@ export class TahsilatExportService {
     bankaHesapId?: string,
     firmaKrediKartiId?: string,
   ): Promise<Buffer> {
-    const where: any = {};
+    const where: any = {
+      deletedAt: null,
+      OR: [
+        { faturaId: null },
+        { fatura: { deletedAt: null } }
+      ]
+    };
 
     if (tip) {
       where.tip = tip;
@@ -293,7 +309,11 @@ export class TahsilatExportService {
       include: {
         cari: true,
         kasa: true,
-        bankaHesap: true,
+        bankaHesap: {
+          include: {
+            banka: true,
+          },
+        },
         firmaKrediKarti: true,
       },
       orderBy: {
@@ -305,14 +325,14 @@ export class TahsilatExportService {
     const vfs = require('pdfmake/build/vfs_fonts.js');
     const fonts = {
       Roboto: {
-        normal: Buffer.from(vfs['Roboto-Regular.ttf'], 'base64'),
+        normal: Buffer.from(vfs['Roboto-Regular.ttf'] || '', 'base64'),
         bold: Buffer.from(
-          vfs['Roboto-Medium.ttf'] || vfs['Roboto-Regular.ttf'],
+          vfs['Roboto-Medium.ttf'] || vfs['Roboto-Regular.ttf'] || '',
           'base64',
         ),
       },
     };
-    const printer = new PdfPrinter(fonts);
+    const printer = new (require('pdfmake'))(fonts);
 
     // Tablo body
     const tableBody: any[] = [];
@@ -341,7 +361,7 @@ export class TahsilatExportService {
       const kasa = tahsilat.kasa?.kasaAdi || 'Çapraz Ödeme';
       const banka =
         tahsilat.firmaKrediKarti?.bankaAdi ||
-        tahsilat.bankaHesap?.bankaAdi ||
+        tahsilat.bankaHesap?.banka?.ad ||
         '-';
       const tutar = parseFloat(tahsilat.tutar.toString());
       const aciklama = tahsilat.aciklama || '-';
@@ -480,8 +500,6 @@ export class TahsilatExportService {
       NAKIT: 'Nakit',
       KREDI_KARTI: 'Kredi Kartı',
       HAVALE: 'Havale',
-      CEK: 'Çek',
-      SENET: 'Senet',
     };
     return odemeTipiMap[odemeTipi] || odemeTipi;
   }
@@ -492,7 +510,6 @@ export class TahsilatExportService {
       POS: 'POS',
       FIRMA_KREDI_KARTI: 'Firma Kredi Kartı',
       BANKA: 'Banka',
-      CEK_SENET: 'Çek/Senet',
     };
     return kasaTipiMap[kasaTipi] || kasaTipi;
   }

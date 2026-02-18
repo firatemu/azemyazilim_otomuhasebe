@@ -2,10 +2,16 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { PrismaService } from '../../common/prisma.service';
 import { CreateTenantDto } from './dto/create-tenant.dto';
 import { UpdateTenantDto } from './dto/update-tenant.dto';
+import { UpdateTenantSettingsDto } from './dto/update-tenant-settings.dto';
+
+import { CipherService } from '../../common/services/cipher.service';
 
 @Injectable()
 export class TenantsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private cipherService: CipherService,
+  ) { }
 
   async create(createTenantDto: CreateTenantDto) {
     return this.prisma.tenant.create({
@@ -51,6 +57,21 @@ export class TenantsService {
     });
   }
 
+  async getCurrent(id: string) {
+    const tenant = await this.prisma.tenant.findUnique({
+      where: { id },
+      include: {
+        settings: true,
+      },
+    });
+
+    if (!tenant) {
+      throw new NotFoundException(`Tenant with ID ${id} not found`);
+    }
+
+    return tenant;
+  }
+
   async approveTrial(tenantId: string) {
     // Önce tenant'ı plan olmadan çek (Prisma null plan hatası vermesin)
     const tenant = await this.prisma.tenant.findUnique({
@@ -76,8 +97,8 @@ export class TenantsService {
     // Plan'ı ayrı bir sorgu ile çek (null olabilir)
     const plan = tenant.subscription.planId
       ? await this.prisma.plan.findUnique({
-          where: { id: tenant.subscription.planId },
-        })
+        where: { id: tenant.subscription.planId },
+      })
       : null;
 
     // Eğer plan varsa, deneme paketi kontrolü yap
@@ -122,6 +143,95 @@ export class TenantsService {
     }
 
     return updatedTenant;
+  }
+
+  async getSettings(tenantId: string) {
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID bulunamadı');
+    }
+
+    let settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+    });
+
+    // Eğer settings yoksa, boş bir kayıt oluştur
+    if (!settings) {
+      settings = await this.prisma.tenantSettings.create({
+        data: {
+          tenantId,
+        },
+      });
+    }
+
+    return settings;
+  }
+
+  async updateSettings(tenantId: string, updateSettingsDto: UpdateTenantSettingsDto) {
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID bulunamadı');
+    }
+
+    // Encrypt sensitive fields if present
+    const data = { ...updateSettingsDto };
+    const sensitiveFields = ['smtpPassword', 'iyzicoSecretKey', 'gibPassword'];
+
+    for (const field of sensitiveFields) {
+      if ((data as any)[field]) {
+        (data as any)[field] = await this.cipherService.encrypt((data as any)[field]);
+      }
+    }
+
+    // Önce mevcut settings'i kontrol et
+    let settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+    });
+
+    // Eğer yoksa oluştur
+    if (!settings) {
+      settings = await this.prisma.tenantSettings.create({
+        data: {
+          tenantId,
+          ...(data as any),
+        },
+      });
+    } else {
+      // Varsa güncelle
+      settings = await this.prisma.tenantSettings.update({
+        where: { tenantId },
+        data: (data as any),
+      });
+    }
+
+    return settings;
+  }
+
+  async updateLogo(tenantId: string, logoUrl: string) {
+    if (!tenantId) {
+      throw new BadRequestException('Tenant ID bulunamadı');
+    }
+
+    // Settings var mı kontrol et
+    let settings = await this.prisma.tenantSettings.findUnique({
+      where: { tenantId },
+    });
+
+    if (!settings) {
+      settings = await this.prisma.tenantSettings.create({
+        data: {
+          tenantId,
+          logoUrl,
+        },
+      });
+    } else {
+      settings = await this.prisma.tenantSettings.update({
+        where: { tenantId },
+        data: {
+          logoUrl,
+        },
+      });
+    }
+
+    return settings;
   }
 }
 

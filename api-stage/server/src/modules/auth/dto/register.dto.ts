@@ -47,6 +47,11 @@ export class RegisterDto {
   role?: UserRole;
 
   @IsOptional()
+  @IsOptional()
   @IsString()
   planSlug?: string; // 'trial' veya ücretli plan slug'ı (örn: 'basic', 'professional')
+
+  @IsOptional()
+  @IsString()
+  companyType?: string;
 }

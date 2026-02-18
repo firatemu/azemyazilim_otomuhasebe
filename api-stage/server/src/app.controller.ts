@@ -9,6 +9,7 @@ export class AppController {
   @Public()
   @Get()
   getHealth() {
+    console.log('[Debug] Health check endpoint called - Deployment verified');
     return { status: 'ok', timestamp: new Date().toISOString() };
   }
 }

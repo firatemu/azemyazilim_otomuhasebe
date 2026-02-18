@@ -1,66 +1,67 @@
-import {
-  IsNotEmpty,
-  IsString,
-  IsNumber,
-  IsOptional,
-  IsEnum,
-  IsDateString,
-  Min,
-  IsBoolean,
-} from 'class-validator';
-import { CekSenetTip, PortfoyTip, CekSenetDurum } from '@prisma/client';
+import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString, IsDateString, Min } from 'class-validator';
+import { CekSenetTip, CekSenetDurum } from '@prisma/client';
 
 export class CreateCekSenetDto {
-  @IsNotEmpty()
-  @IsEnum(CekSenetTip)
-  tip: CekSenetTip;
+    @IsEnum(CekSenetTip)
+    tip: CekSenetTip;
 
-  @IsNotEmpty()
-  @IsEnum(PortfoyTip)
-  portfoyTip: PortfoyTip;
 
-  @IsNotEmpty()
-  @IsString()
-  cariId: string;
+    @IsString()
+    @IsNotEmpty()
+    evrakNo: string;
 
-  @IsNotEmpty()
-  @IsNumber()
-  @Min(0.01)
-  tutar: number;
+    @IsDateString()
+    vadeTarihi: string;
 
-  @IsNotEmpty()
-  @IsDateString()
-  vade: string;
+    @IsNumber()
+    @Min(0)
+    tutar: number;
 
-  @IsOptional()
-  @IsString()
-  banka?: string;
+    @IsString()
+    @IsOptional()
+    borclu?: string;
 
-  @IsOptional()
-  @IsString()
-  sube?: string;
+    @IsString()
+    @IsOptional()
+    banka?: string;
 
-  @IsOptional()
-  @IsString()
-  hesapNo?: string;
+    @IsString()
+    @IsOptional()
+    sube?: string;
 
-  @IsOptional()
-  @IsString()
-  cekNo?: string;
+    @IsString()
+    @IsOptional()
+    hesapNo?: string;
 
-  @IsOptional()
-  @IsString()
-  seriNo?: string;
+    @IsString()
+    @IsOptional()
+    aciklama?: string;
 
-  @IsOptional()
-  @IsEnum(CekSenetDurum)
-  durum?: CekSenetDurum;
+    // İlk giriş sırasında hangi cariden alındığı (Giriş Bordrosu için) context'ten gelecek
+}
 
-  @IsOptional()
-  @IsString()
-  aciklama?: string;
+export class UpdateCekSenetDto {
+    @IsString()
+    @IsOptional()
+    evrakNo?: string;
 
-  @IsNotEmpty()
-  @IsString()
-  kasaId: string; // Çek/Senet Kasası ID'si
+    @IsDateString()
+    @IsOptional()
+    vadeTarihi?: string;
+
+    @IsString()
+    @IsOptional()
+    borclu?: string;
+
+    @IsString()
+    @IsOptional()
+    banka?: string;
+
+    @IsString()
+    @IsOptional()
+    sube?: string;
+
+    @IsString()
+    @IsOptional()
+    hesapNo?: string;
 }

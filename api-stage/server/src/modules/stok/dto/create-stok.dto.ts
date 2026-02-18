@@ -38,10 +38,6 @@ export class CreateStokDto {
   kdvOrani?: number;
 
   @IsOptional()
-  @IsNumber()
-  kritikStokMiktari?: number;
-
-  @IsOptional()
   @IsString()
   kategori?: string;
 

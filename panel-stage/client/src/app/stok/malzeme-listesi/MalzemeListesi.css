@@ -2,25 +2,25 @@
 
 /* CSS Custom Properties - Design System Variables */
 :root {
-  --background: oklch(0.9751 0.0127 244.2507);
-  --foreground: oklch(0.3729 0.0306 259.7328);
-  --card: oklch(1.0000 0 0);
-  --card-foreground: oklch(0.3729 0.0306 259.7328);
-  --popover: oklch(1.0000 0 0);
-  --popover-foreground: oklch(0.3729 0.0306 259.7328);
-  --primary: oklch(0.7227 0.1920 149.5793);
-  --primary-foreground: oklch(1.0000 0 0);
-  --secondary: oklch(0.9514 0.0250 236.8242);
-  --secondary-foreground: oklch(0.4461 0.0263 256.8018);
-  --muted: oklch(0.9670 0.0029 264.5419);
-  --muted-foreground: oklch(0.5510 0.0234 264.3637);
-  --accent: oklch(0.9505 0.0507 163.0508);
-  --accent-foreground: oklch(0.3729 0.0306 259.7328);
-  --destructive: oklch(0.6368 0.2078 25.3313);
-  --destructive-foreground: oklch(1.0000 0 0);
-  --border: oklch(0.9276 0.0058 264.5313);
-  --input: oklch(0.9276 0.0058 264.5313);
-  --ring: oklch(0.7227 0.1920 149.5793);
+  --background: rgb(241 245 249);
+  --foreground: rgb(51 65 85);
+  --card: rgb(255 255 255);
+  --card-foreground: rgb(51 65 85);
+  --popover: rgb(255 255 255);
+  --popover-foreground: rgb(51 65 85);
+  --primary: rgb(16 185 129);
+  --primary-foreground: rgb(255 255 255);
+  --secondary: rgb(226 232 240);
+  --secondary-foreground: rgb(71 85 105);
+  --muted: rgb(241 245 249);
+  --muted-foreground: rgb(100 116 139);
+  --accent: rgb(20 184 166);
+  --accent-foreground: rgb(51 65 85);
+  --destructive: rgb(239 68 68);
+  --destructive-foreground: rgb(255 255 255);
+  --border: rgb(226 232 240);
+  --input: rgb(226 232 240);
+  --ring: rgb(16 185 129);
   --radius: 0.5rem;
   --shadow-sm: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 1px 2px -2px hsl(0 0% 0% / 0.10);
   --shadow-md: 0px 4px 8px -1px hsl(0 0% 0% / 0.10), 0px 2px 4px -2px hsl(0 0% 0% / 0.10);
@@ -31,49 +31,49 @@
 /* Dark mode - Sistem tercihine göre otomatik */
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: oklch(0.2077 0.0398 265.7549);
-    --foreground: oklch(0.8717 0.0093 258.3382);
-    --card: oklch(0.2795 0.0368 260.0310);
-    --card-foreground: oklch(0.8717 0.0093 258.3382);
-    --popover: oklch(0.2795 0.0368 260.0310);
-    --popover-foreground: oklch(0.8717 0.0093 258.3382);
-    --primary: oklch(0.7729 0.1535 163.2231);
-    --primary-foreground: oklch(0.2077 0.0398 265.7549);
-    --secondary: oklch(0.3351 0.0331 260.9120);
-    --secondary-foreground: oklch(0.7118 0.0129 286.0665);
-    --muted: oklch(0.2463 0.0275 259.9628);
-    --muted-foreground: oklch(0.5510 0.0234 264.3637);
-    --accent: oklch(0.3729 0.0306 259.7328);
-    --accent-foreground: oklch(0.7118 0.0129 286.0665);
-    --destructive: oklch(0.6368 0.2078 25.3313);
-    --destructive-foreground: oklch(0.2077 0.0398 265.7549);
-    --border: oklch(0.4461 0.0263 256.8018);
-    --input: oklch(0.4461 0.0263 256.8018);
-    --ring: oklch(0.7729 0.1535 163.2231);
+    --background: rgb(2 6 23);
+    --foreground: rgb(241 245 249);
+    --card: rgb(15 23 42);
+    --card-foreground: rgb(241 245 249);
+    --popover: rgb(15 23 42);
+    --popover-foreground: rgb(241 245 249);
+    --primary: rgb(251 191 36);
+    --primary-foreground: rgb(15 23 42);
+    --secondary: rgb(30 41 59);
+    --secondary-foreground: rgb(148 163 184);
+    --muted: rgb(30 41 59);
+    --muted-foreground: rgb(100 116 139);
+    --accent: rgb(51 65 85);
+    --accent-foreground: rgb(148 163 184);
+    --destructive: rgb(239 68 68);
+    --destructive-foreground: rgb(15 23 42);
+    --border: rgb(71 85 105);
+    --input: rgb(71 85 105);
+    --ring: rgb(251 191 36);
   }
 }
 
 /* Manuel dark mode desteği için .dark sınıfı */
 .dark {
-  --background: oklch(0.2077 0.0398 265.7549);
-  --foreground: oklch(0.8717 0.0093 258.3382);
-  --card: oklch(0.2795 0.0368 260.0310);
-  --card-foreground: oklch(0.8717 0.0093 258.3382);
-  --popover: oklch(0.2795 0.0368 260.0310);
-  --popover-foreground: oklch(0.8717 0.0093 258.3382);
-  --primary: oklch(0.7729 0.1535 163.2231);
-  --primary-foreground: oklch(0.2077 0.0398 265.7549);
-  --secondary: oklch(0.3351 0.0331 260.9120);
-  --secondary-foreground: oklch(0.7118 0.0129 286.0665);
-  --muted: oklch(0.2463 0.0275 259.9628);
-  --muted-foreground: oklch(0.5510 0.0234 264.3637);
-  --accent: oklch(0.3729 0.0306 259.7328);
-  --accent-foreground: oklch(0.7118 0.0129 286.0665);
-  --destructive: oklch(0.6368 0.2078 25.3313);
-  --destructive-foreground: oklch(0.2077 0.0398 265.7549);
-  --border: oklch(0.4461 0.0263 256.8018);
-  --input: oklch(0.4461 0.0263 256.8018);
-  --ring: oklch(0.7729 0.1535 163.2231);
+  --background: rgb(2 6 23);
+  --foreground: rgb(241 245 249);
+  --card: rgb(15 23 42);
+  --card-foreground: rgb(241 245 249);
+  --popover: rgb(15 23 42);
+  --popover-foreground: rgb(241 245 249);
+  --primary: rgb(251 191 36);
+  --primary-foreground: rgb(15 23 42);
+  --secondary: rgb(30 41 59);
+  --secondary-foreground: rgb(148 163 184);
+  --muted: rgb(30 41 59);
+  --muted-foreground: rgb(100 116 139);
+  --accent: rgb(51 65 85);
+  --accent-foreground: rgb(148 163 184);
+  --destructive: rgb(239 68 68);
+  --destructive-foreground: rgb(15 23 42);
+  --border: rgb(71 85 105);
+  --input: rgb(71 85 105);
+  --ring: rgb(251 191 36);
 }
 
 /* Page Container */
@@ -190,7 +190,7 @@
 }
 
 .malzeme-listesi-btn-primary:hover {
-  background: oklch(from var(--primary) l c calc(h + 10));
+  filter: brightness(0.9);
   box-shadow: var(--shadow-md);
   transform: translateY(-1px);
 }
@@ -245,7 +245,7 @@
 .malzeme-listesi-input:focus {
   outline: none;
   border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 20%, transparent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 }
 
 .malzeme-listesi-input::placeholder {
@@ -269,7 +269,7 @@
 .malzeme-listesi-select:focus {
   outline: none;
   border-color: var(--ring);
-  box-shadow: 0 0 0 3px color-mix(in oklch, var(--ring) 20%, transparent);
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
 }
 
 /* Chip/Badge */
@@ -285,12 +285,12 @@
 }
 
 .malzeme-listesi-chip-success {
-  background: oklch(0.7 0.15 150);
+  background: rgb(16 185 129);
   color: var(--primary-foreground);
 }
 
 .malzeme-listesi-chip-warning {
-  background: oklch(0.7 0.15 50);
+  background: rgb(245 158 11);
   color: var(--primary-foreground);
 }
 

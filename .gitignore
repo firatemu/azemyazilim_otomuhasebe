@@ -52,4 +52,20 @@ next-env.d.ts
 *-backup/
 *_backup/
 panel-prod-backup/
+migration_backup/
+backups_consolidated/
+admin-stage-backup/
 
+# Logs and temp files
+*.log
+*.bak*
+*.txt
+!README*.md
+!*.md
+tsc_output*.txt
+cutover-hardening-report.txt
+docker-health-report.txt
+
+# Environment files
+.env*
+!.env.example

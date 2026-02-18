@@ -56,7 +56,7 @@ services:
       - app_net
     healthcheck:
       test: ["CMD-SHELL", "pg_isready", "-U", "postgres"]
-      interval: 5s
+      interval: 30s
       timeout: 3s
       retries: 20
 
@@ -64,6 +64,8 @@ services:
     image: redis:7-alpine
     container_name: otomuhasebe-redis
     restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
     command: redis-server --appendonly yes --requirepass ""
     volumes:
       - redis_data:/data
@@ -71,6 +73,29 @@ services:
       - app_net
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
-      interval: 10s
+      interval: 30s
       timeout: 3s
       retries: 5
+
+  minio:
+    image: minio/minio:latest
+    container_name: otomuhasebe-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin123}
+      MINIO_BROWSER: "off"  # Disable public console access
+    volumes:
+      - /opt/minio-data:/data  # Host bind mount (persists even if container is removed)
+    ports:
+      - "127.0.0.1:9000:9000"  # API (localhost only, not exposed to internet)
+      - "127.0.0.1:9001:9001"  # Console (localhost only, for admin access)
+    networks:
+      - app_net
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s

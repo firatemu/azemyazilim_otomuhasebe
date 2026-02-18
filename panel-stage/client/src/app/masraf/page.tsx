@@ -101,16 +101,14 @@ const ODEME_TIPI_LABELS: Record<string, string> = {
   NAKIT: 'Nakit',
   KREDI_KARTI: 'Kredi Kartı',
   BANKA_HAVALESI: 'Banka Havalesi',
-  CEK: 'Çek',
-  SENET: 'Senet',
+  BANKA_HAVALESI: 'Banka Havalesi',
 };
 
 const ODEME_TIPI_COLORS: Record<string, string> = {
   NAKIT: '#10b981',
   KREDI_KARTI: '#3b82f6',
   BANKA_HAVALESI: '#0891b2',
-  CEK: '#7c3aed',
-  SENET: '#6366f1',
+  BANKA_HAVALESI: '#0891b2',
 };
 
 const getOdemeTipiLabel = (tip: string) => ODEME_TIPI_LABELS[tip] || tip;
@@ -144,10 +142,10 @@ const MasrafFormDialog = memo(({
   if (!open) return null;
 
   return (
-    <Dialog 
-      open={open} 
-      onClose={onClose} 
-      maxWidth="md" 
+    <Dialog
+      open={open}
+      onClose={onClose}
+      maxWidth="md"
       fullWidth
       PaperProps={{
         sx: {
@@ -156,8 +154,8 @@ const MasrafFormDialog = memo(({
         },
       }}
     >
-      <DialogTitle sx={{ 
-        bgcolor: 'var(--destructive)', 
+      <DialogTitle sx={{
+        bgcolor: 'var(--destructive)',
         color: 'var(--destructive-foreground)',
         borderBottom: '1px solid var(--border)',
       }}>
@@ -192,8 +190,6 @@ const MasrafFormDialog = memo(({
                 <MenuItem value="NAKIT">Nakit</MenuItem>
                 <MenuItem value="KREDI_KARTI">Kredi Kartı</MenuItem>
                 <MenuItem value="BANKA_HAVALESI">Banka Havalesi</MenuItem>
-                <MenuItem value="CEK">Çek</MenuItem>
-                <MenuItem value="SENET">Senet</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -236,7 +232,7 @@ const MasrafFormDialog = memo(({
         </Grid>
       </DialogContent>
       <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
-        <Button 
+        <Button
           onClick={onClose}
           sx={{
             borderColor: 'var(--border)',
@@ -253,10 +249,10 @@ const MasrafFormDialog = memo(({
           variant="contained"
           onClick={onSubmit}
           disabled={loading}
-          sx={{ 
-            bgcolor: 'var(--destructive)', 
+          sx={{
+            bgcolor: 'var(--destructive)',
             color: 'var(--destructive-foreground)',
-            '&:hover': { 
+            '&:hover': {
               bgcolor: 'color-mix(in srgb, var(--destructive) 90%, #000 10%)',
             },
           }}
@@ -564,7 +560,7 @@ export default function MasrafPage() {
           <Chip
             label={row.kategori?.kategoriAdi || '-'}
             size="small"
-            sx={{ 
+            sx={{
               bgcolor: 'color-mix(in srgb, var(--muted-foreground) 10%, transparent)',
               color: 'var(--foreground)',
               borderColor: 'var(--border)',
@@ -615,8 +611,7 @@ export default function MasrafPage() {
           NAKIT: 'var(--chart-2)',
           KREDI_KARTI: 'var(--chart-1)',
           BANKA_HAVALESI: 'var(--secondary)',
-          CEK: 'var(--chart-3)',
-          SENET: 'var(--primary)',
+          BANKA_HAVALESI: 'var(--secondary)',
         };
         const chipColor = colorMap[row.odemeTipi] || 'var(--muted-foreground)';
         return (
@@ -666,8 +661,8 @@ export default function MasrafPage() {
         return (
           <Box sx={{ display: 'flex', gap: 1 }}>
             <Tooltip title="Düzenle">
-              <IconButton 
-                size="small" 
+              <IconButton
+                size="small"
                 onClick={() => handleOpenDialog(row)}
                 sx={{
                   color: 'var(--chart-3)',
@@ -686,7 +681,7 @@ export default function MasrafPage() {
                   setSelectedMasraf(row);
                   setOpenDelete(true);
                 }}
-                sx={{ 
+                sx={{
                   color: 'var(--destructive)',
                   '&:hover': {
                     bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
@@ -707,12 +702,12 @@ export default function MasrafPage() {
       <Box sx={{ p: 3, bgcolor: 'var(--background)' }}>
         <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
           <Box>
-            <Typography 
-              variant="h4" 
-              sx={{ 
-                fontWeight: 700, 
-                display: 'flex', 
-                alignItems: 'center', 
+            <Typography
+              variant="h4"
+              sx={{
+                fontWeight: 700,
+                display: 'flex',
+                alignItems: 'center',
                 gap: 1,
                 color: 'var(--foreground)',
                 letterSpacing: '-0.02em',
@@ -728,8 +723,8 @@ export default function MasrafPage() {
               variant="outlined"
               startIcon={<Category />}
               onClick={() => handleOpenKategoriDialog()}
-              sx={{ 
-                color: 'var(--secondary)', 
+              sx={{
+                color: 'var(--secondary)',
                 borderColor: 'var(--secondary)',
                 '&:hover': {
                   borderColor: 'var(--secondary-hover)',
@@ -761,10 +756,10 @@ export default function MasrafPage() {
               variant="contained"
               startIcon={<Add />}
               onClick={() => handleOpenDialog()}
-              sx={{ 
-                bgcolor: 'var(--destructive)', 
+              sx={{
+                bgcolor: 'var(--destructive)',
                 color: 'var(--destructive-foreground)',
-                '&:hover': { 
+                '&:hover': {
                   bgcolor: 'color-mix(in srgb, var(--destructive) 90%, #000 10%)',
                 },
               }}
@@ -957,8 +952,8 @@ export default function MasrafPage() {
         />
 
         {/* Silme Dialog */}
-        <Dialog 
-          open={openDelete} 
+        <Dialog
+          open={openDelete}
           onClose={() => setOpenDelete(false)}
           PaperProps={{
             sx: {
@@ -978,7 +973,7 @@ export default function MasrafPage() {
             </Typography>
           </DialogContent>
           <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
-            <Button 
+            <Button
               onClick={() => setOpenDelete(false)}
               sx={{
                 borderColor: 'var(--border)',
@@ -991,9 +986,9 @@ export default function MasrafPage() {
             >
               İptal
             </Button>
-            <Button 
-              variant="contained" 
-              onClick={handleDelete} 
+            <Button
+              variant="contained"
+              onClick={handleDelete}
               disabled={actionLoading}
               sx={{
                 bgcolor: 'var(--destructive)',
@@ -1009,10 +1004,10 @@ export default function MasrafPage() {
         </Dialog>
 
         {/* Kategori Yönetimi Dialog */}
-        <Dialog 
-          open={openKategoriDialog} 
-          onClose={() => setOpenKategoriDialog(false)} 
-          maxWidth="md" 
+        <Dialog
+          open={openKategoriDialog}
+          onClose={() => setOpenKategoriDialog(false)}
+          maxWidth="md"
           fullWidth
           PaperProps={{
             sx: {
@@ -1021,11 +1016,11 @@ export default function MasrafPage() {
             },
           }}
         >
-          <DialogTitle sx={{ 
-            bgcolor: 'var(--secondary)', 
+          <DialogTitle sx={{
+            bgcolor: 'var(--secondary)',
             color: 'var(--secondary-foreground)',
-            display: 'flex', 
-            alignItems: 'center', 
+            display: 'flex',
+            alignItems: 'center',
             gap: 1,
             borderBottom: '1px solid var(--border)',
           }}>
@@ -1067,10 +1062,10 @@ export default function MasrafPage() {
                         startIcon={kategoriEditMode ? <Edit /> : <Add />}
                         onClick={handleKategoriSubmit}
                         disabled={actionLoading}
-                        sx={{ 
-                          bgcolor: 'var(--secondary)', 
+                        sx={{
+                          bgcolor: 'var(--secondary)',
                           color: 'var(--secondary-foreground)',
-                          '&:hover': { 
+                          '&:hover': {
                             bgcolor: 'var(--secondary-hover)',
                           },
                         }}
@@ -1125,8 +1120,8 @@ export default function MasrafPage() {
                       </TableRow>
                     ) : (
                       kategoriler.map((kat) => (
-                        <TableRow 
-                          key={kat.id} 
+                        <TableRow
+                          key={kat.id}
                           hover
                           sx={{
                             bgcolor: 'var(--background)',
@@ -1151,8 +1146,8 @@ export default function MasrafPage() {
                               label={kat._count?.masraflar || 0}
                               size="small"
                               sx={{
-                                bgcolor: kat._count?.masraflar 
-                                  ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)' 
+                                bgcolor: kat._count?.masraflar
+                                  ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)'
                                   : 'color-mix(in srgb, var(--muted-foreground) 10%, transparent)',
                                 color: kat._count?.masraflar ? 'var(--chart-2)' : 'var(--muted-foreground)',
                                 borderColor: kat._count?.masraflar ? 'var(--chart-2)' : 'var(--border)',
@@ -1165,7 +1160,7 @@ export default function MasrafPage() {
                               <IconButton
                                 size="small"
                                 onClick={() => handleOpenKategoriDialog(kat)}
-                                sx={{ 
+                                sx={{
                                   color: 'var(--chart-3)',
                                   '&:hover': {
                                     bgcolor: 'color-mix(in srgb, var(--chart-3) 10%, transparent)',
@@ -1182,7 +1177,7 @@ export default function MasrafPage() {
                                   setSelectedKategori(kat);
                                   setOpenKategoriDelete(true);
                                 }}
-                                sx={{ 
+                                sx={{
                                   color: 'var(--destructive)',
                                   '&:hover': {
                                     bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
@@ -1203,7 +1198,7 @@ export default function MasrafPage() {
             </Box>
           </DialogContent>
           <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
-            <Button 
+            <Button
               onClick={() => setOpenKategoriDialog(false)}
               sx={{
                 borderColor: 'var(--border)',
@@ -1220,8 +1215,8 @@ export default function MasrafPage() {
         </Dialog>
 
         {/* Kategori Silme Dialog */}
-        <Dialog 
-          open={openKategoriDelete} 
+        <Dialog
+          open={openKategoriDelete}
           onClose={() => setOpenKategoriDelete(false)}
           PaperProps={{
             sx: {
@@ -1250,7 +1245,7 @@ export default function MasrafPage() {
             </Typography>
           </DialogContent>
           <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
-            <Button 
+            <Button
               onClick={() => setOpenKategoriDelete(false)}
               sx={{
                 borderColor: 'var(--border)',

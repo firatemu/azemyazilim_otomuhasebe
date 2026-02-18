@@ -31,7 +31,7 @@ import { WorkOrderStatus } from '@prisma/client';
 
 @Controller('work-orders')
 export class WorkOrderController {
-  constructor(private readonly workOrderService: WorkOrderService) {}
+  constructor(private readonly workOrderService: WorkOrderService) { }
 
   private getUserInfo(req: any) {
     const user = req.user;
@@ -138,6 +138,18 @@ export class WorkOrderController {
   ) {
     const { userId, ipAddress, userAgent } = this.getUserInfo(req);
     return this.workOrderService.requestPartSupply(id, dto, userId, ipAddress, userAgent);
+  }
+
+
+  @Get('supply-requests/all')
+  @UseGuards(RolesGuard)
+  @Roles('ADMIN', 'TENANT_ADMIN', 'SUPER_ADMIN')
+  async getAllSupplyRequests(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(50), ParseIntPipe) limit: number,
+    @Query('status') status?: any,
+  ) {
+    return this.workOrderService.getAllSupplyRequests(page, limit, status);
   }
 
   @Get(':id/supply-requests')

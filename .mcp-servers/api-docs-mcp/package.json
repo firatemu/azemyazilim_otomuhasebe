@@ -1,0 +1,20 @@
+{
+    "name": "@otomuhasebe/api-docs-mcp",
+    "version": "1.0.0",
+    "description": "MCP server for API testing and documentation",
+    "main": "dist/index.js",
+    "type": "module",
+    "scripts": {
+        "build": "tsc && node -e \"require('fs').chmodSync('dist/index.js', '755')\"",
+        "watch": "tsc --watch",
+        "start": "node dist/index.js"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/sdk": "^1.0.4",
+        "axios": "^1.7.9"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.2",
+        "typescript": "^5.7.2"
+    }
+}

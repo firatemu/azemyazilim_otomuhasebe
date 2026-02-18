@@ -145,6 +145,7 @@ const menuItems = [
     bgColor: '#fef2f2',
     subItems: [
       { id: 'servis-is-emirleri', label: 'İş Emirleri', icon: Assignment, path: '/servis/is-emirleri', color: '#ef4444' },
+      { id: 'servis-tedarik-yonetimi', label: 'Tedarik Yönetimi', icon: Inventory, path: '/servis/tedarik-yonetimi', color: '#10b981' },
       { id: 'servis-atolye-panosu', label: 'Atölye Panosu', icon: Dashboard, path: '/servis/atolye-panosu', color: '#f59e0b' },
       { id: 'servis-araclar', label: 'Araçlar', icon: DirectionsCar, path: '/servis/araclar', color: '#3b82f6' },
       { id: 'servis-teknisyenler', label: 'Teknisyenler', icon: Engineering, path: '/servis/teknisyenler', color: '#8b5cf6' },
@@ -445,11 +446,11 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
             <DirectionsCar sx={{ fontSize: 22, color: 'var(--primary-foreground)' }} />
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography 
-              variant="subtitle1" 
-              noWrap 
-              fontWeight="700" 
-              sx={{ 
+            <Typography
+              variant="subtitle1"
+              noWrap
+              fontWeight="700"
+              sx={{
                 lineHeight: 1.2,
                 fontSize: '1rem',
                 color: 'var(--foreground)',
@@ -458,10 +459,10 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
             >
               Oto Muhasebe
             </Typography>
-            <Typography 
-              variant="caption" 
-              sx={{ 
-                color: 'var(--muted-foreground)', 
+            <Typography
+              variant="caption"
+              sx={{
+                color: 'var(--muted-foreground)',
                 fontSize: '0.7rem',
                 display: 'block',
               }}
@@ -489,7 +490,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
           )}
         </IconButton>
       </Toolbar>
-      
+
       {/* Quick Actions Button */}
       <Box sx={{ px: 2, pt: 2, pb: 1 }}>
         <Button
@@ -555,7 +556,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
           </MenuItem>
         </Menu>
       </Box>
-      
+
       <Divider sx={{ borderColor: 'var(--border)', mx: 2 }} />
 
       {/* Modern Search */}
@@ -624,8 +625,8 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                       px: 1.5,
                       py: 0.875,
                       transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                      background: isActive 
-                        ? 'color-mix(in srgb, var(--primary) 10%, var(--card) 90%)' 
+                      background: isActive
+                        ? 'color-mix(in srgb, var(--primary) 10%, var(--card) 90%)'
                         : 'transparent',
                       position: 'relative',
                       '&::before': isActive ? {
@@ -640,34 +641,34 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                         borderRadius: '0 2px 2px 0',
                       } : {},
                       '&:hover': {
-                        background: isActive 
-                          ? 'color-mix(in srgb, var(--primary) 10%, var(--card) 90%)' 
+                        background: isActive
+                          ? 'color-mix(in srgb, var(--primary) 10%, var(--card) 90%)'
                           : 'color-mix(in srgb, #527575 20%, var(--card) 80%)',
                         transform: 'translateX(2px)',
                       },
                     }}
                   >
                     <ListItemIcon sx={{ minWidth: 40 }}>
-                    <Box
-                      sx={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        width: 32,
-                        height: 32,
-                        borderRadius: 'calc(var(--radius) - 2px)',
-                        bgcolor: isActive 
-                          ? 'color-mix(in srgb, var(--primary) 12%, transparent)' 
-                          : 'transparent',
-                        transition: 'all 0.2s ease',
-                      }}
-                    >
-                      <item.icon sx={{ 
-                        color: isActive ? 'var(--primary)' : 'var(--muted-foreground)', 
-                        fontSize: 18,
-                        transition: 'color 0.2s ease',
-                      }} />
-                    </Box>
+                      <Box
+                        sx={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          width: 32,
+                          height: 32,
+                          borderRadius: 'calc(var(--radius) - 2px)',
+                          bgcolor: isActive
+                            ? 'color-mix(in srgb, var(--primary) 12%, transparent)'
+                            : 'transparent',
+                          transition: 'all 0.2s ease',
+                        }}
+                      >
+                        <item.icon sx={{
+                          color: isActive ? 'var(--primary)' : 'var(--muted-foreground)',
+                          fontSize: 18,
+                          transition: 'color 0.2s ease',
+                        }} />
+                      </Box>
                     </ListItemIcon>
                     <ListItemText
                       primary={item.label}
@@ -682,7 +683,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                       }}
                     />
                     {hasSubMenu && (
-                      <Box sx={{ 
+                      <Box sx={{
                         color: isActive ? 'var(--primary)' : 'var(--muted-foreground)',
                         transition: 'all 0.2s ease',
                         transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
@@ -727,8 +728,8 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                                     transition: 'all 0.2s ease',
                                     bgcolor: isSubActive ? 'color-mix(in srgb, #527575 18%, transparent)' : 'transparent',
                                     '&:hover': {
-                                      bgcolor: isSubActive 
-                                        ? 'color-mix(in srgb, #527575 18%, transparent)' 
+                                      bgcolor: isSubActive
+                                        ? 'color-mix(in srgb, #527575 18%, transparent)'
                                         : 'color-mix(in srgb, #527575 14%, transparent)',
                                       transform: 'translateX(2px)',
                                     },
@@ -743,13 +744,13 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                                         width: 24,
                                         height: 24,
                                         borderRadius: 'calc(var(--radius) - 4px)',
-                                        bgcolor: isSubActive 
-                                          ? 'color-mix(in srgb, #527575 10%, transparent)' 
+                                        bgcolor: isSubActive
+                                          ? 'color-mix(in srgb, #527575 10%, transparent)'
                                           : 'transparent',
                                       }}
                                     >
-                                      <subItem.icon sx={{ 
-                                        color: isSubActive ? '#527575' : 'var(--muted-foreground)', 
+                                      <subItem.icon sx={{
+                                        color: isSubActive ? '#527575' : 'var(--muted-foreground)',
                                         fontSize: 16,
                                       }} />
                                     </Box>
@@ -811,9 +812,9 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
             {user?.fullName?.[0]?.toUpperCase() || 'U'}
           </Avatar>
           <Box sx={{ flex: 1, minWidth: 0 }}>
-            <Typography 
-              variant="body2" 
-              sx={{ 
+            <Typography
+              variant="body2"
+              sx={{
                 fontWeight: 600,
                 color: 'var(--foreground)',
                 fontSize: '0.875rem',
@@ -825,9 +826,9 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
             >
               {user?.fullName || 'Kullanıcı'}
             </Typography>
-            <Typography 
-              variant="caption" 
-              sx={{ 
+            <Typography
+              variant="caption"
+              sx={{
                 color: 'var(--muted-foreground)',
                 fontSize: '0.75rem',
                 display: 'block',

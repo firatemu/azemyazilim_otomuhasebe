@@ -256,9 +256,9 @@ export default function LoginPage() {
             <CardContent sx={{ p: 4 }}>
               {error && (
                 <Fade in={!!error}>
-                  <Alert 
-                    severity="error" 
-                    sx={{ 
+                  <Alert
+                    severity="error"
+                    sx={{
                       mb: 3,
                       borderRadius: 2,
                       '& .MuiAlert-icon': {
@@ -494,7 +494,7 @@ export default function LoginPage() {
 
               <Box sx={{ textAlign: 'center', mt: 4 }}>
                 <Typography variant="caption" sx={{ opacity: 0.7, color: 'text.secondary' }}>
-                  © 2024 Oto Muhasebe • Tüm hakları saklıdır
+                  © 2026 Oto Muhasebe • Bir Azem Yazılım Ürünüdür.Tüm hakları saklıdır
                 </Typography>
               </Box>
             </CardContent>

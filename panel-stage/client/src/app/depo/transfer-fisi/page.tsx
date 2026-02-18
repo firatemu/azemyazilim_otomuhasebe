@@ -15,7 +15,8 @@ import {
   InputLabel,
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
-import { Add, Visibility, Edit, Delete, LocalShipping, CheckCircle, Cancel } from '@mui/icons-material';
+import { Add, Visibility, Edit, Delete, LocalShipping, CheckCircle, Cancel, Print } from '@mui/icons-material';
+import WarehouseTransferPrintForm from '@/components/PrintForm/WarehouseTransferPrintForm';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
 import { useRouter } from 'next/navigation';
@@ -40,6 +41,8 @@ export default function AmbarTransferFisiPage() {
   const [loading, setLoading] = useState(false);
   const [filterDurum, setFilterDurum] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedTransfer, setSelectedTransfer] = useState<any>(null);
+  const [printOpen, setPrintOpen] = useState(false);
 
   useEffect(() => {
     fetchTransfers();
@@ -50,7 +53,7 @@ export default function AmbarTransferFisiPage() {
       setLoading(true);
       const params: any = {};
       if (filterDurum) params.durum = filterDurum;
-      
+
       const response = await axios.get('/warehouse-transfer', { params });
       setTransfers(response.data);
     } catch (error) {
@@ -62,7 +65,7 @@ export default function AmbarTransferFisiPage() {
 
   const handleDelete = async (id: string) => {
     if (!confirm('Transfer fişini silmek istediğinizden emin misiniz?')) return;
-    
+
     try {
       await axios.delete(`/warehouse-transfer/${id}`);
       fetchTransfers();
@@ -86,25 +89,25 @@ export default function AmbarTransferFisiPage() {
       field: 'tarih',
       headerName: 'Tarih',
       width: 120,
-      valueFormatter: (params) => new Date(params.value).toLocaleDateString('tr-TR'),
+      valueFormatter: (value) => value ? new Date(value).toLocaleDateString('tr-TR') : '-',
     },
     {
       field: 'fromWarehouse',
       headerName: 'Çıkış Ambarı',
       width: 180,
-      valueGetter: (params) => params.row.fromWarehouse?.name || '-',
+      valueGetter: (value, row) => row.fromWarehouse?.name || '-',
     },
     {
       field: 'toWarehouse',
       headerName: 'Giriş Ambarı',
       width: 180,
-      valueGetter: (params) => params.row.toWarehouse?.name || '-',
+      valueGetter: (value, row) => row.toWarehouse?.name || '-',
     },
     {
       field: 'kalemler',
       headerName: 'Ürün Sayısı',
       width: 120,
-      valueGetter: (params) => params.row.kalemler?.length || 0,
+      valueGetter: (value, row) => row.kalemler?.length || 0,
     },
     {
       field: 'driverName',
@@ -166,6 +169,16 @@ export default function AmbarTransferFisiPage() {
               </IconButton>
             </>
           )}
+          <IconButton
+            size="small"
+            onClick={() => {
+              setSelectedTransfer(params.row);
+              setPrintOpen(true);
+            }}
+            sx={{ color: '#6366f1' }}
+          >
+            <Print fontSize="small" />
+          </IconButton>
         </Box>
       ),
     },
@@ -256,6 +269,12 @@ export default function AmbarTransferFisiPage() {
             }}
           />
         </Paper>
+
+        <WarehouseTransferPrintForm
+          open={printOpen}
+          transfer={selectedTransfer}
+          onClose={() => setPrintOpen(false)}
+        />
       </Box>
     </MainLayout>
   );

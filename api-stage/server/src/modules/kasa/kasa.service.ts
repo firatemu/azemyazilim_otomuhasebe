@@ -13,6 +13,7 @@ import { UpdateKasaDto } from './dto/update-kasa.dto';
 import { CreateKasaHareketDto } from './dto/create-kasa-hareket.dto';
 import { KasaTipi, Prisma } from '@prisma/client';
 import { CodeTemplateService } from '../code-template/code-template.service';
+import { SystemParameterService } from '../system-parameter/system-parameter.service';
 
 @Injectable()
 export class KasaService {
@@ -21,7 +22,8 @@ export class KasaService {
     private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => CodeTemplateService))
     private codeTemplateService: CodeTemplateService,
-  ) {}
+    private systemParameterService: SystemParameterService,
+  ) { }
 
   async findAll(kasaTipi?: KasaTipi, aktif?: boolean) {
     const tenantId = await this.tenantResolver.resolveForQuery();
@@ -45,19 +47,15 @@ export class KasaService {
     // Her kasa için count'ları manuel olarak ekle
     const kasalarWithCount = await Promise.all(
       kasalar.map(async (kasa) => {
-        const [hareketler, bankaHesaplari, firmaKrediKartlari] =
+        const [hareketler] =
           await Promise.all([
             this.prisma.kasaHareket.count({ where: { kasaId: kasa.id } }),
-            this.prisma.bankaHesabi.count({ where: { kasaId: kasa.id } }),
-            this.prisma.firmaKrediKarti.count({ where: { kasaId: kasa.id } }),
           ]);
 
         return {
           ...kasa,
           _count: {
             hareketler,
-            bankaHesaplari,
-            firmaKrediKartlari,
           },
         };
       }),
@@ -74,12 +72,6 @@ export class KasaService {
         ...buildTenantWhereClause(tenantId ?? undefined),
       },
       include: {
-        bankaHesaplari: {
-          orderBy: { createdAt: 'asc' },
-        },
-        firmaKrediKartlari: {
-          orderBy: { createdAt: 'asc' },
-        },
         hareketler: {
           include: {
             cari: {
@@ -220,17 +212,15 @@ export class KasaService {
       }
     }
 
-    // Alt hesap kontrolü (Banka Hesapları veya Firma Kredi Kartları)
-    const bankaHesapSayisi = await this.prisma.bankaHesabi.count({
-      where: { kasaId: id },
-    });
+    // Alt hesap kontrolü (Firma Kredi Kartları)
+    // bankaHesabi artık Banka'ya bağlı, Kasa'ya değil
     const firmaKartSayisi = await this.prisma.firmaKrediKarti.count({
       where: { kasaId: id },
     });
 
-    if (bankaHesapSayisi > 0 || firmaKartSayisi > 0) {
+    if (firmaKartSayisi > 0) {
       throw new BadRequestException(
-        'Bu kasaya bağlı hesaplar veya kartlar var, önce onları silin.',
+        'Bu kasaya bağlı kartlar var, önce onları silin.',
       );
     }
 
@@ -242,6 +232,9 @@ export class KasaService {
   // Kasa hareketleri
   async createHareket(createHareketDto: CreateKasaHareketDto, userId?: string) {
     const kasa = await this.findOne(createHareketDto.kasaId);
+
+    // Negatif bakiye kontrolü parametresini al
+    const allowNegativeBalance = await this.systemParameterService.getParameterAsBoolean('ALLOW_NEGATIVE_CASH_BALANCE', false);
 
     return this.prisma.$transaction(async (prisma) => {
       let bakiyeDegisim = createHareketDto.tutar;
@@ -265,6 +258,13 @@ export class KasaService {
       }
 
       const yeniBakiye = kasa.bakiye.toNumber() + bakiyeDegisim;
+
+      // Negatif bakiye kontrolü
+      if (!allowNegativeBalance && yeniBakiye < 0) {
+        throw new BadRequestException(
+          `Kasa bakiyesi yetersiz! Mevcut Bakiye: ${kasa.bakiye}, İşlem Tutarı: ${createHareketDto.tutar}, İşlem Sonrası Bakiye: ${yeniBakiye}. (Negatif bakiye izni kapalı)`,
+        );
+      }
 
       // Hareket kaydı oluştur
       const hareket = await prisma.kasaHareket.create({

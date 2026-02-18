@@ -1,0 +1,22 @@
+{
+    "name": "@otomuhasebe/mcp-shared",
+    "version": "1.0.0",
+    "description": "Shared utilities for Otomuhasebe MCP servers",
+    "main": "dist/index.js",
+    "types": "dist/index.d.ts",
+    "scripts": {
+        "build": "tsc",
+        "watch": "tsc --watch"
+    },
+    "dependencies": {
+        "@prisma/client": "^6.19.0",
+        "dockerode": "^4.0.2",
+        "ioredis": "^5.4.1",
+        "pg": "^8.13.1"
+    },
+    "devDependencies": {
+        "@types/node": "^22.10.2",
+        "@types/pg": "^8.11.10",
+        "typescript": "^5.7.2"
+    }
+}

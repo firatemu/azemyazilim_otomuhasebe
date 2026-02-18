@@ -21,8 +21,8 @@ import {
   LinearProgress,
   Tooltip,
   IconButton,
+  Grid,
 } from '@mui/material';
-import Grid from '@mui/material/GridLegacy';
 import {
   CalendarToday,
   Warning,
@@ -230,7 +230,7 @@ export default function VadeAnalizPage() {
         <>
           {/* Özet Kartlar */}
           <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid item xs={12} md={3}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <Card
                 sx={{
                   background: 'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
@@ -256,7 +256,7 @@ export default function VadeAnalizPage() {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <Card
                 sx={{
                   background: 'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
@@ -282,7 +282,7 @@ export default function VadeAnalizPage() {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <Card
                 sx={{
                   background: 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
@@ -308,7 +308,7 @@ export default function VadeAnalizPage() {
               </Card>
             </Grid>
 
-            <Grid item xs={12} md={3}>
+            <Grid size={{ xs: 12, md: 3 }}>
               <Card
                 sx={{
                   background: 'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
@@ -424,8 +424,8 @@ export default function VadeAnalizPage() {
                             fatura.vadeDurumu === 'GECMIS'
                               ? 'error.lighter'
                               : fatura.vadeDurumu === 'BUGUN'
-                              ? 'warning.lighter'
-                              : 'inherit',
+                                ? 'warning.lighter'
+                                : 'inherit',
                         }}
                       >
                         <TableCell>{fatura.faturaNo}</TableCell>

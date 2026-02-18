@@ -45,6 +45,8 @@ import {
 } from '@mui/icons-material';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
+import { getBankLogo } from '@/constants/bankalar';
+
 
 interface BankaHesabi {
   id: string;
@@ -81,6 +83,15 @@ interface BankaHavale {
   createdAt: string;
   updatedAt: string;
   bankaHesabi: BankaHesabi;
+  bankaHesap?: {
+    id: string;
+    hesapKodu: string;
+    hesapAdi: string;
+    banka: {
+      ad: string;
+      logo?: string;
+    };
+  };
   cari: Cari;
   createdByUser?: {
     id: string;
@@ -175,8 +186,11 @@ const HavaleDialog = memo(({
               options={bankaHesaplari}
               getOptionLabel={(option) => {
                 const bankaAdi = option.bankaAdi || '';
+                const hesapAdi = option.kasaAdi || '';
                 const hesapInfo = option.hesapNo || option.iban || '';
-                return hesapInfo ? `${bankaAdi} (${hesapInfo})` : bankaAdi;
+
+                // Banka Adı - Hesap Adı (Hesap No/IBAN)
+                return `${bankaAdi} - ${hesapAdi}${hesapInfo ? ` (${hesapInfo})` : ''}`;
               }}
               value={bankaHesaplari.find(b => b.id === localFormData.bankaHesabiId) || null}
               onChange={(_, newValue) => handleLocalChange('bankaHesabiId', newValue?.id || '')}
@@ -195,7 +209,7 @@ const HavaleDialog = memo(({
                   <li key={option.id} {...otherProps}>
                     <Box>
                       <Typography variant="body2" fontWeight={500}>
-                        {option.bankaAdi || '-'}
+                        {option.bankaAdi} - {option.kasaAdi}
                       </Typography>
                       {hesapInfo && (
                         <Typography variant="caption" color="text.secondary">
@@ -302,12 +316,12 @@ const HavaleDialog = memo(({
           variant="contained"
           onClick={handleLocalSubmit}
           disabled={loading}
-          sx={{ 
+          sx={{
             bgcolor: 'var(--destructive)',
             color: 'white',
             textTransform: 'none',
             fontWeight: 600,
-            '&:hover': { 
+            '&:hover': {
               bgcolor: 'color-mix(in srgb, var(--destructive) 90%, black)',
             },
           }}
@@ -385,10 +399,42 @@ export default function GidenHavalePage() {
 
   const fetchBankaHesaplari = async () => {
     try {
-      const response = await axios.get('/banka-hesap', { params: { hesapTipi: 'VADESIZ' } });
-      setBankaHesaplari(response.data || []);
+      // ✅ ÇÖZÜM: Yeni Banka API'sini kullan (/api/banka)
+      // Bu endpoint bankaları ve altındaki hesapları getirir.
+      // Biz sadece VADESIZ hesapları düz bir liste olarak alacağız.
+      const response = await axios.get('/banka');
+      const bankalar = response.data || [];
+
+      const vadesizHesaplar: BankaHesabi[] = [];
+
+      bankalar.forEach((banka: any) => {
+        if (banka.hesaplar && Array.isArray(banka.hesaplar)) {
+          banka.hesaplar.forEach((hesap: any) => {
+            if (hesap.hesapTipi === 'VADESIZ') {
+              vadesizHesaplar.push({
+                id: hesap.id,
+                kasaKodu: 'BANKA', // Varsayılan değer
+                kasaAdi: hesap.hesapAdi || banka.ad, // Hesap adı yoksa banka adını kullan
+                bankaAdi: banka.ad,
+                subeAdi: banka.sube,
+                hesapNo: hesap.hesapNo,
+                iban: hesap.iban,
+                // Eski yapıya uyumluluk için kasa objesi (gerekirse)
+                kasa: {
+                  id: hesap.id,
+                  kasaKodu: 'BANKA',
+                  kasaAdi: hesap.hesapAdi || banka.ad,
+                }
+              });
+            }
+          });
+        }
+      });
+
+      setBankaHesaplari(vadesizHesaplar);
     } catch (error) {
       console.error('Banka hesapları yüklenirken hata:', error);
+      showSnackbar('Banka hesapları yüklenirken hata oluştu', 'error');
     }
   };
 
@@ -476,22 +522,18 @@ export default function GidenHavalePage() {
 
       const submitData: any = {
         hareketTipi: submitFormData.hareketTipi,
-        bankaHesabiId: selectedBankaHesabi.kasa.id, // Kasa.id (zorunlu)
         cariId: submitFormData.cariId,
         tutar: tutarNumber,
         tarih: submitFormData.tarih,
+        aciklama: submitFormData.aciklama || '',
+        referansNo: submitFormData.referansNo || '',
       };
 
-      // Optional fields - only include if they have values
-      if (submitFormData.bankaHesabiId) {
-        submitData.bankaHesapId = submitFormData.bankaHesabiId; // BankaHesabi.id (spesifik hesap)
-      }
-      if (submitFormData.aciklama) {
-        submitData.aciklama = submitFormData.aciklama;
-      }
-      if (submitFormData.referansNo) {
-        submitData.referansNo = submitFormData.referansNo;
-      }
+      // ID Yapılandırması: 
+      // Biz her zaman yeni BankaHesabi.id'yi bankaHesapId olarak göndereceğiz.
+      // Eğer geriye dönük bir kasa eşleşmesi varsa (mock objemizdeki gibi), 
+      // backend her ikisini de kontrol ediyor zaten.
+      submitData.bankaHesapId = selectedBankaHesabi.id;
 
       if (editMode && selectedHavale) {
         await axios.put(`/banka-havale/${selectedHavale.id}`, submitData);
@@ -568,9 +610,9 @@ export default function GidenHavalePage() {
         {/* Header */}
         <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <Box>
-            <Typography 
-              variant="h4" 
-              sx={{ 
+            <Typography
+              variant="h4"
+              sx={{
                 fontWeight: 700,
                 fontSize: '1.875rem',
                 color: 'var(--foreground)',
@@ -584,8 +626,8 @@ export default function GidenHavalePage() {
               <TrendingDown sx={{ fontSize: 40, color: 'var(--destructive)' }} />
               Giden Havale İşlemleri
             </Typography>
-            <Typography 
-              variant="body2" 
+            <Typography
+              variant="body2"
               sx={{
                 color: 'var(--muted-foreground)',
                 fontSize: '0.875rem',
@@ -635,15 +677,15 @@ export default function GidenHavalePage() {
         {stats && (
           <Grid container spacing={2} sx={{ mb: 3 }}>
             <Grid size={{ xs: 12, md: 4 }}>
-              <Card sx={{ 
-                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)', 
+              <Card sx={{
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
                 borderLeft: '4px solid var(--destructive)',
                 borderRadius: 'var(--radius)',
                 boxShadow: 'var(--shadow-sm)',
               }}>
                 <CardContent>
-                  <Typography 
-                    variant="body2" 
+                  <Typography
+                    variant="body2"
                     sx={{
                       color: 'var(--muted-foreground)',
                       fontSize: '0.875rem',
@@ -652,10 +694,10 @@ export default function GidenHavalePage() {
                   >
                     Toplam Kayıt
                   </Typography>
-                  <Typography 
-                    variant="h4" 
-                    sx={{ 
-                      color: 'var(--destructive)', 
+                  <Typography
+                    variant="h4"
+                    sx={{
+                      color: 'var(--destructive)',
                       fontWeight: 700,
                       fontSize: '1.875rem',
                     }}
@@ -666,15 +708,15 @@ export default function GidenHavalePage() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <Card sx={{ 
-                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)', 
+              <Card sx={{
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
                 borderLeft: '4px solid var(--destructive)',
                 borderRadius: 'var(--radius)',
                 boxShadow: 'var(--shadow-sm)',
               }}>
                 <CardContent>
-                  <Typography 
-                    variant="body2" 
+                  <Typography
+                    variant="body2"
                     sx={{
                       color: 'var(--muted-foreground)',
                       fontSize: '0.875rem',
@@ -683,10 +725,10 @@ export default function GidenHavalePage() {
                   >
                     Giden Havale Sayısı
                   </Typography>
-                  <Typography 
-                    variant="h5" 
-                    sx={{ 
-                      color: 'var(--destructive)', 
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      color: 'var(--destructive)',
                       fontWeight: 700,
                       fontSize: '1.5rem',
                     }}
@@ -697,15 +739,15 @@ export default function GidenHavalePage() {
               </Card>
             </Grid>
             <Grid size={{ xs: 12, md: 4 }}>
-              <Card sx={{ 
-                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)', 
+              <Card sx={{
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
                 borderLeft: '4px solid var(--destructive)',
                 borderRadius: 'var(--radius)',
                 boxShadow: 'var(--shadow-sm)',
               }}>
                 <CardContent>
-                  <Typography 
-                    variant="body2" 
+                  <Typography
+                    variant="body2"
                     sx={{
                       color: 'var(--muted-foreground)',
                       fontSize: '0.875rem',
@@ -714,10 +756,10 @@ export default function GidenHavalePage() {
                   >
                     Toplam Giden
                   </Typography>
-                  <Typography 
-                    variant="h5" 
-                    sx={{ 
-                      color: 'var(--destructive)', 
+                  <Typography
+                    variant="h5"
+                    sx={{
+                      color: 'var(--destructive)',
                       fontWeight: 700,
                       fontSize: '1.5rem',
                     }}
@@ -731,19 +773,19 @@ export default function GidenHavalePage() {
         )}
 
         {/* Filtreler */}
-        <Paper sx={{ 
-          p: 2, 
+        <Paper sx={{
+          p: 2,
           mb: 3,
           borderRadius: 'var(--radius)',
           boxShadow: 'var(--shadow-sm)',
           bgcolor: 'var(--card)',
         }}>
-          <Typography 
-            variant="h6" 
-            sx={{ 
-              mb: 2, 
-              display: 'flex', 
-              alignItems: 'center', 
+          <Typography
+            variant="h6"
+            sx={{
+              mb: 2,
+              display: 'flex',
+              alignItems: 'center',
               gap: 1,
               fontWeight: 700,
               color: 'var(--foreground)',
@@ -813,9 +855,9 @@ export default function GidenHavalePage() {
         </Paper>
 
         {/* Tablo */}
-        <TableContainer 
+        <TableContainer
           component={Paper}
-          sx={{ 
+          sx={{
             borderRadius: 'var(--radius)',
             boxShadow: 'var(--shadow-sm)',
             bgcolor: 'var(--card)',
@@ -853,13 +895,34 @@ export default function GidenHavalePage() {
                   <TableRow key={havale.id} hover>
                     <TableCell>{formatDate(havale.tarih)}</TableCell>
                     <TableCell>
-                      <Box>
-                        <Typography variant="body2" fontWeight={500}>
-                          {havale.bankaHesabi.kasaAdi}
-                        </Typography>
-                        <Typography variant="caption" color="textSecondary">
-                          {havale.bankaHesabi.bankaAdi}
-                        </Typography>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                        <Box sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 1,
+                          bgcolor: 'white',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          color: 'var(--primary)',
+                          overflow: 'hidden',
+                          border: '1px solid var(--border)',
+                          p: 0.5
+                        }}>
+                          {getBankLogo(havale.bankaHesabi?.bankaAdi || havale.bankaHesap?.banka?.ad || '', havale.bankaHesap?.banka?.logo) ? (
+                            <Box component="img" src={getBankLogo(havale.bankaHesabi?.bankaAdi || havale.bankaHesap?.banka?.ad || '', havale.bankaHesap?.banka?.logo)!} sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          ) : (
+                            <AccountBalance sx={{ fontSize: 16 }} />
+                          )}
+                        </Box>
+                        <Box>
+                          <Typography variant="body2" fontWeight={500}>
+                            {havale.bankaHesabi?.kasaAdi || havale.bankaHesap?.ad}
+                          </Typography>
+                          <Typography variant="caption" color="textSecondary">
+                            {havale.bankaHesabi?.bankaAdi || havale.bankaHesap?.banka?.ad}
+                          </Typography>
+                        </Box>
                       </Box>
                     </TableCell>
                     <TableCell>
@@ -877,9 +940,9 @@ export default function GidenHavalePage() {
                       <Chip
                         label={formatCurrency(havale.tutar)}
                         size="small"
-                        sx={{ 
-                          bgcolor: 'color-mix(in srgb, var(--destructive) 15%, transparent)', 
-                          color: 'var(--destructive)', 
+                        sx={{
+                          bgcolor: 'color-mix(in srgb, var(--destructive) 15%, transparent)',
+                          color: 'var(--destructive)',
                           fontWeight: 700,
                           border: '1px solid color-mix(in srgb, var(--destructive) 30%, transparent)',
                         }}
@@ -908,7 +971,7 @@ export default function GidenHavalePage() {
                         <IconButton
                           size="small"
                           onClick={() => handleViewDetail(havale)}
-                          sx={{ 
+                          sx={{
                             color: 'var(--primary)',
                             '&:hover': {
                               bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
@@ -922,7 +985,7 @@ export default function GidenHavalePage() {
                         <IconButton
                           size="small"
                           onClick={() => handleOpenDialog(havale)}
-                          sx={{ 
+                          sx={{
                             color: 'var(--chart-1)',
                             '&:hover': {
                               bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)',
@@ -939,7 +1002,7 @@ export default function GidenHavalePage() {
                             setSelectedHavale(havale);
                             setOpenDelete(true);
                           }}
-                          sx={{ 
+                          sx={{
                             color: 'var(--destructive)',
                             '&:hover': {
                               bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
@@ -1022,12 +1085,35 @@ export default function GidenHavalePage() {
                 <Grid container spacing={2}>
                   <Grid size={{ xs: 6 }}>
                     <Typography variant="caption" color="textSecondary">Banka Hesabı</Typography>
-                    <Typography variant="body1" fontWeight={500}>
-                      {selectedHavale.bankaHesabi.kasaAdi}
-                    </Typography>
-                    <Typography variant="caption" color="textSecondary">
-                      {selectedHavale.bankaHesabi.bankaAdi}
-                    </Typography>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mt: 0.5 }}>
+                      <Box sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: 1.5,
+                        bgcolor: 'white',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        color: 'var(--primary)',
+                        overflow: 'hidden',
+                        border: '1px solid var(--border)',
+                        p: 0.5
+                      }}>
+                        {getBankLogo(selectedHavale.bankaHesabi?.bankaAdi || selectedHavale.bankaHesap?.banka?.ad || '', selectedHavale.bankaHesap?.banka?.logo) ? (
+                          <Box component="img" src={getBankLogo(selectedHavale.bankaHesabi?.bankaAdi || selectedHavale.bankaHesap?.banka?.ad || '', selectedHavale.bankaHesap?.banka?.logo)!} sx={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                        ) : (
+                          <AccountBalance sx={{ fontSize: 20 }} />
+                        )}
+                      </Box>
+                      <Box>
+                        <Typography variant="body1" fontWeight={500} sx={{ lineHeight: 1.2 }}>
+                          {selectedHavale.bankaHesabi?.kasaAdi || selectedHavale.bankaHesap?.ad}
+                        </Typography>
+                        <Typography variant="caption" color="textSecondary">
+                          {selectedHavale.bankaHesabi?.bankaAdi || selectedHavale.bankaHesap?.banka?.ad}
+                        </Typography>
+                      </Box>
+                    </Box>
                   </Grid>
                   <Grid size={{ xs: 6 }}>
                     <Typography variant="caption" color="textSecondary">Cari</Typography>
@@ -1138,7 +1224,7 @@ export default function GidenHavalePage() {
           </Alert>
         </Snackbar>
       </Box>
-    </MainLayout>
+    </MainLayout >
   );
 }
 

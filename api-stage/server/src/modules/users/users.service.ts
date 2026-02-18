@@ -3,13 +3,13 @@ import { PrismaService } from '../../common/prisma.service';
 
 @Injectable()
 export class UsersService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll(search?: string, limit: number = 100, page: number = 1) {
     const skip = (page - 1) * limit;
-    
+
     const where: any = {};
-    
+
     if (search) {
       where.OR = [
         { email: { contains: search, mode: 'insensitive' } },
@@ -117,6 +117,65 @@ export class UsersService {
     });
 
     return updatedUser;
+  }
+
+  async updateRole(userId: string, newRole: string) {
+    // Validate user exists
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+    });
+
+    if (!user) {
+      throw new NotFoundException(`User with ID ${userId} not found`);
+    }
+
+    // Update role
+    const updatedUser = await this.prisma.user.update({
+      where: { id: userId },
+      data: {
+        role: newRole as any,
+      },
+      include: {
+        tenant: {
+          select: {
+            id: true,
+            name: true,
+            status: true,
+          },
+        },
+      },
+    });
+
+    return updatedUser;
+  }
+
+  async getStats() {
+    // Get total counts
+    const [totalUsers, activeUsers, inactiveUsers] = await Promise.all([
+      this.prisma.user.count(),
+      this.prisma.user.count({ where: { isActive: true } }),
+      this.prisma.user.count({ where: { isActive: false } }),
+    ]);
+
+    // Get counts by role
+    const roleStats = await this.prisma.user.groupBy({
+      by: ['role'],
+      _count: {
+        id: true,
+      },
+    });
+
+    const byRole = roleStats.reduce((acc, stat) => {
+      acc[stat.role] = stat._count.id;
+      return acc;
+    }, {} as Record<string, number>);
+
+    return {
+      total: totalUsers,
+      active: activeUsers,
+      inactive: inactiveUsers,
+      byRole,
+    };
   }
 }
 

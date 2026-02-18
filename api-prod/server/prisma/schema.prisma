@@ -458,6 +458,16 @@ model Stok {
   @@index([tenantId])
   @@index([tenantId, stokKodu])
   @@index([tenantId, barkod])
+  // Performance optimization indexes
+  @@index([tenantId, marka])
+  @@index([tenantId, kategori])
+  @@index([tenantId, anaKategori, altKategori])
+  @@index([tenantId, oem])
+  @@index([tenantId, aracMarka, aracModel])
+  @@index([tenantId, createdAt(sort: Desc)])
+  @@index([tenantId, stokAdi])
+  @@index([tenantId, marka, kategori])
+  @@index([esdegerGrupId])
   @@map("stoklar")
 }
 
@@ -541,6 +551,9 @@ model StokHareket {
 
   stok Stok @relation(fields: [stokId], references: [id], onDelete: Cascade)
 
+  @@index([stokId, createdAt(sort: Desc)])
+  @@index([stokId, hareketTipi])
+  @@index([hareketTipi, createdAt(sort: Desc)])
   @@map("stok_hareketleri")
 }
 
@@ -919,6 +932,13 @@ model Fatura {
   @@index([durum])
   @@index([deliveryNoteId])
   @@index([warehouseId])
+  // Performance optimization indexes
+  @@index([tenantId, deletedAt, faturaTipi])
+  @@index([cariId, durum, deletedAt])
+  @@index([tenantId, vade, durum])
+  @@index([deletedAt, createdAt(sort: Desc)])
+  @@index([tenantId, cariId, durum])
+  @@index([tenantId, tarih(sort: Desc), createdAt(sort: Desc)])
   @@map("faturalar")
 }
 
@@ -937,6 +957,7 @@ model FaturaLog {
 
   @@index([faturaId])
   @@index([userId])
+  @@index([faturaId, createdAt(sort: Desc)])
   @@map("fatura_logs")
 }
 
@@ -994,6 +1015,9 @@ model FaturaKalemi {
 
   invoiceProfits InvoiceProfit[] @relation("FaturaKalemiProfit")
 
+  @@index([faturaId])
+  @@index([stokId])
+  @@index([faturaId, stokId])
   @@map("fatura_kalemleri")
 }
 

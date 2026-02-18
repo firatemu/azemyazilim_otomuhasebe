@@ -1,66 +1,80 @@
-import { Injectable, Scope } from '@nestjs/common';
+import { Injectable, BadRequestException, Logger } from '@nestjs/common';
+import { ClsService } from './cls.service';
 
-@Injectable({ scope: Scope.REQUEST })
+@Injectable()
 export class TenantContextService {
-  private tenantId?: string;
-  private userId?: string;
-  private userRole?: string;
+  private readonly logger = new Logger(TenantContextService.name);
 
-  setTenant(tenantId: string, userId: string) {
-    this.tenantId = tenantId;
-    this.userId = userId;
-  }
+  /**
+   * Validates if the current execution context has a valid tenant or system privilege.
+   * Creates a 'Fail-Fast' mechanism.
+   */
+  validateContext(): void {
+    if (this.isSystem()) return;
+    if (this.isSuperAdmin()) return;
 
-  setUserRole(role: string) {
-    this.userRole = role;
+    const tenantId = this.getTenantId();
+    if (!tenantId) {
+      this.logger.error('Security Alert: Tenant context missing in protected operation.');
+      throw new BadRequestException('Tenant context missing. Operation aborted.');
+    }
   }
 
   getTenantId(): string | undefined {
-    // SUPER_ADMIN için tenant kontrolünü atla
-    const role = this.userRole?.toString() || this.userRole;
-    if (role === 'SUPER_ADMIN' || role === 'SuperAdmin' || role === 'super_admin') {
-      return undefined; // SUPER_ADMIN tenant kontrollerini atlayabilir
-    }
-
-    // Staging/development: Middleware tenant set ettiyse (header, user.tenantId, STAGING_DEFAULT)
-    // onu döndür. Yoksa undefined (opsiyonel tenant).
-    // Böylece Kasa vb. create işlemlerinde FK için gerçek tenant kullanılır; var olmayan
-    // hardcoded default’a düşülmez.
-    const isStaging = process.env.NODE_ENV === 'staging' ||
-                      process.env.NODE_ENV === 'development' ||
-                      (typeof process !== 'undefined' && process.env.STAGING_DISABLE_TENANT === 'true');
-
-    if (isStaging) {
-      return this.tenantId;
-    }
-
-    return this.tenantId;
+    return ClsService.getTenantId();
   }
 
   getUserId(): string | undefined {
-    return this.userId;
+    return ClsService.get('userId');
   }
 
-  hasTenant(): boolean {
-    // SUPER_ADMIN için tenant kontrolünü atla
-    const role = this.userRole?.toString() || this.userRole;
-    if (role === 'SUPER_ADMIN' || role === 'SuperAdmin' || role === 'super_admin') {
-      return true; // SUPER_ADMIN tenant olmadan da çalışabilir
-    }
+  setTenant(tenantId: string, userId: string) {
+    if (!tenantId) throw new Error('Cannot set empty tenantId');
+    ClsService.setTenantId(tenantId);
+    ClsService.set('userId', userId);
+  }
 
-    // STAGING ORTAMI İÇİN: Tenant ID gereksiz (her zaman true döndür)
-    const isStaging = process.env.NODE_ENV === 'staging' ||
-                      process.env.NODE_ENV === 'development' ||
-                      process.env.STAGING_DISABLE_TENANT === 'true';
-    if (isStaging) {
-      return true; // Staging'de tenant ID gereksiz
-    }
-
-    return !!this.tenantId;
+  setUserRole(role: string) {
+    ClsService.set('userRole', role);
   }
 
   isSuperAdmin(): boolean {
-    const role = this.userRole?.toString() || this.userRole;
+    const role = ClsService.get('userRole');
     return role === 'SUPER_ADMIN' || role === 'SuperAdmin' || role === 'super_admin' || role === 'SUPERADMIN';
+  }
+
+  isSystem(): boolean {
+    return ClsService.get('isSystem') === true;
+  }
+
+  /**
+   * Run a callback with system privileges (bypassing tenant checks)
+   * Use with CAUTION.
+   * usage: await this.tenantContext.runAsSystem(async () => { ... });
+   */
+  async runAsSystem<T>(callback: () => Promise<T>): Promise<T> {
+    return ClsService.run(async () => {
+      ClsService.set('isSystem', true);
+      return callback();
+    });
+  }
+
+  /**
+   * Run a callback within a specific tenant context
+   * Useful for background jobs (BullMQ) where HTTP request context is missing.
+   * usage: await this.tenantContext.runWithTenantContext(tenantId, userId, async () => { ... });
+   */
+  async runWithTenantContext<T>(
+    tenantId: string,
+    userId: string | undefined,
+    callback: () => Promise<T>,
+  ): Promise<T> {
+    if (!tenantId) throw new Error('Tenant ID required for context hydration');
+
+    return ClsService.run(async () => {
+      ClsService.setTenantId(tenantId);
+      if (userId) ClsService.set('userId', userId);
+      return callback();
+    });
   }
 }

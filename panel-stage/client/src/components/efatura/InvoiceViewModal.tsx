@@ -84,11 +84,11 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
     queryKey: ['invoice-content', document?.uuid || document?.ettn],
     queryFn: async () => {
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:88',message:'queryFn called',data:{uuid:document?.uuid,ettn:document?.ettn,open},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:88', message: 'queryFn called', data: { uuid: document?.uuid, ettn: document?.ettn, open }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
       // #endregion
       if (!document?.uuid && !document?.ettn) {
         // #region agent log
-        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:91',message:'UUID/ETTN missing',data:{uuid:document?.uuid,ettn:document?.ettn},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:91', message: 'UUID/ETTN missing', data: { uuid: document?.uuid, ettn: document?.ettn }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
         // #endregion
         throw new Error('UUID veya ETTN gerekli');
       }
@@ -96,17 +96,17 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
       // HTML formatında al (XSLT ile oluşturulmuş orijinal görüntü)
       const url = `/hizli/document-content?uuid=${uuid}&type=HTML`;
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:96',message:'Making axios request',data:{url,uuid},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:96', message: 'Making axios request', data: { url, uuid }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
       // #endregion
       try {
         const response = await axios.get(url);
         // #region agent log
-        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:101',message:'Axios response received',data:{status:response.status,hasData:!!response.data,contentLength:response.data?.content?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:101', message: 'Axios response received', data: { status: response.status, hasData: !!response.data, contentLength: response.data?.content?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
         // #endregion
         return response.data;
       } catch (err: any) {
         // #region agent log
-        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:106',message:'Axios error',data:{status:err?.response?.status,statusText:err?.response?.statusText,url:err?.config?.url,message:err?.message},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
+        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:106', message: 'Axios error', data: { status: err?.response?.status, statusText: err?.response?.statusText, url: err?.config?.url, message: err?.message }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run1', hypothesisId: 'B' }) }).catch(() => { });
         // #endregion
         throw err;
       }
@@ -118,7 +118,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
   useEffect(() => {
     if (data?.content) {
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:118',message:'Content received',data:{contentLength:data.content.length,contentStart:data.content.substring(0,100),isBase64:data.content.match(/^[A-Za-z0-9+/=]+$/)?.length === 1},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'F'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:118', message: 'Content received', data: { contentLength: data.content.length, contentStart: data.content.substring(0, 100), isBase64: data.content.match(/^[A-Za-z0-9+/=]+$/)?.length === 1 }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run5', hypothesisId: 'F' }) }).catch(() => { });
       // #endregion
 
       let contentToUse = data.content;
@@ -140,14 +140,14 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
           if (decoded.trim().startsWith('<!DOCTYPE') || decoded.trim().startsWith('<html') || decoded.trim().startsWith('<?xml') || decoded.includes('<body')) {
             contentToUse = decoded;
             // #region agent log
-            fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:128',message:'Base64 decoded to HTML/XML with UTF-8',data:{decodedLength:decoded.length,decodedStart:decoded.substring(0,100),hasTurkishChars:decoded.includes('İ') || decoded.includes('ş') || decoded.includes('ğ')},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'F'})}).catch(()=>{});
+            fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:128', message: 'Base64 decoded to HTML/XML with UTF-8', data: { decodedLength: decoded.length, decodedStart: decoded.substring(0, 100), hasTurkishChars: decoded.includes('İ') || decoded.includes('ş') || decoded.includes('ğ') }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run5', hypothesisId: 'F' }) }).catch(() => { });
             // #endregion
           }
         }
       } catch (e) {
         // Base64 decode başarısız, orijinal içeriği kullan
         // #region agent log
-        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:135',message:'Base64 decode failed, using original',data:{error:e instanceof Error ? e.message : String(e)},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'F'})}).catch(()=>{});
+        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:135', message: 'Base64 decode failed, using original', data: { error: e instanceof Error ? e.message : String(e) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run5', hypothesisId: 'F' }) }).catch(() => { });
         // #endregion
       }
 
@@ -158,7 +158,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
         // HTML içeriği - parse etme, direkt göster
         setInvoiceData(null); // HTML gösterilecek, parsed data gerekmez
         // #region agent log
-        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:165',message:'HTML content detected, skipping XML parse',data:{contentStart:contentToUse.substring(0,100)},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'F'})}).catch(()=>{});
+        fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:165', message: 'HTML content detected, skipping XML parse', data: { contentStart: contentToUse.substring(0, 100) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run5', hypothesisId: 'F' }) }).catch(() => { });
         // #endregion
         return;
       }
@@ -294,7 +294,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
     // Client-side kontrolü - SSR sırasında çalışmamalı
     if (typeof window === 'undefined') {
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:325',message:'handleDownloadPdf called on server side',data:{},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'H'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:325', message: 'handleDownloadPdf called on server side', data: {}, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run6', hypothesisId: 'H' }) }).catch(() => { });
       // #endregion
       return;
     }
@@ -304,7 +304,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
 
     if (!document?.uuid && !document?.ettn) {
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:330',message:'UUID/ETTN missing for PDF download',data:{uuid:document?.uuid,ettn:document?.ettn},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'H'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:330', message: 'UUID/ETTN missing for PDF download', data: { uuid: document?.uuid, ettn: document?.ettn }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run6', hypothesisId: 'H' }) }).catch(() => { });
       // #endregion
       alert('UUID veya ETTN bulunamadı');
       return;
@@ -312,7 +312,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
 
     try {
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:335',message:'Downloading PDF',data:{uuid:document?.uuid,ettn:document?.ettn},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'H'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:335', message: 'Downloading PDF', data: { uuid: document?.uuid, ettn: document?.ettn }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run6', hypothesisId: 'H' }) }).catch(() => { });
       // #endregion
 
       const uuid = document?.uuid || document?.ettn;
@@ -321,7 +321,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
       });
 
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:343',message:'PDF response received',data:{hasContent:!!response.data?.content,contentLength:response.data?.content?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'H'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:343', message: 'PDF response received', data: { hasContent: !!response.data?.content, contentLength: response.data?.content?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run6', hypothesisId: 'H' }) }).catch(() => { });
       // #endregion
 
       if (!response.data?.content) {
@@ -347,11 +347,11 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
       window.URL.revokeObjectURL(url);
 
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:362',message:'PDF downloaded successfully',data:{fileName:`${document?.invoiceNo || document?.ettn || 'invoice'}.pdf`},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'H'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:362', message: 'PDF downloaded successfully', data: { fileName: `${document?.invoiceNo || document?.ettn || 'invoice'}.pdf` }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run6', hypothesisId: 'H' }) }).catch(() => { });
       // #endregion
     } catch (error: any) {
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:365',message:'PDF download error',data:{error:error?.message || String(error)},timestamp:Date.now(),sessionId:'debug-session',runId:'run6',hypothesisId:'H'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:365', message: 'PDF download error', data: { error: error?.message || String(error) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run6', hypothesisId: 'H' }) }).catch(() => { });
       // #endregion
       console.error('PDF indirme hatası:', error);
       alert('PDF indirilemedi: ' + (error?.message || 'Bilinmeyen hata'));
@@ -360,14 +360,14 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
 
   const formatCurrency = (amount: number, currency: string = 'TRY') => {
     // #region agent log
-    fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:239',message:'formatCurrency called',data:{amount,currency,currencyType:typeof currency,currencyLength:currency?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run4',hypothesisId:'E'})}).catch(()=>{});
+    fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:239', message: 'formatCurrency called', data: { amount, currency, currencyType: typeof currency, currencyLength: currency?.length }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run4', hypothesisId: 'E' }) }).catch(() => { });
     // #endregion
 
     // Currency boş veya geçersizse TRY kullan
     const validCurrency = currency && currency.trim() && currency.length >= 3 ? currency.trim().toUpperCase() : 'TRY';
 
     // #region agent log
-    fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:245',message:'formatCurrency using currency',data:{validCurrency,originalCurrency:currency},timestamp:Date.now(),sessionId:'debug-session',runId:'run4',hypothesisId:'E'})}).catch(()=>{});
+    fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:245', message: 'formatCurrency using currency', data: { validCurrency, originalCurrency: currency }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run4', hypothesisId: 'E' }) }).catch(() => { });
     // #endregion
 
     try {
@@ -377,7 +377,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
       }).format(amount);
     } catch (error: any) {
       // #region agent log
-      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:252',message:'formatCurrency error',data:{error:error?.message,validCurrency,originalCurrency:currency},timestamp:Date.now(),sessionId:'debug-session',runId:'run4',hypothesisId:'E'})}).catch(()=>{});
+      fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:252', message: 'formatCurrency error', data: { error: error?.message, validCurrency, originalCurrency: currency }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run4', hypothesisId: 'E' }) }).catch(() => { });
       // #endregion
       // Hata durumunda TRY ile tekrar dene
       return new Intl.NumberFormat('tr-TR', {
@@ -451,7 +451,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
           >
             {/* #region agent log */}
             {(() => {
-              fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'InvoiceViewModal.tsx:330',message:'Rendering HTML in iframe',data:{contentLength:xmlContent.length,contentStart:xmlContent.substring(0,50)},timestamp:Date.now(),sessionId:'debug-session',runId:'run5',hypothesisId:'F'})}).catch(()=>{});
+              fetch('http://localhost:7244/ingest/fde0823c-7edc-4232-a192-3b97a49bcd3d', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ location: 'InvoiceViewModal.tsx:330', message: 'Rendering HTML in iframe', data: { contentLength: xmlContent.length, contentStart: xmlContent.substring(0, 50) }, timestamp: Date.now(), sessionId: 'debug-session', runId: 'run5', hypothesisId: 'F' }) }).catch(() => { });
               return null;
             })()}
             {/* #endregion */}
@@ -467,7 +467,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
             {/* Fatura Özet Bilgileri */}
             <Paper elevation={1} sx={{ p: 2, mb: 3 }}>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Alıcı
                   </Typography>
@@ -480,7 +480,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
                     </Typography>
                   )}
                 </Grid>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Satıcı
                   </Typography>
@@ -493,7 +493,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
                     </Typography>
                   )}
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Fatura Tarihi
                   </Typography>
@@ -501,13 +501,13 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
                     {formatDate(invoiceData.issueDate || document?.invoiceDate || '')}
                   </Typography>
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Fatura Tipi
                   </Typography>
                   <Chip label={invoiceData.invoiceType || invoiceData.profileId || '-'} size="small" />
                 </Grid>
-                <Grid item xs={12} md={4}>
+                <Grid size={{ xs: 12, md: 4 }}>
                   <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                     Para Birimi
                   </Typography>
@@ -562,7 +562,7 @@ export default function InvoiceViewModal({ open, onClose, document }: InvoiceVie
             {/* Toplamlar */}
             <Paper elevation={1} sx={{ p: 2 }}>
               <Grid container spacing={2}>
-                <Grid item xs={12} md={6}>
+                <Grid size={{ xs: 12, md: 6 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
                     <Typography variant="body2" color="text.secondary">
                       Ara Toplam:

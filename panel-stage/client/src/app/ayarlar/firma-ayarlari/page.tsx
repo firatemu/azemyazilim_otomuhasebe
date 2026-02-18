@@ -29,7 +29,7 @@ import {
   ToggleButtonGroup,
   Autocomplete,
 } from '@mui/material';
-import { Add, Edit, Delete, Warehouse as WarehouseIcon, CheckCircle, Business, Person } from '@mui/icons-material';
+import { Add, Edit, Delete, Warehouse as WarehouseIcon, CheckCircle, Business, Person, CloudUpload } from '@mui/icons-material';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
 import locationService, { Province, District, Neighborhood } from '@/services/locationService';
@@ -67,6 +67,7 @@ interface CompanyInfo {
   neighborhood: string;
   postalCode: string;
   address: string;
+  logoUrl?: string;
 }
 
 export default function FirmaAyarlariPage() {
@@ -111,6 +112,7 @@ export default function FirmaAyarlariPage() {
     neighborhood: '',
     postalCode: '',
     address: '',
+    logoUrl: '',
   });
 
   useEffect(() => {
@@ -136,9 +138,10 @@ export default function FirmaAyarlariPage() {
     setNeighborhoods([]); // Clear neighborhoods
   };
 
-  // Load neighborhoods when province is selected
-  const loadNeighborhoods = async (provinceId: number) => {
-    const data = await locationService.getNeighborhoods(provinceId);
+  // Load neighborhoods when district is selected
+  const loadNeighborhoods = async (city: string, district: string) => {
+    if (!city || !district) return;
+    const data = await locationService.getLocalNeighborhoods(city, district);
     setNeighborhoods(data);
   };
 
@@ -186,6 +189,7 @@ export default function FirmaAyarlariPage() {
           neighborhood: response.data.neighborhood || '',
           postalCode: response.data.postalCode || '',
           address: response.data.address || '',
+          logoUrl: response.data.logoUrl || '',
         });
 
         // Load districts and neighborhoods if city is already set
@@ -194,7 +198,7 @@ export default function FirmaAyarlariPage() {
           if (province) {
             await loadDistricts(province.id);
             if (response.data.district) {
-              await loadNeighborhoods(province.id);
+              await loadNeighborhoods(response.data.city, response.data.district);
             }
           }
         }
@@ -225,13 +229,63 @@ export default function FirmaAyarlariPage() {
       await axios.put('/tenants/settings', companyInfo);
       setSnackbar({ open: true, message: 'Firma bilgileri kaydedildi', severity: 'success' });
     } catch (error: any) {
-      setSnackbar({ 
-        open: true, 
-        message: error.response?.data?.message || 'Kaydetme işlemi başarısız', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Kaydetme işlemi başarısız',
+        severity: 'error'
       });
     } finally {
       setCompanyLoading(false);
+    }
+  };
+
+  const handleLogoUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    // Dosya boyutu kontrolü (75KB)
+    if (file.size > 75 * 1024) {
+      setSnackbar({
+        open: true,
+        message: 'Logo dosyası en fazla 75KB olabilir',
+        severity: 'error'
+      });
+      return;
+    }
+
+    // Dosya tipi kontrolü
+    if (!file.type.match(/^image\/(jpeg|png|gif)$/)) {
+      setSnackbar({
+        open: true,
+        message: 'Sadece resim dosyaları (jpg, jpeg, png, gif) yüklenebilir',
+        severity: 'error'
+      });
+      return;
+    }
+
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      setCompanyLoading(true);
+      const response = await axios.post('/tenants/settings/logo', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
+
+      setCompanyInfo({ ...companyInfo, logoUrl: response.data.logoUrl });
+      setSnackbar({ open: true, message: 'Logo başarıyla yüklendi', severity: 'success' });
+    } catch (error: any) {
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Logo yüklenirken bir hata oluştu',
+        severity: 'error'
+      });
+    } finally {
+      setCompanyLoading(false);
+      // Input değerini temizle ki aynı dosyayı tekrar seçebilelim
+      event.target.value = '';
     }
   };
 
@@ -295,10 +349,10 @@ export default function FirmaAyarlariPage() {
       handleCloseDialog();
       fetchWarehouses();
     } catch (error: any) {
-      setSnackbar({ 
-        open: true, 
-        message: error.response?.data?.message || 'İşlem başarısız', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'İşlem başarısız',
+        severity: 'error'
       });
     } finally {
       setLoading(false);
@@ -313,10 +367,10 @@ export default function FirmaAyarlariPage() {
       setSnackbar({ open: true, message: 'Ambar silindi', severity: 'success' });
       fetchWarehouses();
     } catch (error: any) {
-      setSnackbar({ 
-        open: true, 
-        message: error.response?.data?.message || 'Silme işlemi başarısız', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'Silme işlemi başarısız',
+        severity: 'error'
       });
     }
   };
@@ -326,14 +380,14 @@ export default function FirmaAyarlariPage() {
       const warehouse = warehouses.find(w => w.id === id);
       if (!warehouse) return;
 
-      await axios.put(`/warehouse/${id}`, { ...warehouse, isDefault: true });
+      await axios.put(`/warehouse/${id}`, { isDefault: true });
       setSnackbar({ open: true, message: 'Varsayılan ambar güncellendi', severity: 'success' });
       fetchWarehouses();
     } catch (error: any) {
-      setSnackbar({ 
-        open: true, 
-        message: error.response?.data?.message || 'İşlem başarısız', 
-        severity: 'error' 
+      setSnackbar({
+        open: true,
+        message: error.response?.data?.message || 'İşlem başarısız',
+        severity: 'error'
       });
     }
   };
@@ -361,9 +415,58 @@ export default function FirmaAyarlariPage() {
           {tabValue === 0 && (
             <Box sx={{ p: 3 }}>
               <Alert severity="info" sx={{ mb: 3 }}>
-                <strong>Önemli:</strong> Bu bilgiler e-Fatura/e-Arşiv entegrasyonunda kullanılacaktır. 
+                <strong>Önemli:</strong> Bu bilgiler e-Fatura/e-Arşiv entegrasyonunda kullanılacaktır.
                 Lütfen bilgilerinizi eksiksiz ve doğru giriniz.
               </Alert>
+
+              {/* Logo Yükleme Alanı */}
+              <Paper sx={{ p: 3, mb: 3, display: 'flex', alignItems: 'center', gap: 3 }}>
+                <Box
+                  sx={{
+                    width: 120,
+                    height: 120,
+                    border: '2px dashed var(--border)',
+                    borderRadius: 1,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    overflow: 'hidden',
+                    bgcolor: 'var(--background)',
+                  }}
+                >
+                  {companyInfo.logoUrl ? (
+                    <img
+                      src={companyInfo.logoUrl}
+                      alt="Firma Logosu"
+                      style={{ width: '100%', height: '100%', objectFit: 'contain' }}
+                    />
+                  ) : (
+                    <Business sx={{ fontSize: 48, color: 'var(--muted-foreground)' }} />
+                  )}
+                </Box>
+                <Box>
+                  <Typography variant="h6" sx={{ mb: 1, fontWeight: 600 }}>
+                    Firma Logosu
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'var(--muted-foreground)', mb: 2 }}>
+                    Maksimum dosya boyutu: 75KB. Desteklenen formatlar: JPG, PNG, GIF.
+                  </Typography>
+                  <Button
+                    variant="outlined"
+                    component="label"
+                    startIcon={<CloudUpload />}
+                    disabled={companyLoading}
+                  >
+                    Logo Yükle
+                    <input
+                      type="file"
+                      hidden
+                      accept="image/jpeg,image/png,image/gif"
+                      onChange={handleLogoUpload}
+                    />
+                  </Button>
+                </Box>
+              </Paper>
 
               {/* Firma Tipi Seçimi */}
               <Box sx={{ mb: 3 }}>
@@ -557,8 +660,8 @@ export default function FirmaAyarlariPage() {
                     const districtName = typeof newValue === 'string' ? newValue : newValue?.name || '';
                     setCompanyInfo({ ...companyInfo, district: districtName, neighborhood: '' });
                     setNeighborhoods([]);
-                    if (newValue && typeof newValue !== 'string' && selectedProvinceId) {
-                      await loadNeighborhoods(selectedProvinceId);
+                    if (newValue && typeof newValue !== 'string') {
+                      await loadNeighborhoods(companyInfo.city, newValue.name);
                     }
                   }}
                   onInputChange={(e, newValue) => {
@@ -579,21 +682,9 @@ export default function FirmaAyarlariPage() {
                   getOptionLabel={(option) => typeof option === 'string' ? option : option.name}
                   value={companyInfo.neighborhood}
                   disabled={!companyInfo.district}
-                  onChange={async (e, newValue) => {
+                  onChange={(e, newValue) => {
                     const neighborhoodName = typeof newValue === 'string' ? newValue : newValue?.name || '';
                     setCompanyInfo({ ...companyInfo, neighborhood: neighborhoodName });
-                    
-                    // Posta kodunu otomatik doldur
-                    if (neighborhoodName && companyInfo.city && companyInfo.district) {
-                      const postalCode = await fetchPostalCode(
-                        companyInfo.city,
-                        companyInfo.district,
-                        neighborhoodName
-                      );
-                      if (postalCode) {
-                        setCompanyInfo(prev => ({ ...prev, neighborhood: neighborhoodName, postalCode }));
-                      }
-                    }
                   }}
                   onInputChange={(e, newValue) => {
                     if (e?.type === 'change') {

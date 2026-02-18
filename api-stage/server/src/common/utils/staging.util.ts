@@ -7,12 +7,21 @@
  * Staging ortamında mıyız?
  */
 export function isStagingEnvironment(): boolean {
-  return (
+  const isStaging = (
     process.env.NODE_ENV === 'staging' ||
     process.env.NODE_ENV === 'development' ||
+    process.env.APP_ENV === 'staging' ||
     process.env.STAGING_DISABLE_TENANT === 'true' ||
     !!process.env.STAGING_DEFAULT_TENANT_ID
   );
+  if (!isStaging) {
+    console.log('[isStagingEnvironment] Returning FALSE. Env:', {
+      NODE_ENV: process.env.NODE_ENV,
+      APP_ENV: process.env.APP_ENV,
+      STAGING_DISABLE: process.env.STAGING_DISABLE_TENANT
+    });
+  }
+  return isStaging;
 }
 
 /**

@@ -7,12 +7,13 @@ import {
   HttpStatus,
 } from '@nestjs/common';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
+import { Public } from '../../common/decorators/public.decorator';
 import { PostalCodeService } from './postal-code.service';
 
 @Controller('postal-codes')
 @UseGuards(JwtAuthGuard)
 export class PostalCodeController {
-  constructor(private readonly postalCodeService: PostalCodeService) {}
+  constructor(private readonly postalCodeService: PostalCodeService) { }
 
   /**
    * İl, ilçe ve mahalle bilgisine göre posta kodunu getirir
@@ -44,5 +45,30 @@ export class PostalCodeController {
       postalCode,
       found: !!postalCode,
     };
+  }
+
+  /**
+   * İl ve ilçe bilgisine göre mahalle listesini getirir
+   * GET /postal-codes/neighborhoods?city=İstanbul&district=Kadıköy
+   */
+  @Public()
+  @Get('neighborhoods')
+  async getNeighborhoods(
+    @Query('city') city?: string,
+    @Query('district') district?: string,
+  ) {
+    if (!city || !district) {
+      throw new HttpException(
+        'city ve district parametreleri zorunludur',
+        HttpStatus.BAD_REQUEST,
+      );
+    }
+
+    const neighborhoods = await this.postalCodeService.findNeighborhoodsByCityAndDistrict(
+      city,
+      district,
+    );
+
+    return neighborhoods;
   }
 }

@@ -14,13 +14,13 @@ export class CreateBankaHavaleDto {
   @IsEnum(HavaleTipi)
   hareketTipi: HavaleTipi;
 
-  @IsNotEmpty()
+  @IsOptional()
   @IsString()
-  bankaHesabiId: string; // Kasa.id
+  bankaHesabiId?: string; // Kasa.id (opsiyonel)
 
   @IsOptional()
   @IsString()
-  bankaHesapId?: string; // BankaHesabi.id (spesifik hesap)
+  bankaHesapId?: string; // BankaHesabi.id (yeni sistem)
 
   @IsNotEmpty()
   @IsString()

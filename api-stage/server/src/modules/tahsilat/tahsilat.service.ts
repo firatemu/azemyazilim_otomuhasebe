@@ -10,12 +10,20 @@ import { TahsilatTip, OdemeTipi, KasaHareketTipi } from '@prisma/client';
 
 @Injectable()
 export class TahsilatService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async create(createDto: CreateTahsilatDto, userId: string) {
+    console.log('Tahsilat Create DTO:', JSON.stringify(createDto));
+
+    // Relation ID sanitization
+    const kasaId = (!createDto.kasaId || createDto.kasaId === 'null' || createDto.kasaId === 'undefined' || createDto.kasaId.trim() === '') ? null : createDto.kasaId;
+    const bankaHesapId = (!createDto.bankaHesapId || createDto.bankaHesapId === 'null' || createDto.bankaHesapId === 'undefined' || createDto.bankaHesapId.trim() === '') ? null : createDto.bankaHesapId;
+    const firmaKrediKartiId = (!createDto.firmaKrediKartiId || createDto.firmaKrediKartiId === 'null' || createDto.firmaKrediKartiId === 'undefined' || createDto.firmaKrediKartiId.trim() === '') ? null : createDto.firmaKrediKartiId;
+
     // Cari kontrolü
     const cari = await this.prisma.cari.findUnique({
       where: { id: createDto.cariId },
+      select: { id: true, satisElemaniId: true }
     });
 
     if (!cari) {
@@ -34,9 +42,9 @@ export class TahsilatService {
     }
 
     // Kasa kontrolü (nakit veya kredi kartı ise)
-    if (createDto.kasaId) {
+    if (kasaId) {
       const kasa = await this.prisma.kasa.findUnique({
-        where: { id: createDto.kasaId },
+        where: { id: kasaId },
       });
 
       if (!kasa) {
@@ -58,11 +66,12 @@ export class TahsilatService {
           tutar: createDto.tutar,
           tarih: createDto.tarih ? new Date(createDto.tarih) : new Date(),
           odemeTipi: createDto.odemeTipi,
-          kasaId: createDto.kasaId,
-          bankaHesapId: createDto.bankaHesapId,
-          firmaKrediKartiId: createDto.firmaKrediKartiId,
+          kasaId: kasaId,
+          bankaHesapId: bankaHesapId,
+          firmaKrediKartiId: firmaKrediKartiId,
           aciklama: createDto.aciklama,
           createdBy: userId,
+          satisElemaniId: createDto.satisElemaniId || cari?.satisElemaniId,
         },
         include: {
           cari: true,
@@ -82,24 +91,9 @@ export class TahsilatService {
         createDto.tutar,
       );
 
-      // Cari bakiye güncelle
-      const bakiyeDegisimi =
-        createDto.tip === 'TAHSILAT'
-          ? -createDto.tutar // Tahsilat bakiyeyi azaltır
-          : createDto.tutar; // Ödeme bakiyeyi artırır
-
-      await tx.cari.update({
-        where: { id: createDto.cariId },
-        data: {
-          bakiye: {
-            increment: bakiyeDegisimi,
-          },
-        },
-      });
-
       // Cari hareket kaydı oluştur
       // Mevcut cari bakiyesini al
-      const cari = await tx.cari.findUnique({
+      const cariRecord = await tx.cari.findUnique({
         where: { id: createDto.cariId },
         select: { bakiye: true },
       });
@@ -108,7 +102,7 @@ export class TahsilatService {
         createDto.tip === 'TAHSILAT'
           ? -createDto.tutar // Tahsilat: Alacak azaldı
           : createDto.tutar; // Ödeme: Borç arttı
-      const yeniCariBakiye = cari!.bakiye.toNumber() + cariBakiyeDegisim;
+      const yeniCariBakiye = cariRecord!.bakiye.toNumber() + cariBakiyeDegisim;
 
       await tx.cariHareket.create({
         data: {
@@ -344,7 +338,13 @@ export class TahsilatService {
     firmaKrediKartiId?: string,
   ) {
     const skip = (page - 1) * limit;
-    const where: any = {};
+    const where: any = {
+      deletedAt: null,
+      OR: [
+        { faturaId: null },
+        { fatura: { deletedAt: null } }
+      ]
+    };
 
     if (tip) {
       where.tip = tip;
@@ -409,7 +409,11 @@ export class TahsilatService {
             select: {
               id: true,
               hesapAdi: true,
-              bankaAdi: true,
+              banka: {
+                select: {
+                  ad: true,
+                },
+              },
             },
           },
           firmaKrediKarti: {
@@ -443,8 +447,8 @@ export class TahsilatService {
   }
 
   async findOne(id: string) {
-    const tahsilat = await this.prisma.tahsilat.findUnique({
-      where: { id },
+    const tahsilat = await this.prisma.tahsilat.findFirst({
+      where: { id, deletedAt: null },
       include: {
         cari: true,
         kasa: true,
@@ -456,12 +460,34 @@ export class TahsilatService {
       throw new NotFoundException('Tahsilat kaydı bulunamadı');
     }
 
-    return tahsilat;
+    // Get the balance at the time of transaction from CariHareket
+    const hareket = await this.prisma.cariHareket.findFirst({
+      where: {
+        belgeTipi: 'TAHSILAT',
+        belgeNo: id,
+        cariId: tahsilat.cariId,
+      },
+      select: { bakiye: true },
+    });
+
+    return {
+      ...tahsilat,
+      kalanBakiye: hareket?.bakiye || 0,
+    };
   }
 
   async getStats() {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+
+    // Temel filtre: Silinmemiş tahsilatlar ve (faturası yoksa veya faturası silinmemişse)
+    const baseWhere = {
+      deletedAt: null,
+      OR: [
+        { faturaId: null },
+        { fatura: { deletedAt: null } }
+      ]
+    };
 
     const [
       toplamTahsilat,
@@ -473,17 +499,18 @@ export class TahsilatService {
     ] = await Promise.all([
       // Toplam tahsilatlar
       this.prisma.tahsilat.aggregate({
-        where: { tip: 'TAHSILAT' },
+        where: { ...baseWhere, tip: 'TAHSILAT' },
         _sum: { tutar: true },
       }),
       // Toplam ödemeler
       this.prisma.tahsilat.aggregate({
-        where: { tip: 'ODEME' },
+        where: { ...baseWhere, tip: 'ODEME' },
         _sum: { tutar: true },
       }),
       // Bu ay tahsilatlar
       this.prisma.tahsilat.aggregate({
         where: {
+          ...baseWhere,
           tip: 'TAHSILAT',
           tarih: { gte: startOfMonth },
         },
@@ -492,6 +519,7 @@ export class TahsilatService {
       // Bu ay ödemeler
       this.prisma.tahsilat.aggregate({
         where: {
+          ...baseWhere,
           tip: 'ODEME',
           tarih: { gte: startOfMonth },
         },
@@ -500,6 +528,7 @@ export class TahsilatService {
       // Nakit tahsilatlar
       this.prisma.tahsilat.aggregate({
         where: {
+          ...baseWhere,
           tip: 'TAHSILAT',
           odemeTipi: 'NAKIT',
         },
@@ -508,6 +537,7 @@ export class TahsilatService {
       // Kredi kartı tahsilatlar
       this.prisma.tahsilat.aggregate({
         where: {
+          ...baseWhere,
           tip: 'TAHSILAT',
           odemeTipi: 'KREDI_KARTI',
         },
@@ -515,7 +545,7 @@ export class TahsilatService {
       }),
     ]);
 
-    return {
+    const result = {
       toplamTahsilat: toplamTahsilat._sum.tutar || 0,
       toplamOdeme: toplamOdeme._sum.tutar || 0,
       aylikTahsilat: aylikTahsilat._sum.tutar || 0,
@@ -523,6 +553,9 @@ export class TahsilatService {
       nakitTahsilat: nakitTahsilat._sum.tutar || 0,
       krediKartiTahsilat: krediKartiTahsilat._sum.tutar || 0,
     };
+
+    console.log('[TahsilatService] getStats result:', result);
+    return result;
   }
 
   async delete(id: string) {
@@ -577,9 +610,12 @@ export class TahsilatService {
         },
       });
 
-      // Tahsilat kaydını sil
-      await tx.tahsilat.delete({
+      // Tahsilat kaydını soft-delete yap
+      await tx.tahsilat.update({
         where: { id },
+        data: {
+          deletedAt: new Date(),
+        },
       });
 
       return { message: 'Tahsilat kaydı silindi' };

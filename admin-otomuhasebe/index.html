@@ -18,7 +18,7 @@
     <title>admin-otomuhasebe</title>
     
     <script>
-      // Browser cache'i tamamen devre dışı bırak
+      // Browser cache'i temizlemek için (daha güvenli yöntem)
       if ('serviceWorker' in navigator) {
         navigator.serviceWorker.getRegistrations().then(function(registrations) {
           for(let registration of registrations) {
@@ -27,21 +27,13 @@
         });
       }
       
-      // Cache API'yi temizle
+      // Cache API'yi temizle (opsiyonel, bazen gerekebilir)
       if ('caches' in window) {
         caches.keys().then(function(names) {
           for (let name of names) {
             caches.delete(name);
           }
         });
-      }
-      
-      // LocalStorage ve SessionStorage için version control
-      const CACHE_VERSION = Date.now();
-      if (!localStorage.getItem('cacheVersion') || localStorage.getItem('cacheVersion') !== String(CACHE_VERSION)) {
-        localStorage.clear();
-        sessionStorage.clear();
-        localStorage.setItem('cacheVersion', String(CACHE_VERSION));
       }
     </script>
   </head>

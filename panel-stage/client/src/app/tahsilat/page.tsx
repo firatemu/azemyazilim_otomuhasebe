@@ -31,6 +31,12 @@ import {
   AccordionSummary,
   AccordionDetails,
   Grid,
+  Skeleton,
+  Drawer,
+  Fab,
+  Pagination,
+  ToggleButton,
+  ToggleButtonGroup,
 } from '@mui/material';
 import {
   Add,
@@ -47,28 +53,37 @@ import {
   Info,
   Visibility,
   ExpandMore,
+  FilterList,
   Download,
   PictureAsPdf,
+  Search,
+  TableRows,
+  ViewCompact,
+  CloudUpload,
 } from '@mui/icons-material';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip as RechartsTooltip,
+  Legend,
+  ResponsiveContainer,
+  CartesianGrid,
+} from 'recharts';
 import { DataGrid, GridColDef, GridRenderCellParams } from '@mui/x-data-grid';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useMediaQuery, useTheme } from '@mui/material';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
+import CaprazOdemeDialog from './components/CaprazOdemeDialog';
+import TahsilatFormDialog from './components/TahsilatFormDialog';
+import { TahsilatFormData, CaprazOdemeFormData, Cari, Kasa, BankaHesap, SatisElemani } from './types';
 
-interface Cari {
-  id: string;
-  cariKodu: string;
-  unvan: string;
-  bakiye: number;
-}
 
-interface Kasa {
-  id: string;
-  kasaKodu: string;
-  kasaAdi: string;
-  bakiye: number;
-  kasaTipi: 'NAKIT' | 'POS' | 'FIRMA_KREDI_KARTI' | 'BANKA' | 'CEK_SENET';
-}
 
 interface Tahsilat {
   id: string;
@@ -184,7 +199,7 @@ const KasaDetayContent: React.FC<KasaDetayContentProps> = ({ kasaId }) => {
               Bakiye
             </Typography>
             <Typography variant="body1" fontWeight={600} color="primary">
-              {formatMoney(kasaDetay.bakiye?.toNumber() || 0)}
+              {formatMoney(Number(kasaDetay.bakiye) || 0)}
             </Typography>
           </Grid>
         </Grid>
@@ -436,17 +451,32 @@ const DataGridNoRowsOverlay = () => (
     sx={{
       height: '100%',
       display: 'flex',
+      flexDirection: 'column',
       alignItems: 'center',
       justifyContent: 'center',
       color: 'text.secondary',
-      typography: 'body2',
+      py: 8,
+      gap: 2,
     }}
   >
-    Kayıt bulunamadı
+    <Payments sx={{ fontSize: 80, opacity: 0.3 }} />
+    <Typography variant="h6" fontWeight={600} sx={{
+      background: 'linear-gradient(135deg, #6b7280 0%, #9ca3af 100%)',
+      WebkitBackgroundClip: 'text',
+      WebkitTextFillColor: 'transparent',
+    }}>
+      Kayıt Bulunamadı
+    </Typography>
+    <Typography variant="body2" color="text.secondary">
+      Seçili filtrelere uygun tahsilat/ödeme kaydı bulunmuyor
+    </Typography>
   </Box>
 );
 
 export default function TahsilatPage() {
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
   const queryClient = useQueryClient();
   const [openDialog, setOpenDialog] = useState(false);
   const [openCaprazOdemeDialog, setOpenCaprazOdemeDialog] = useState(false);
@@ -454,9 +484,18 @@ export default function TahsilatPage() {
   const [selectedTahsilat, setSelectedTahsilat] = useState<Tahsilat | null>(null);
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as any });
   const [activeTab, setActiveTab] = useState(0); // 0: Tahsilat, 1: Ödeme
+  const [searchQuery, setSearchQuery] = useState(''); // Global arama
+  const [denseMode, setDenseMode] = useState(false); // Compact görünüm
   const [actionLoading, setActionLoading] = useState(false);
+
   const [openKasaDetayDialog, setOpenKasaDetayDialog] = useState(false);
   const [selectedKasa, setSelectedKasa] = useState<any>(null);
+  const [openFilterDrawer, setOpenFilterDrawer] = useState(false);
+  const [chartTab, setChartTab] = useState(0); // 0: Ödeme Tipi, 1: Kasa Dağılımı
+  const [trendPeriod, setTrendPeriod] = useState<string>('WEEKLY'); // WEEKLY, MONTHLY
+
+  // Mobil Pagination State
+  const [mobilePage, setMobilePage] = useState(1);
 
   // Tarih filtresi state
   const [dateRange, setDateRange] = useState<{ start: string; end: string }>({
@@ -464,6 +503,12 @@ export default function TahsilatPage() {
     end: '',
   });
   const [quickFilter, setQuickFilter] = useState<string>('TÜMÜ'); // TÜMÜ, BUGÜN, BU_HAFTA, BU_AY, BU_YIL
+
+  // Filtre değiştiğinde mobil sayfayı başa al
+  useEffect(() => {
+    setMobilePage(1);
+  }, [dateRange, quickFilter, activeTab, searchQuery]);
+
   const openDeleteConfirmation = useCallback((row: Tahsilat) => {
     setSelectedTahsilat(row);
     setOpenDeleteDialog(true);
@@ -661,6 +706,29 @@ export default function TahsilatPage() {
   });
 
   const {
+    data: bankaHesaplari = [],
+    isFetching: bankaHesaplariLoading,
+  } = useQuery<any[]>({
+    queryKey: ['banka', 'hesaplar', 'tahsilat'],
+    queryFn: async () => {
+      const response = await axios.get('/banka/ozet');
+      // response.data.bankalar içinden tüm hesapları çıkar
+      const hesaplar: any[] = [];
+      response.data.bankalar?.forEach((banka: any) => {
+        banka.hesaplar?.forEach((hesap: any) => {
+          hesaplar.push({
+            ...hesap,
+            bankaAdi: banka.ad || banka.bankaAdi || 'Banka Adı Yok',
+            bankaId: banka.id,
+          });
+        });
+      });
+      return hesaplar;
+    },
+    enabled: openDialog || openCaprazOdemeDialog,
+  });
+
+  const {
     data: kasalar = [],
     isFetching: kasalarFetching,
   } = useQuery<Kasa[]>({
@@ -672,9 +740,23 @@ export default function TahsilatPage() {
     enabled: openDialog || openCaprazOdemeDialog,
   });
 
+  const {
+    data: satisElemanlari = [],
+    isFetching: satisElemanlariLoading,
+  } = useQuery<any[]>({
+    queryKey: ['satis-elemani', 'tahsilat'],
+    queryFn: async () => {
+      const response = await axios.get('/satis-elemani');
+      return response.data ?? [];
+    },
+    enabled: openDialog,
+  });
+
+
   // ✅ ÇÖZÜM: initialFormData - Parent'ta sadece initial değerleri tut
   const [initialFormData, setInitialFormData] = useState({
     cariId: '',
+    satisElemaniId: '',
     tip: 'TAHSILAT' as 'TAHSILAT' | 'ODEME',
     tutar: 0,
     tarih: new Date().toISOString().split('T')[0],
@@ -709,6 +791,7 @@ export default function TahsilatPage() {
     // ✅ ÇÖZÜM: initialFormData'yı set et, dialog kendi local state'ini kullanacak
     setInitialFormData({
       cariId: '',
+      satisElemaniId: '',
       tip,
       tutar: 0,
       tarih: new Date().toISOString().split('T')[0],
@@ -726,6 +809,45 @@ export default function TahsilatPage() {
 
   const handleCloseDialog = useCallback(() => {
     setOpenDialog(false);
+    setSelectedTahsilat(null);
+  }, []);
+
+  const handleQuickFilter = useCallback((filter: string) => {
+    setQuickFilter(filter);
+    const today = new Date();
+
+    switch (filter) {
+      case 'BUGÜN':
+        const todayStr = today.toISOString().split('T')[0];
+        setDateRange({ start: todayStr, end: todayStr });
+        break;
+      case 'BU_HAFTA':
+        const weekStart = new Date(today);
+        weekStart.setDate(today.getDate() - today.getDay());
+        setDateRange({
+          start: weekStart.toISOString().split('T')[0],
+          end: today.toISOString().split('T')[0],
+        });
+        break;
+      case 'BU_AY':
+        const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+        setDateRange({
+          start: monthStart.toISOString().split('T')[0],
+          end: today.toISOString().split('T')[0],
+        });
+        break;
+      case 'BU_YIL':
+        const yearStart = new Date(today.getFullYear(), 0, 1);
+        setDateRange({
+          start: yearStart.toISOString().split('T')[0],
+          end: today.toISOString().split('T')[0],
+        });
+        break;
+      case 'TÜMÜ':
+      default:
+        setDateRange({ start: '', end: '' });
+        break;
+    }
   }, []);
 
   // ✅ ÇÖZÜM: handleSubmit - Dialog'dan gelen veriyi al ve kaydet
@@ -756,6 +878,7 @@ export default function TahsilatPage() {
 
         const dataToSend: any = {
           cariId: submitFormData.cariId,
+          satisElemaniId: submitFormData.satisElemaniId || null,
           tip: submitFormData.tip,
           tutar: Number(submitFormData.tutar),
           tarih: submitFormData.tarih,
@@ -893,7 +1016,7 @@ export default function TahsilatPage() {
     }
   }, [caprazOdemeFormData, cariler, queryClient, showSnackbar]);
 
-const formatMoney = useCallback((value: number) => {
+  const formatCurrency = useCallback((value: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
       currency: 'TRY',
@@ -924,10 +1047,35 @@ const formatMoney = useCallback((value: number) => {
     }
   }, []);
 
-  // ✅ En son eklenen en üstte - DESC sıralama
+  // ✅ En son eklenen en üstte - DESC sıralama + Global arama
   const filteredTahsilatlar = useMemo<Tahsilat[]>(() => {
     return tahsilatData
       .filter((t) => (activeTab === 0 ? t.tip === 'TAHSILAT' : t.tip === 'ODEME'))
+      .filter((t) => {
+        // Global arama filtresi
+        if (!searchQuery.trim()) return true;
+
+        const query = searchQuery.toLowerCase().trim();
+
+        // Aranacak alanlar
+        const cariUnvan = t.cari?.unvan?.toLowerCase() || '';
+        const cariKodu = t.cari?.cariKodu?.toLowerCase() || '';
+        const tutar = t.tutar?.toString() || '';
+        const aciklama = t.aciklama?.toLowerCase() || '';
+        const kasaAdi = t.kasa?.kasaAdi?.toLowerCase() || '';
+        const bankaHesapAdi = t.bankaHesap?.hesapAdi?.toLowerCase() || '';
+        const firmaKrediKartiAdi = t.firmaKrediKarti?.kartAdi?.toLowerCase() || '';
+
+        return (
+          cariUnvan.includes(query) ||
+          cariKodu.includes(query) ||
+          tutar.includes(query) ||
+          aciklama.includes(query) ||
+          kasaAdi.includes(query) ||
+          bankaHesapAdi.includes(query) ||
+          firmaKrediKartiAdi.includes(query)
+        );
+      })
       .sort((a, b) => {
         // Önce tarihe göre DESC (en yeni tarih en üstte)
         const dateCompare = new Date(b.tarih).getTime() - new Date(a.tarih).getTime();
@@ -941,14 +1089,73 @@ const formatMoney = useCallback((value: number) => {
         // createdAt yoksa id'ye göre DESC (UUID'ler timestamp içerir)
         return b.id.localeCompare(a.id);
       });
-  }, [tahsilatData, activeTab]);
+  }, [tahsilatData, activeTab, searchQuery]);
+
+  // Grafik Verisi Hazırlama
+  const chartData = useMemo(() => {
+    if (!filteredTahsilatlar.length) return { pie: [], kasa: [], trend: [] };
+
+    const typeMap = new Map();
+    const kasaMap = new Map();
+    const dateMap = new Map();
+
+    filteredTahsilatlar.forEach((item) => {
+      // Pie Data - Ödeme Tipi
+      const type = item.odemeTipi || 'Diğer';
+      const label = getOdemeTipiLabel(type);
+      const amount = Number(item.tutar) || 0;
+      typeMap.set(label, (typeMap.get(label) || 0) + amount);
+
+      // Pie Data - Kasa Dağılımı
+      let kasaLabel = 'Diğer';
+      if (item.kasa) kasaLabel = item.kasa.kasaAdi;
+      else if (item.bankaHesap) kasaLabel = item.bankaHesap.hesapAdi;
+      else if (item.firmaKrediKarti) kasaLabel = item.firmaKrediKarti.kartAdi;
+
+      kasaMap.set(kasaLabel, (kasaMap.get(kasaLabel) || 0) + amount);
+
+      // Trend Data - Tarih
+      const date = item.tarih.split('T')[0];
+      if (!dateMap.has(date)) {
+        dateMap.set(date, {
+          date,
+          displayDate: new Date(item.tarih).toLocaleDateString('tr-TR', { day: 'numeric', month: 'short' }),
+          tahsilat: 0,
+          odeme: 0
+        });
+      }
+      const dayStats = dateMap.get(date);
+      if (item.tip === 'TAHSILAT') dayStats.tahsilat += amount;
+      else dayStats.odeme += amount;
+    });
+
+    const pieData = Array.from(typeMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    const kasaData = Array.from(kasaMap.entries())
+      .map(([name, value]) => ({ name, value }))
+      .sort((a, b) => b.value - a.value);
+
+    // Tarihe göre sırala
+    const allTrendData = Array.from(dateMap.values())
+      .sort((a: any, b: any) => a.date.localeCompare(b.date));
+
+    // Periyot Filtresi
+    const limit = trendPeriod === 'WEEKLY' ? 7 : 30;
+    const trendData = allTrendData.slice(-limit);
+
+    return { pie: pieData, kasa: kasaData, trend: trendData };
+  }, [filteredTahsilatlar, getOdemeTipiLabel, trendPeriod]);
+
+  const CHART_COLORS = ['#10b981', '#3b82f6', '#f59e0b', '#ef4444', '#8b5cf6', '#6366f1'];
 
   const columns = useMemo<GridColDef<Tahsilat>[]>(() => [
     {
       field: 'tarih',
       headerName: 'Tarih',
       width: 110,
-      sortable: false,
+      sortable: true,
       renderCell: (params: GridRenderCellParams) => {
         const row = params.row as Tahsilat;
         return (
@@ -962,7 +1169,7 @@ const formatMoney = useCallback((value: number) => {
       field: 'cariKodu',
       headerName: 'Cari Kodu',
       minWidth: 120,
-      sortable: false,
+      sortable: true,
       renderCell: (params: GridRenderCellParams) => {
         const row = params.row as Tahsilat;
         return (
@@ -991,7 +1198,7 @@ const formatMoney = useCallback((value: number) => {
       field: 'odemeTipi',
       headerName: 'Ödeme Tipi',
       minWidth: 150,
-      sortable: false,
+      sortable: true,
       renderCell: (params: GridRenderCellParams) => {
         const row = params.row as Tahsilat;
         return (
@@ -1011,37 +1218,61 @@ const formatMoney = useCallback((value: number) => {
       sortable: false,
       renderCell: (params: GridRenderCellParams) => {
         const row = params.row as Tahsilat;
-        // Çapraz ödemede kasa kullanılmaz (kasaId: null)
-        if (!row.kasa) {
+        // Kasa varsa kasa adını göster
+        if (row.kasa) {
           return (
-            <Typography variant="body2" color="text.secondary" fontStyle="italic">
-              Çapraz Ödeme
-            </Typography>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" fontWeight={500}>
+                {row.kasa.kasaAdi}
+              </Typography>
+              <Tooltip title="Kasa Detayları">
+                <IconButton
+                  size="small"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setSelectedKasa(row.kasa);
+                    setOpenKasaDetayDialog(true);
+                  }}
+                  sx={{ p: 0.5 }}
+                >
+                  <Info fontSize="small" color="primary" />
+                </IconButton>
+              </Tooltip>
+            </Box>
           );
         }
 
+        // POS (Banka Hesabı) varsa
+        if (row.bankaHesap) {
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" fontWeight={500}>
+                {row.bankaHesap.bankaAdi || 'Banka'} {'>'} {row.bankaHesap.hesapAdi}
+              </Typography>
+            </Box>
+          );
+        }
+
+        // Firma Kredi Kartı varsa
+        if (row.firmaKrediKarti) {
+          return (
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <Typography variant="body2" fontWeight={500}>
+                {row.firmaKrediKarti.kartAdi}
+              </Typography>
+            </Box>
+          );
+        }
+
+        // Hiçbiri yoksa
         return (
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="body2" fontWeight={500}>
-              {row.kasa.kasaAdi}
-            </Typography>
-            <Tooltip title="Kasa Detayları">
-              <IconButton
-                size="small"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setSelectedKasa(row.kasa);
-                  setOpenKasaDetayDialog(true);
-                }}
-                sx={{ p: 0.5 }}
-              >
-                <Info fontSize="small" color="primary" />
-              </IconButton>
-            </Tooltip>
-          </Box>
+          <Typography variant="body2" color="text.secondary" fontStyle="italic">
+            -
+          </Typography>
         );
       },
     },
+
     {
       field: 'kasaTipi',
       headerName: 'Kasa Tipi',
@@ -1049,11 +1280,26 @@ const formatMoney = useCallback((value: number) => {
       sortable: false,
       renderCell: (params: GridRenderCellParams) => {
         const row = params.row as Tahsilat;
-        // Çapraz ödemede kasa tipi yok
+        // Kasa yoksa Ödeme Tipine bak
         if (!row.kasa) {
+          let label = '-';
+          if (row.odemeTipi === 'KREDI_KARTI') label = '💳 POS';
+          else if (row.odemeTipi === 'BANKA_HAVALESI') label = '🏦 Havale/EFT';
+          else if (row.firmaKrediKarti) label = '💳 Firma Kredi Kartı';
+          else if (row.tip === 'TAHSILAT' && !row.odemeTipi) label = 'Çapraz Ödeme'; // Çapraz ödemede odemeTipi null olabilir veya özel bir şey olabilir
+
+          // Eğer gerçekten çapraz ödeme ise (backend create'de odemeTipi set ediyor mu?)
+          // Create servisine bakarsak createCaprazOdeme'de odemeTipi 'KREDI_KARTI' set ediliyor veya parametre.
+          // Ama kasaId null.
+
+          // Neyse, basitçe:
+          if (row.bankaHesap) label = '💳 POS';
+          else if (row.firmaKrediKarti) label = '💳 Firma Kredi Kartı';
+          else label = 'Çapraz Ödeme';
+
           return (
-            <Typography variant="body2" color="text.secondary" fontStyle="italic">
-              -
+            <Typography variant="body2" color="text.secondary">
+              {label}
             </Typography>
           );
         }
@@ -1063,7 +1309,7 @@ const formatMoney = useCallback((value: number) => {
           POS: '💳 POS',
           FIRMA_KREDI_KARTI: '💳 Firma Kredi Kartı',
           BANKA: '🏦 Banka',
-          CEK_SENET: '📄 Çek/Senet',
+
         };
 
         return (
@@ -1073,49 +1319,7 @@ const formatMoney = useCallback((value: number) => {
         );
       },
     },
-    {
-      field: 'banka',
-      headerName: 'Banka',
-      width: 130,
-      sortable: false,
-      renderCell: (params: GridRenderCellParams) => {
-        const row = params.row as Tahsilat;
 
-        // Çapraz ödemede banka bilgisi yok
-        if (!row.kasa) {
-          return (
-            <Typography variant="body2" color="text.secondary" fontStyle="italic">
-              -
-            </Typography>
-          );
-        }
-
-        // Firma kredi kartı bilgisi
-        if (row.firmaKrediKarti && row.firmaKrediKarti.bankaAdi) {
-          return (
-            <Typography variant="body2" fontWeight={500} color="primary">
-              {row.firmaKrediKarti.bankaAdi}
-            </Typography>
-          );
-        }
-
-        // Banka hesabı bilgisi
-        if (row.bankaHesap && row.bankaHesap.bankaAdi) {
-          return (
-            <Typography variant="body2" fontWeight={500} color="primary">
-              {row.bankaHesap.bankaAdi}
-            </Typography>
-          );
-        }
-
-        // Diğer durumlar (Nakit, POS vb.)
-        return (
-          <Typography variant="body2" color="text.secondary" fontStyle="italic">
-            -
-          </Typography>
-        );
-      },
-    },
     {
       field: 'kartAdi',
       headerName: 'Kart Adı',
@@ -1124,14 +1328,8 @@ const formatMoney = useCallback((value: number) => {
       renderCell: (params: GridRenderCellParams) => {
         const row = params.row as Tahsilat;
 
-        // Çapraz ödemede kart adı bilgisi yok
-        if (!row.kasa) {
-          return (
-            <Typography variant="body2" color="text.secondary" fontStyle="italic">
-              -
-            </Typography>
-          );
-        }
+        // Kasa kontrolünü kaldırıyoruz
+
 
         // Firma kredi kartı bilgisi
         if (row.firmaKrediKarti && row.firmaKrediKarti.kartAdi) {
@@ -1165,7 +1363,7 @@ const formatMoney = useCallback((value: number) => {
       minWidth: 160,
       align: 'right',
       headerAlign: 'right',
-      sortable: false,
+      sortable: true,
       renderCell: (params: GridRenderCellParams) => {
         const row = params.row as Tahsilat;
         return (
@@ -1173,7 +1371,7 @@ const formatMoney = useCallback((value: number) => {
             fontWeight="bold"
             color={row.tip === 'TAHSILAT' ? 'success.main' : 'error.main'}
           >
-            {formatMoney(row.tutar)}
+            {formatCurrency(row.tutar)}
           </Typography>
         );
       },
@@ -1234,16 +1432,165 @@ const formatMoney = useCallback((value: number) => {
         );
       },
     },
-  ], [actionLoading, formatMoney, getOdemeTipiIcon, getOdemeTipiLabel, openDeleteConfirmation]);
+  ], [actionLoading, formatCurrency, getOdemeTipiIcon, getOdemeTipiLabel, openDeleteConfirmation]);
+
+  // İstatistik Kartları Verisi
+  const statCards = [
+    {
+      title: 'Toplam Tahsilat',
+      value: stats.toplamTahsilat,
+      icon: <AccountBalance sx={{ fontSize: isMobile ? 32 : 40, opacity: 0.8 }} />,
+      gradient: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
+      shadowColor: '37, 99, 235',
+      id: 'toplam-tahsilat'
+    },
+    {
+      title: 'Toplam Ödeme',
+      value: stats.toplamOdeme,
+      icon: <Payments sx={{ fontSize: isMobile ? 32 : 40, opacity: 0.8 }} />,
+      gradient: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+      shadowColor: '239, 68, 68',
+      id: 'toplam-odeme'
+    },
+    {
+      title: 'Nakit Tahsilat',
+      value: stats.nakitTahsilat,
+      icon: <AttachMoney sx={{ fontSize: isMobile ? 32 : 40, opacity: 0.8 }} />,
+      gradient: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+      shadowColor: '16, 185, 129',
+      id: 'nakit-tahsilat'
+    },
+    {
+      title: 'K.Kartı Tahsilat',
+      value: stats.krediKartiTahsilat,
+      icon: <CreditCard sx={{ fontSize: isMobile ? 32 : 40, opacity: 0.8 }} />,
+      gradient: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
+      shadowColor: '139, 92, 246',
+      id: 'kk-tahsilat'
+    },
+  ];
+
+  // Filtre İçeriği (Hem Drawer hem Desktop için tekrar kullanılabilir)
+  const filterContent = (
+    <Box sx={{ p: isMobile ? 1 : 0 }}>
+      {/* Hızlı Filtreler */}
+      <Box sx={{ mb: 3 }}>
+        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5, display: 'flex', alignItems: 'center', gap: 1 }}>
+          <FilterList fontSize="small" color="action" />
+          Hızlı Tarih Seçimi
+        </Typography>
+        <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap sx={{ gap: 1 }}>
+          {['TÜMÜ', 'BUGÜN', 'BU_HAFTA', 'BU_AY', 'BU_YIL'].map((filter) => (
+            <Chip
+              key={filter}
+              label={
+                filter === 'TÜMÜ' ? 'Tümü' :
+                  filter === 'BUGÜN' ? 'Bugün' :
+                    filter === 'BU_HAFTA' ? 'Bu Hafta' :
+                      filter === 'BU_AY' ? 'Bu Ay' : 'Bu Yıl'
+              }
+              onClick={() => handleQuickFilter(filter)}
+              color={quickFilter === filter ? 'primary' : 'default'}
+              variant={quickFilter === filter ? 'filled' : 'outlined'}
+              sx={{
+                fontWeight: quickFilter === filter ? 600 : 400,
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                },
+                bgcolor: quickFilter !== filter ? 'background.paper' : undefined,
+              }}
+            />
+          ))}
+        </Stack>
+      </Box>
+
+      {/* Özel Tarih Aralığı */}
+      <Box>
+        <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1.5 }}>
+          Özel Tarih Aralığı
+        </Typography>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+          <TextField
+            label="Başlangıç Tarihi"
+            type="date"
+            size="small"
+            value={dateRange.start}
+            onChange={(e) => {
+              setDateRange({ ...dateRange, start: e.target.value });
+              setQuickFilter('');
+            }}
+            slotProps={{
+              inputLabel: { shrink: true }
+            }}
+            fullWidth
+          />
+          <TextField
+            label="Bitiş Tarihi"
+            type="date"
+            size="small"
+            value={dateRange.end}
+            onChange={(e) => {
+              setDateRange({ ...dateRange, end: e.target.value });
+              setQuickFilter('');
+            }}
+            slotProps={{
+              inputLabel: { shrink: true }
+            }}
+            fullWidth
+          />
+        </Stack>
+      </Box>
+
+      <Box sx={{ mt: 3, pt: 2, borderTop: 1, borderColor: 'divider' }}>
+        <Stack direction="row" spacing={2} justifyContent="flex-end">
+          <Button
+            variant="outlined"
+            startIcon={<Download />}
+            onClick={handleExportExcel}
+            color="success"
+            size="small"
+            fullWidth={isMobile}
+          >
+            Excel
+          </Button>
+          <Button
+            variant="outlined"
+            startIcon={<PictureAsPdf />}
+            onClick={handleExportPdf}
+            color="error"
+            size="small"
+            fullWidth={isMobile}
+          >
+            PDF
+          </Button>
+        </Stack>
+      </Box>
+    </Box>
+  );
 
   return (
     <MainLayout>
       <Box sx={{ mb: 4 }}>
-        <Box sx={{ mb: 3 }}>
+        <Box
+          sx={{
+            mb: 3,
+            position: isMobile ? 'sticky' : 'static',
+            top: isMobile ? -1 : 'auto',
+            zIndex: 10,
+            bgcolor: 'background.default',
+            pb: 1,
+            pt: isMobile ? 1 : 0,
+            borderBottom: isMobile ? 1 : 0,
+            borderColor: 'divider'
+          }}
+        >
           <Typography variant="h4" fontWeight="bold" sx={{
             background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
             WebkitBackgroundClip: 'text',
             WebkitTextFillColor: 'transparent',
+            fontSize: isMobile ? '1.75rem' : '2.125rem',
           }}>
             Tahsilat & Ödeme
           </Typography>
@@ -1253,233 +1600,513 @@ const formatMoney = useCallback((value: number) => {
         </Box>
 
         {/* İstatistik Kartları */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-            <Card sx={{
-              background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
-              color: 'white'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <TrendingDown sx={{ fontSize: 40, opacity: 0.8 }} />
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Toplam Tahsilat
-                    </Typography>
-                    <Typography variant="h5" fontWeight="bold">
-                      {formatMoney(stats.toplamTahsilat)}
-                    </Typography>
-                  </Box>
+        {isMobile ? (
+          <Box
+            sx={{
+              display: 'flex',
+              gap: 2,
+              overflowX: 'auto',
+              pb: 2,
+              mb: 2,
+              mx: -2,
+              px: 2,
+              scrollSnapType: 'x mandatory',
+              '&::-webkit-scrollbar': { display: 'none' },
+              msOverflowStyle: 'none',
+              scrollbarWidth: 'none',
+            }}
+          >
+            {statsFetching
+              ? [1, 2, 3, 4].map((i) => (
+                <Box key={i} sx={{ minWidth: '85%', scrollSnapAlign: 'center', flexShrink: 0 }}>
+                  <Card sx={{ boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)', borderRadius: 2 }}>
+                    <CardContent sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Skeleton variant="circular" width={40} height={40} />
+                        <Box sx={{ flex: 1 }}>
+                          <Skeleton variant="text" width="80%" sx={{ mb: 1 }} />
+                          <Skeleton variant="text" width="60%" height={32} />
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
                 </Box>
-              </CardContent>
-            </Card>
+              ))
+              : statCards.map((card) => (
+                <Box key={card.id} sx={{ minWidth: '85%', scrollSnapAlign: 'center', flexShrink: 0 }}>
+                  <Card
+                    sx={{
+                      background: card.gradient,
+                      color: 'white',
+                      boxShadow: `0 4px 6px rgba(${card.shadowColor}, 0.3)`,
+                      borderRadius: 2,
+                    }}
+                  >
+                    <CardContent sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {card.icon}
+                        <Box>
+                          <Typography variant="body2" sx={{ opacity: 0.9, whiteSpace: 'nowrap' }}>
+                            {card.title}
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold">
+                            {formatCurrency(card.value)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Box>
+              ))}
+          </Box>
+        ) : (
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            {statsFetching
+              ? [1, 2, 3, 4].map((i) => (
+                <Grid key={i} size={{ xs: 6, md: 6, lg: 3 }}>
+                  <Card sx={{ boxShadow: '0 4px 6px rgba(0, 0, 0, 0.1)' }}>
+                    <CardContent>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <Skeleton variant="circular" width={40} height={40} />
+                        <Box sx={{ flex: 1 }}>
+                          <Skeleton variant="text" width="80%" sx={{ mb: 1 }} />
+                          <Skeleton variant="text" width="60%" height={32} />
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))
+              : statCards.map((card) => (
+                <Grid key={card.id} size={{ xs: 6, md: 6, lg: 3 }}>
+                  <Card
+                    sx={{
+                      background: card.gradient,
+                      color: 'white',
+                      boxShadow: `0 4px 6px rgba(${card.shadowColor}, 0.3)`,
+                      transition: 'all 0.3s ease-in-out',
+                      cursor: 'pointer',
+                      '&:hover': {
+                        transform: 'translateY(-4px) scale(1.02)',
+                        boxShadow: `0 8px 16px rgba(${card.shadowColor}, 0.4)`,
+                      },
+                    }}
+                  >
+                    <CardContent sx={{ p: 2 }}>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        {card.icon}
+                        <Box>
+                          <Typography variant="body2" sx={{ opacity: 0.9 }}>
+                            {card.title}
+                          </Typography>
+                          <Typography variant="h5" fontWeight="bold">
+                            {formatCurrency(card.value)}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              ))}
           </Grid>
+        )}
 
-          <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-            <Card sx={{
-              background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
-              color: 'white'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <TrendingUp sx={{ fontSize: 40, opacity: 0.8 }} />
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Toplam Ödeme
-                    </Typography>
-                    <Typography variant="h5" fontWeight="bold">
-                      {formatMoney(stats.toplamOdeme)}
-                    </Typography>
-                  </Box>
+        {/* Grafikler (Sadece veri varsa ve loading değilse göster) */}
+        {!statsFetching && (chartData.pie.length > 0 || chartData.trend.length > 0) && (
+          <Grid container spacing={3} sx={{ mb: 3 }}>
+            {/* Pie Chart: Ödeme ve Kasa Dağılımı (Tablı) */}
+            <Grid size={{ xs: 12, md: 12, lg: 4 }}>
+              <Card sx={{ height: '100%', minHeight: 450, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', borderRadius: 2 }}>
+                <Box sx={{ borderBottom: 1, borderColor: 'divider' }}>
+                  <Tabs
+                    value={chartTab}
+                    onChange={(e, v) => setChartTab(v)}
+                    variant="fullWidth"
+                    textColor="primary"
+                    indicatorColor="primary"
+                  >
+                    <Tab label="Ödeme Tipi" />
+                    <Tab label="Kasa Dağılımı" />
+                  </Tabs>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
+                <CardContent>
+                  <Typography variant="subtitle1" fontWeight={600} gutterBottom align="center" sx={{ mb: 2 }}>
+                    {chartTab === 0 ? 'Ödeme Yöntemi Dağılımı' : 'Kasa/Banka Dağılımı'}
+                  </Typography>
+                  <Box sx={{ height: 300, position: 'relative' }}>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <PieChart>
+                        <Pie
+                          data={chartTab === 0 ? chartData.pie : chartData.kasa}
+                          cx="50%"
+                          cy="50%"
+                          innerRadius={60}
+                          outerRadius={90}
+                          paddingAngle={5}
+                          dataKey="value"
+                        >
+                          {(chartTab === 0 ? chartData.pie : chartData.kasa).map((entry, index) => (
+                            <Cell key={`cell-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />
+                          ))}
+                        </Pie>
+                        <RechartsTooltip
+                          formatter={(value) => formatCurrency(value as number)}
+                          contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                        />
+                        <Legend verticalAlign="bottom" height={36} />
+                      </PieChart>
+                    </ResponsiveContainer>
+                  </Box>
+                </CardContent>
+              </Card>
+            </Grid>
 
-          <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-            <Card sx={{
-              background: 'linear-gradient(135deg, #3b82f6 0%, #2563eb 100%)',
-              color: 'white'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <AttachMoney sx={{ fontSize: 40, opacity: 0.8 }} />
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      Nakit Tahsilat
-                    </Typography>
-                    <Typography variant="h5" fontWeight="bold">
-                      {formatMoney(stats.nakitTahsilat)}
-                    </Typography>
-                  </Box>
+            {/* Bar Chart: Tahsilat Trendi */}
+            <Grid size={{ xs: 12, md: 12, lg: 8 }}>
+              <Card sx={{ height: '100%', minHeight: 450, boxShadow: '0 4px 6px rgba(0,0,0,0.05)', borderRadius: 2 }}>
+                <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider' }}>
+                  <Typography variant="h6" fontWeight={600}>İşlem Trendi</Typography>
+                  <ToggleButtonGroup
+                    value={trendPeriod}
+                    exclusive
+                    onChange={(e, val) => val && setTrendPeriod(val)}
+                    size="small"
+                    color="primary"
+                  >
+                    <ToggleButton value="WEEKLY">Haftalık</ToggleButton>
+                    <ToggleButton value="MONTHLY">Aylık</ToggleButton>
+                  </ToggleButtonGroup>
                 </Box>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid size={{ xs: 12, md: 6, lg: 3 }}>
-            <Card sx={{
-              background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
-              color: 'white'
-            }}>
-              <CardContent>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                  <CreditCard sx={{ fontSize: 40, opacity: 0.8 }} />
-                  <Box>
-                    <Typography variant="body2" sx={{ opacity: 0.9 }}>
-                      K.Kartı Tahsilat
-                    </Typography>
-                    <Typography variant="h5" fontWeight="bold">
-                      {formatMoney(stats.krediKartiTahsilat)}
-                    </Typography>
+                <CardContent>
+                  <Box sx={{ height: 300, mt: 2 }}>
+                    <ResponsiveContainer width="100%" height={300}>
+                      <BarChart data={chartData.trend} margin={{ top: 20, right: 30, left: 20, bottom: 5 }}>
+                        <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                        <XAxis
+                          dataKey="displayDate"
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#6b7280', fontSize: 12 }}
+                        />
+                        <YAxis
+                          axisLine={false}
+                          tickLine={false}
+                          tick={{ fill: '#6b7280', fontSize: 12 }}
+                          tickFormatter={(value) => `₺${value / 1000}k`}
+                        />
+                        <RechartsTooltip
+                          formatter={(value) => formatCurrency(value as number)}
+                          contentStyle={{ borderRadius: 8, border: 'none', boxShadow: '0 4px 12px rgba(0,0,0,0.1)' }}
+                          cursor={{ fill: 'rgba(0,0,0,0.04)' }}
+                        />
+                        <Legend />
+                        <Bar dataKey="tahsilat" name="Tahsilat" fill="#10b981" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                        <Bar dataKey="odeme" name="Ödeme" fill="#ef4444" radius={[4, 4, 0, 0]} maxBarSize={50} />
+                      </BarChart>
+                    </ResponsiveContainer>
                   </Box>
-                </Box>
-              </CardContent>
-            </Card>
+                </CardContent>
+              </Card>
+            </Grid>
           </Grid>
-        </Grid>
+        )}
 
         {/* Tabs */}
-        <Paper sx={{ mb: 2 }}>
-          <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)}>
+        <Paper sx={{ mb: 2, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
+          <Tabs
+            value={activeTab}
+            onChange={(e, v) => setActiveTab(v)}
+            sx={{
+              '& .MuiTab-root': {
+                minHeight: 72,
+                transition: 'all 0.2s ease-in-out',
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                },
+              },
+              '& .Mui-selected': {
+                fontWeight: 700,
+              },
+            }}
+          >
             <Tab
-              label="Tahsilatlar"
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body1">Tahsilatlar</Typography>
+                  <Chip
+                    label={tahsilatData.filter(t => t.tip === 'TAHSILAT').length}
+                    size="small"
+                    sx={{
+                      bgcolor: activeTab === 0 ? '#10b981' : 'rgba(16, 185, 129, 0.1)',
+                      color: activeTab === 0 ? 'white' : '#10b981',
+                      fontWeight: 600,
+                      minWidth: 36,
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1, fontWeight: 600 }}>
+                    {formatCurrency(tahsilatData.filter(t => t.tip === 'TAHSILAT').reduce((sum, t) => sum + Number(t.tutar || 0), 0))}
+                  </Typography>
+                </Box>
+              }
               icon={<TrendingDown />}
               iconPosition="start"
             />
             <Tab
-              label="Ödemeler"
+              label={
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                  <Typography variant="body1">Ödemeler</Typography>
+                  <Chip
+                    label={tahsilatData.filter(t => t.tip === 'ODEME').length}
+                    size="small"
+                    sx={{
+                      bgcolor: activeTab === 1 ? '#ef4444' : 'rgba(239, 68, 68, 0.1)',
+                      color: activeTab === 1 ? 'white' : '#ef4444',
+                      fontWeight: 600,
+                      minWidth: 36,
+                    }}
+                  />
+                  <Typography variant="caption" color="text.secondary" sx={{ ml: 1, fontWeight: 600 }}>
+                    {formatCurrency(tahsilatData.filter(t => t.tip === 'ODEME').reduce((sum, t) => sum + Number(t.tutar || 0), 0))}
+                  </Typography>
+                </Box>
+              }
               icon={<TrendingUp />}
               iconPosition="start"
             />
           </Tabs>
         </Paper>
 
-
-
-        {/* Tarih Filtresi */}
-        <Paper sx={{ p: 2, mb: 3 }}>
-          <Box sx={{ mb: 2 }}>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Hızlı Filtreler
-            </Typography>
-            <Stack direction="row" spacing={1} flexWrap="wrap" gap={1}>
-              <Button
-                size="small"
-                variant={quickFilter === 'TÜMÜ' ? 'contained' : 'outlined'}
-                onClick={() => setQuickFilter('TÜMÜ')}
-              >
-                Tümü
-              </Button>
-              <Button
-                size="small"
-                variant={quickFilter === 'BUGÜN' ? 'contained' : 'outlined'}
-                onClick={() => setQuickFilter('BUGÜN')}
-              >
-                Bugün
-              </Button>
-              <Button
-                size="small"
-                variant={quickFilter === 'BU_HAFTA' ? 'contained' : 'outlined'}
-                onClick={() => setQuickFilter('BU_HAFTA')}
-              >
-                Bu Hafta
-              </Button>
-              <Button
-                size="small"
-                variant={quickFilter === 'BU_AY' ? 'contained' : 'outlined'}
-                onClick={() => setQuickFilter('BU_AY')}
-              >
-                Bu Ay
-              </Button>
-              <Button
-                size="small"
-                variant={quickFilter === 'BU_YIL' ? 'contained' : 'outlined'}
-                onClick={() => setQuickFilter('BU_YIL')}
-              >
-                Bu Yıl
-              </Button>
-            </Stack>
-          </Box>
-          <Box>
-            <Typography variant="subtitle2" fontWeight={600} sx={{ mb: 1 }}>
-              Tarih Aralığı
-            </Typography>
-            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap" gap={2}>
-              <TextField
-                type="date"
-                label="Başlangıç Tarihi"
-                size="small"
-                value={dateRange.start}
-                onChange={(e) => {
-                  setDateRange((prev) => ({ ...prev, start: e.target.value }));
-                  setQuickFilter('TÜMÜ');
-                }}
-                InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: 180 }}
-              />
-              <TextField
-                type="date"
-                label="Bitiş Tarihi"
-                size="small"
-                value={dateRange.end}
-                onChange={(e) => {
-                  setDateRange((prev) => ({ ...prev, end: e.target.value }));
-                  setQuickFilter('TÜMÜ');
-                }}
-                InputLabelProps={{ shrink: true }}
-                sx={{ minWidth: 180 }}
-              />
-              {(dateRange.start || dateRange.end) && (
-                <Button
-                  size="small"
-                  variant="outlined"
-                  color="error"
-                  onClick={() => {
-                    setDateRange({ start: '', end: '' });
-                    setQuickFilter('TÜMÜ');
-                  }}
-                >
-                  Temizle
-                </Button>
-              )}
-            </Stack>
-          </Box>
-
-          <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
-            <Stack direction="row" spacing={2} justifyContent="flex-end">
+        {/* Global Arama */}
+        <Paper sx={{ p: 2, mb: 3, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
+          <Stack direction="row" spacing={1} alignItems="stretch">
+            <TextField
+              fullWidth
+              placeholder="Cari adı, kodu, tutar, açıklama veya hesap adı ile ara..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search color="action" />
+                  </InputAdornment>
+                ),
+                endAdornment: searchQuery && (
+                  <InputAdornment position="end">
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                      <Chip
+                        label={`${filteredTahsilatlar.length} sonuç`}
+                        size="small"
+                        color="primary"
+                        sx={{ fontWeight: 600 }}
+                      />
+                      <IconButton
+                        size="small"
+                        onClick={() => setSearchQuery('')}
+                        sx={{
+                          transition: 'all 0.2s',
+                          '&:hover': {
+                            transform: 'rotate(90deg)',
+                            backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                          },
+                        }}
+                      >
+                        <Close fontSize="small" />
+                      </IconButton>
+                    </Box>
+                  </InputAdornment>
+                ),
+              }}
+              sx={{
+                flexGrow: 1,
+                '& .MuiOutlinedInput-root': {
+                  transition: 'all 0.3s ease-in-out',
+                  height: '100%',
+                  '&:hover': {
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.1)',
+                  },
+                  '&.Mui-focused': {
+                    boxShadow: '0 4px 12px rgba(59, 130, 246, 0.2)',
+                  },
+                },
+              }}
+            />
+            {isMobile && (
               <Button
                 variant="outlined"
-                startIcon={<Download />}
-                onClick={handleExportExcel}
-                color="success"
+                onClick={() => setOpenFilterDrawer(true)}
+                sx={{
+                  minWidth: 'auto',
+                  width: 56,
+                  borderRadius: 1,
+                  border: '1px solid rgba(0, 0, 0, 0.23)',
+                  color: 'text.secondary',
+                  '&:hover': {
+                    border: '1px solid rgba(0, 0, 0, 0.87)',
+                    backgroundColor: 'rgba(0, 0, 0, 0.04)',
+                  }
+                }}
               >
-                Excel İndir
+                <FilterList />
               </Button>
+            )}
+          </Stack>
+        </Paper>
+
+
+
+        {/* Tarih Filtresi (Mobile: Drawer, Desktop: Accordion) */}
+        {isMobile ? (
+          <Drawer
+            anchor="bottom"
+            open={openFilterDrawer}
+            onClose={() => setOpenFilterDrawer(false)}
+            PaperProps={{
+              sx: {
+                borderRadius: '16px 16px 0 0',
+                maxHeight: '85vh'
+              }
+            }}
+          >
+            <Box sx={{ p: 2, display: 'flex', alignItems: 'center', justifyContent: 'space-between', borderBottom: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
+              <Typography variant="h6" fontWeight={600}>Filtrele</Typography>
+              <IconButton onClick={() => setOpenFilterDrawer(false)} edge="end">
+                <Close />
+              </IconButton>
+            </Box>
+
+            <Box sx={{ p: 2, overflowY: 'auto' }}>
+              {filterContent}
+            </Box>
+
+            <Box sx={{ p: 2, borderTop: 1, borderColor: 'divider', bgcolor: 'background.default' }}>
               <Button
+                fullWidth
+                variant="contained"
+                size="large"
+                onClick={() => setOpenFilterDrawer(false)}
+                sx={{
+                  background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
+                  boxShadow: '0 4px 12px rgba(16, 185, 129, 0.3)',
+                  fontWeight: 600
+                }}
+              >
+                Uygula
+              </Button>
+            </Box>
+          </Drawer>
+        ) : (
+          <Accordion
+            defaultExpanded
+            sx={{
+              mb: 3,
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+              '&:before': { display: 'none' },
+              borderRadius: '4px !important',
+            }}
+          >
+            <AccordionSummary
+              expandIcon={<ExpandMore />}
+              sx={{
+                '&:hover': {
+                  backgroundColor: 'rgba(0, 0, 0, 0.02)',
+                },
+              }}
+            >
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Typography variant="subtitle1" fontWeight={600}>
+                  📅 Tarih Filtreleri
+                </Typography>
+              </Box>
+            </AccordionSummary>
+            <AccordionDetails>
+              {filterContent}
+            </AccordionDetails>
+          </Accordion>
+        )}
+
+        {/* Aktif Filtreler */}
+        {(searchQuery || dateRange.start || dateRange.end || quickFilter !== 'TÜMÜ') && (
+          <Paper sx={{ p: 2, mb: 3, bgcolor: '#f8f9fa', boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 2 }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, flexWrap: 'wrap' }}>
+                <Typography variant="subtitle2" fontWeight={600} color="text.secondary">
+                  Aktif Filtreler:
+                </Typography>
+
+                {searchQuery && (
+                  <Chip
+                    label={`Arama: "${searchQuery}"`}
+                    onDelete={() => setSearchQuery('')}
+                    color="primary"
+                    size="small"
+                    sx={{ fontWeight: 500 }}
+                  />
+                )}
+
+                {quickFilter && quickFilter !== 'TÜMÜ' && (
+                  <Chip
+                    label={`Tarih: ${quickFilter === 'BUGÜN' ? 'Bugün' :
+                      quickFilter === 'BU_HAFTA' ? 'Bu Hafta' :
+                        quickFilter === 'BU_AY' ? 'Bu Ay' :
+                          quickFilter === 'BU_YIL' ? 'Bu Yıl' : quickFilter
+                      }`}
+                    onDelete={() => handleQuickFilter('TÜMÜ')}
+                    color="secondary"
+                    size="small"
+                    sx={{ fontWeight: 500 }}
+                  />
+                )}
+
+                {(dateRange.start || dateRange.end) && (
+                  <Chip
+                    label={`Özel Tarih: ${dateRange.start || '...'} - ${dateRange.end || '...'}`}
+                    onDelete={() => {
+                      setDateRange({ start: '', end: '' });
+                      setQuickFilter('TÜMÜ');
+                    }}
+                    color="info"
+                    size="small"
+                    sx={{ fontWeight: 500 }}
+                  />
+                )}
+              </Box>
+
+              <Button
+                size="small"
                 variant="outlined"
-                startIcon={<PictureAsPdf />}
-                onClick={handleExportPdf}
                 color="error"
+                onClick={() => {
+                  setSearchQuery('');
+                  setDateRange({ start: '', end: '' });
+                  setQuickFilter('TÜMÜ');
+                }}
+                sx={{
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    transform: 'scale(1.05)',
+                  },
+                }}
               >
-                PDF İndir
+                Tümünü Temizle
               </Button>
-            </Stack>
-          </Box>
-</Paper>
+            </Box>
+          </Paper>
+        )}
 
         {/* Butonlar */}
-        <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 2, mb: 3 }}>
           <Button
             variant="contained"
             startIcon={<Add />}
             onClick={() => handleOpenDialog('TAHSILAT')}
             disabled={actionLoading}
+            fullWidth={isMobile}
             sx={{
               background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)',
               '&:hover': {
                 background: 'linear-gradient(135deg, #059669 0%, #047857 100%)',
-              }
+              },
+              fontSize: isMobile ? '0.875rem' : '1rem',
             }}
           >
             Tahsilat Ekle
@@ -1489,11 +2116,13 @@ const formatMoney = useCallback((value: number) => {
             startIcon={<Add />}
             onClick={() => handleOpenDialog('ODEME')}
             disabled={actionLoading}
+            fullWidth={isMobile}
             sx={{
               background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
               '&:hover': {
                 background: 'linear-gradient(135deg, #dc2626 0%, #b91c1c 100%)',
-              }
+              },
+              fontSize: isMobile ? '0.875rem' : '1rem',
             }}
           >
             Ödeme Ekle
@@ -1503,6 +2132,7 @@ const formatMoney = useCallback((value: number) => {
             startIcon={<SwapHoriz />}
             onClick={() => setOpenCaprazOdemeDialog(true)}
             disabled={actionLoading}
+            fullWidth={isMobile}
             sx={{
               background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
               '&:hover': {
@@ -1514,36 +2144,226 @@ const formatMoney = useCallback((value: number) => {
           </Button>
         </Box>
 
-        {/* Tablo */}
-        <Paper sx={{ p: 1 }}>
-          <DataGrid<Tahsilat>
-            rows={filteredTahsilatlar}
-            columns={columns}
-            loading={tahsilatLoading || tahsilatFetching || actionLoading}
-            autoHeight
-            disableColumnMenu
-            disableColumnSelector
-            disableDensitySelector
-            disableRowSelectionOnClick
-            pageSizeOptions={[25, 50, 100]}
-            initialState={{
-              pagination: {
-                paginationModel: { page: 0, pageSize: 25 },
-              },
-            }}
-            sx={{
-              border: 'none',
-              '& .MuiDataGrid-columnHeaders': {
-                backgroundColor: '#f8f9fa',
-                fontWeight: 600,
-              },
-            }}
-            slots={{
-              noRowsOverlay: DataGridNoRowsOverlay,
-            }}
-          />
-        </Paper>
+        {/* Görünüm Ayarları */}
+        <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+          <Tooltip title={denseMode ? "Normal Görünüm" : "Kompakt Görünüm"}>
+            <Button
+              size="small"
+              variant="outlined"
+              startIcon={denseMode ? <TableRows /> : <ViewCompact />}
+              onClick={() => setDenseMode(!denseMode)}
+              sx={{
+                transition: 'all 0.2s',
+                '&:hover': {
+                  transform: 'translateY(-2px)',
+                  boxShadow: '0 2px 8px rgba(0, 0, 0, 0.15)',
+                },
+              }}
+            >
+              {denseMode ? "Normal" : "Kompakt"}
+            </Button>
+          </Tooltip>
+        </Box>
+
+        {/* Tablo / Mobil Kart Görünümü */}
+        {isMobile ? (
+          <Stack spacing={2}>
+            {(tahsilatLoading || tahsilatFetching) && filteredTahsilatlar.length === 0 ? (
+              [1, 2, 3].map((i) => (
+                <Card key={i}>
+                  <CardContent>
+                    <Skeleton variant="text" width="60%" height={32} sx={{ mb: 1 }} />
+                    <Skeleton variant="text" width="40%" height={20} sx={{ mb: 2 }} />
+                    <Skeleton variant="rectangular" height={40} sx={{ borderRadius: 1 }} />
+                  </CardContent>
+                </Card>
+              ))
+            ) : filteredTahsilatlar.length > 0 ? (
+              <>
+                {filteredTahsilatlar.slice(0, mobilePage * 20).map((row) => (
+                  <Card key={row.id} sx={{ boxShadow: '0 2px 4px rgba(0,0,0,0.05)', borderRadius: 2 }}>
+                    <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                        <Box>
+                          <Typography variant="subtitle2" fontWeight={700} sx={{ lineHeight: 1.2 }}>
+                            {row.cari.unvan}
+                          </Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {row.cari.cariKodu}
+                          </Typography>
+                        </Box>
+                        <Typography
+                          variant="subtitle1"
+                          fontWeight={700}
+                          color={row.tip === 'TAHSILAT' ? 'success.main' : 'error.main'}
+                        >
+                          {formatCurrency(row.tutar)}
+                        </Typography>
+                      </Box>
+
+                      <Box sx={{ display: 'flex', flexWrap: 'wrap', gap: 1, mb: 1.5 }}>
+                        <Chip
+                          icon={getOdemeTipiIcon(row.odemeTipi)}
+                          label={getOdemeTipiLabel(row.odemeTipi)}
+                          size="small"
+                          variant="outlined"
+                          sx={{ borderRadius: 1 }}
+                        />
+                        {row.kasa ? (
+                          <Chip label={row.kasa.kasaAdi} size="small" variant="outlined" sx={{ borderRadius: 1 }} />
+                        ) : row.bankaHesap ? (
+                          <Chip label={`${row.bankaHesap.bankaAdi || 'Banka'} > ${row.bankaHesap.hesapAdi}`} size="small" variant="outlined" sx={{ borderRadius: 1 }} />
+                        ) : row.firmaKrediKarti ? (
+                          <Chip label={row.firmaKrediKarti.kartAdi} size="small" variant="outlined" sx={{ borderRadius: 1 }} />
+                        ) : (
+                          <Chip label="Çapraz Ödeme" size="small" variant="outlined" sx={{ borderRadius: 1 }} />
+                        )}
+                      </Box>
+
+                      {row.aciklama && (
+                        <Box sx={{ bgcolor: 'action.hover', p: 1, borderRadius: 1, mb: 1.5 }}>
+                          <Typography variant="caption" color="text.secondary" sx={{ display: 'block' }}>
+                            {row.aciklama}
+                          </Typography>
+                        </Box>
+                      )}
+
+                      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', pt: 1.5, borderTop: 1, borderColor: 'divider' }}>
+                        <Typography variant="caption" color="text.secondary">
+                          {new Date(row.tarih).toLocaleDateString('tr-TR')}
+                        </Typography>
+                        <Box sx={{ display: 'flex', gap: 1 }}>
+                          <IconButton
+                            size="small"
+                            color="primary"
+                            onClick={() => window.open(`/tahsilat/print/${row.id}`, '_blank', 'noopener,noreferrer')}
+                          >
+                            <Print fontSize="small" />
+                          </IconButton>
+                          <IconButton
+                            size="small"
+                            color="error"
+                            onClick={() => openDeleteConfirmation(row)}
+                            disabled={actionLoading}
+                          >
+                            <Delete fontSize="small" />
+                          </IconButton>
+                        </Box>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                ))}
+
+                {filteredTahsilatlar.length > mobilePage * 20 && (
+                  <Box sx={{ display: 'flex', justifyContent: 'center', mt: 2, pb: 2 }}>
+                    <Button
+                      variant="outlined"
+                      onClick={() => setMobilePage(prev => prev + 1)}
+                      fullWidth
+                      sx={{
+                        borderRadius: 2,
+                        textTransform: 'none',
+                        fontWeight: 600,
+                        py: 1.5,
+                        borderColor: 'divider',
+                        color: 'text.secondary',
+                        '&:hover': {
+                          borderColor: 'primary.main',
+                          color: 'primary.main',
+                          bgcolor: 'rgba(59, 130, 246, 0.04)'
+                        }
+                      }}
+                    >
+                      Daha Fazla Göster ({filteredTahsilatlar.length - mobilePage * 20} kayıt daha)
+                    </Button>
+                  </Box>
+                )}
+              </>
+            ) : (
+              <Box sx={{ py: 4, display: 'flex', justifyContent: 'center' }}>
+                <DataGridNoRowsOverlay />
+              </Box>
+            )}
+          </Stack>
+        ) : (
+          <Paper sx={{ p: 1, boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)' }}>
+            <DataGrid<Tahsilat>
+              rows={filteredTahsilatlar}
+              columns={columns}
+              loading={tahsilatLoading || tahsilatFetching || actionLoading}
+              autoHeight
+              density={denseMode ? 'compact' : 'standard'}
+              disableRowSelectionOnClick
+              pageSizeOptions={[25, 50, 100]}
+              initialState={{
+                pagination: {
+                  paginationModel: { page: 0, pageSize: 25 },
+                },
+              }}
+              sx={{
+                border: 'none',
+                '& .MuiDataGrid-columnHeaders': {
+                  background: 'linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%)',
+                  fontWeight: 600,
+                  fontSize: '0.875rem',
+                  borderRadius: '8px 8px 0 0',
+                  borderBottom: '2px solid #dee2e6',
+                },
+                '& .MuiDataGrid-columnHeaderTitle': {
+                  fontWeight: 700,
+                },
+                '& .MuiDataGrid-row': {
+                  transition: 'all 0.2s ease-in-out',
+                  '&:nth-of-type(odd)': {
+                    backgroundColor: '#fafafa',
+                  },
+                  '&:nth-of-type(even)': {
+                    backgroundColor: '#ffffff',
+                  },
+                  '&:hover': {
+                    backgroundColor: '#f0f9ff !important',
+                    transform: 'scale(1.001)',
+                    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.05)',
+                    cursor: 'pointer',
+                  },
+                },
+                '& .MuiDataGrid-cell': {
+                  borderBottom: '1px solid #f0f0f0',
+                  fontSize: '0.875rem',
+                },
+                '& .MuiDataGrid-footerContainer': {
+                  borderTop: '2px solid #dee2e6',
+                  backgroundColor: '#f8f9fa',
+                },
+              }}
+              slots={{
+                noRowsOverlay: DataGridNoRowsOverlay,
+              }}
+            />
+          </Paper>
+        )}
       </Box>
+
+      {/* FAB - Yeni Ekle (Sadece Mobil) */}
+      {
+        isMobile && (
+          <Fab
+            color="primary"
+            aria-label="add"
+            sx={{
+              position: 'fixed',
+              bottom: 16,
+              right: 16,
+              zIndex: 1000,
+              background: 'linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%)',
+              boxShadow: '0 4px 12px rgba(37, 99, 235, 0.4)',
+            }}
+            onClick={() => setOpenDialog(true)}
+          >
+            <Add />
+          </Fab>
+        )
+      }
 
       {/* ❌ ESKİ DIALOG KALDIRILDI - Artık TahsilatFormDialog kullanılıyor */}
 
@@ -1569,212 +2389,31 @@ const formatMoney = useCallback((value: number) => {
         open={openDialog}
         initialFormData={initialFormData}
         cariler={cariler}
+        bankaHesaplari={bankaHesaplari}
         kasalar={kasalar}
+        satisElemanlari={satisElemanlari}
         carilerLoading={carilerFetching}
+        bankaHesaplariLoading={bankaHesaplariLoading}
         kasalarLoading={kasalarFetching}
+        satisElemanlariLoading={satisElemanlariLoading}
         submitting={actionLoading}
         onClose={handleCloseDialog}
         onSubmit={handleSubmit}
-        formatMoney={formatMoney}
+        formatMoney={formatCurrency}
       />
 
       {/* Çapraz Ödeme Tahsilat Dialog */}
-      <Dialog
+      <CaprazOdemeDialog
         open={openCaprazOdemeDialog}
         onClose={() => setOpenCaprazOdemeDialog(false)}
-        maxWidth="md"
-        fullWidth
-      >
-        <DialogTitle>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <SwapHoriz sx={{ color: '#8b5cf6' }} />
-            <Typography variant="h6">Çapraz Ödeme Tahsilat</Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent>
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Autocomplete
-                options={Array.isArray(cariler) ? cariler : []}
-                getOptionLabel={(option) => {
-                  if (!option) return '';
-                  return `${option.cariKodu || ''} - ${option.unvan || ''}`;
-                }}
-                isOptionEqualToValue={(option, value) => {
-                  if (!option || !value) return false;
-                  return option.id === value.id;
-                }}
-                value={cariler.find(c => c && c.id === caprazOdemeFormData.tahsilatCariId) || null}
-                onChange={(e, newValue) => {
-                  setCaprazOdemeFormData({
-                    ...caprazOdemeFormData,
-                    tahsilatCariId: newValue?.id || '',
-                  });
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Tahsilat Cari *"
-                    required
-                    fullWidth
-                    helperText={carilerFetching ? 'Yükleniyor...' : cariler.length === 0 ? 'Cari bulunamadı' : 'Tahsilat yapılacak cari'}
-                    error={false}
-                  />
-                )}
-                loading={carilerFetching}
-                noOptionsText={carilerFetching ? 'Yükleniyor...' : cariler.length === 0 ? 'Hiç cari bulunamadı' : 'Cari bulunamadı'}
-                disabled={carilerFetching || !Array.isArray(cariler) || cariler.length === 0}
-                filterOptions={(options, params) => {
-                  const filtered = options.filter((option) => {
-                    if (!option) return false;
-                    const searchTerm = params.inputValue.toLowerCase();
-                    return (
-                      option.cariKodu?.toLowerCase().includes(searchTerm) ||
-                      option.unvan?.toLowerCase().includes(searchTerm)
-                    );
-                  });
-                  return filtered;
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <Autocomplete
-                options={Array.isArray(cariler) ? cariler.filter(c => c && c.id !== caprazOdemeFormData.tahsilatCariId) : []}
-                getOptionLabel={(option) => {
-                  if (!option) return '';
-                  return `${option.cariKodu || ''} - ${option.unvan || ''}`;
-                }}
-                isOptionEqualToValue={(option, value) => {
-                  if (!option || !value) return false;
-                  return option.id === value.id;
-                }}
-                value={cariler.find(c => c && c.id === caprazOdemeFormData.odemeCariId) || null}
-                onChange={(e, newValue) => {
-                  setCaprazOdemeFormData({
-                    ...caprazOdemeFormData,
-                    odemeCariId: newValue?.id || '',
-                  });
-                }}
-                renderInput={(params) => (
-                  <TextField
-                    {...params}
-                    label="Ödeme Cari *"
-                    required
-                    fullWidth
-                    helperText={carilerFetching ? 'Yükleniyor...' : cariler.length === 0 ? 'Cari bulunamadı' : 'Ödeme yapılacak cari'}
-                    error={false}
-                  />
-                )}
-                loading={carilerFetching}
-                noOptionsText={carilerFetching ? 'Yükleniyor...' : cariler.length === 0 ? 'Hiç cari bulunamadı' : 'Cari bulunamadı'}
-                disabled={carilerFetching || !Array.isArray(cariler) || cariler.length === 0}
-                filterOptions={(options, params) => {
-                  const filtered = options.filter((option) => {
-                    if (!option) return false;
-                    const searchTerm = params.inputValue.toLowerCase();
-                    return (
-                      option.cariKodu?.toLowerCase().includes(searchTerm) ||
-                      option.unvan?.toLowerCase().includes(searchTerm)
-                    );
-                  });
-                  return filtered;
-                }}
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                label="Tutar *"
-                type="number"
-                required
-                value={caprazOdemeFormData.tutar || ''}
-                onChange={(e) => {
-                  setCaprazOdemeFormData({
-                    ...caprazOdemeFormData,
-                    tutar: parseFloat(e.target.value) || 0,
-                  });
-                }}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">₺</InputAdornment>,
-                }}
-                helperText="Tahsilat ve ödeme için ortak tutar"
-              />
-            </Grid>
-            <Grid size={{ xs: 12, md: 6 }}>
-              <TextField
-                fullWidth
-                label="Tarih *"
-                type="date"
-                required
-                value={caprazOdemeFormData.tarih}
-                onChange={(e) => {
-                  setCaprazOdemeFormData({
-                    ...caprazOdemeFormData,
-                    tarih: e.target.value,
-                  });
-                }}
-                InputLabelProps={{
-                  shrink: true,
-                }}
-              />
-            </Grid>
-            {carilerError && (
-              <Grid size={{ xs: 12 }}>
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  Cariler yüklenirken hata oluştu. Lütfen sayfayı yenileyin.
-                </Alert>
-              </Grid>
-            )}
-            {!carilerFetching && cariler.length === 0 && !carilerError && (
-              <Grid size={{ xs: 12 }}>
-                <Alert severity="warning" sx={{ mb: 2 }}>
-                  Hiç cari bulunamadı. Lütfen önce cari ekleyin.
-                </Alert>
-              </Grid>
-            )}
-            <Grid size={{ xs: 12 }}>
-              <Alert severity="info" sx={{ mb: 2 }}>
-                <Typography variant="body2">
-                  <strong>Çapraz Ödeme:</strong> Para kasaya girmez, doğrudan bir cariden diğerine transfer edilir.
-                  Bu nedenle ödeme tipi ve kasa seçimi yapmanıza gerek yoktur.
-                </Typography>
-              </Alert>
-            </Grid>
-            <Grid size={{ xs: 12 }}>
-              <TextField
-                fullWidth
-                label="Açıklama"
-                multiline
-                rows={2}
-                value={caprazOdemeFormData.aciklama}
-                onChange={(e) => {
-                  setCaprazOdemeFormData({
-                    ...caprazOdemeFormData,
-                    aciklama: e.target.value,
-                  });
-                }}
-                placeholder="Çapraz ödeme açıklaması (opsiyonel)"
-              />
-            </Grid>
-          </Grid>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenCaprazOdemeDialog(false)}>İptal</Button>
-          <Button
-            onClick={handleCaprazOdeme}
-            variant="contained"
-            disabled={actionLoading}
-            sx={{
-              bgcolor: '#8b5cf6',
-              '&:hover': {
-                bgcolor: '#7c3aed',
-              }
-            }}
-          >
-            {actionLoading ? 'Kaydediliyor...' : 'Kaydet'}
-          </Button>
-        </DialogActions>
-      </Dialog>
+        onSubmit={handleCaprazOdeme}
+        formData={caprazOdemeFormData}
+        setFormData={setCaprazOdemeFormData}
+        cariler={cariler as Cari[]}
+        loading={carilerFetching}
+        submitting={actionLoading}
+        carilerError={!!carilerError}
+      />
 
       {/* Snackbar */}
       <Snackbar
@@ -1810,537 +2449,7 @@ const formatMoney = useCallback((value: number) => {
         </DialogContent>
       </Dialog>
 
-    </MainLayout>
+    </MainLayout >
   );
 }
 
-// ✅ ÇÖZÜM: Dialog Component - Local State kullanıyor (FORM-PING-SORUNU-COZUMU.md)
-interface FirmaKrediKarti {
-  id: string;
-  kartKodu: string;
-  kartAdi: string;
-  bankaAdi: string;
-  kartTipi: string;
-  sonDortHane: string;
-  limit: number;
-  aktif: boolean;
-  kasaId: string;
-}
-
-const TahsilatFormDialog = memo(({
-  open,
-  initialFormData,
-  cariler,
-  kasalar,
-  carilerLoading,
-  kasalarLoading,
-  submitting,
-  onClose,
-  onSubmit,
-  formatMoney,
-}: {
-  open: boolean;
-  initialFormData: any;
-  cariler: Cari[];
-  kasalar: Kasa[];
-  carilerLoading: boolean;
-  kasalarLoading: boolean;
-  submitting: boolean;
-  onClose: () => void;
-  onSubmit: (data: any) => void;
-  formatMoney: (value: number) => string;
-}) => {
-  // 1. LOCAL STATE - Parent'ı etkilemez!
-  const [localFormData, setLocalFormData] = useState(initialFormData);
-
-  // 2. Firma kredi kartları - Kasa seçildiğinde çekilecek
-  const [firmaKrediKartlari, setFirmaKrediKartlari] = useState<FirmaKrediKarti[]>([]);
-  const [firmaKrediKartlariLoading, setFirmaKrediKartlariLoading] = useState(false);
-
-  // 3. POS Banka hesapları - Kredi kartı tahsilat için
-  const [posBankaHesaplari, setPosBankaHesaplari] = useState<BankaHesabi[]>([]);
-  const [posBankaHesaplariLoading, setPosBankaHesaplariLoading] = useState(false);
-
-  // 2. initialFormData değiştiğinde local state'i güncelle
-  useEffect(() => {
-    setLocalFormData(initialFormData);
-  }, [initialFormData]);
-
-  // 4. POS Banka hesaplarını çek - Kredi kartı tahsilat için
-  useEffect(() => {
-    const fetchPosBankaHesaplari = async () => {
-      // Sadece tahsilat (TAHSILAT) ve kredi kartı (KREDI_KARTI) için POS banka hesaplarını çek
-      if (localFormData.tip === 'TAHSILAT' && localFormData.odemeTipi === 'KREDI_KARTI') {
-        try {
-          setPosBankaHesaplariLoading(true);
-          // Önce banka kasalarını bul
-          const bankaKasalari = kasalar.filter(k => k.kasaTipi === 'BANKA');
-
-          // Her banka kasası için POS tipindeki hesapları çek
-          const allPosHesaplari: BankaHesabi[] = [];
-          for (const bankaKasa of bankaKasalari) {
-            try {
-              const response = await axios.get('/banka-hesap', {
-                params: { kasaId: bankaKasa.id, hesapTipi: 'POS' },
-              });
-              if (response.data && Array.isArray(response.data)) {
-                allPosHesaplari.push(...response.data);
-              }
-            } catch (error) {
-              console.error(`Banka kasası ${bankaKasa.id} için POS hesapları yüklenirken hata:`, error);
-            }
-          }
-
-          setPosBankaHesaplari(allPosHesaplari);
-        } catch (error) {
-          console.error('POS banka hesapları yüklenirken hata:', error);
-          setPosBankaHesaplari([]);
-        } finally {
-          setPosBankaHesaplariLoading(false);
-        }
-      } else {
-        // Diğer durumlarda POS banka hesaplarını temizle
-        setPosBankaHesaplari([]);
-        setLocalFormData((prev: any) => ({
-          ...prev,
-          bankaHesapId: '',
-        }));
-      }
-    };
-
-    fetchPosBankaHesaplari();
-  }, [kasalar, localFormData.tip, localFormData.odemeTipi]);
-
-  // 5. useMemo ile filtre - kasalar değişmedikçe hesaplanmaz
-  const availableKasalar = useMemo(() => {
-    if (localFormData.odemeTipi === 'NAKIT') {
-      return kasalar.filter(k => k.kasaTipi === 'NAKIT');
-    } else if (localFormData.odemeTipi === 'KREDI_KARTI') {
-      // Tahsilat için artık POS kasası kullanılmıyor, banka hesapları kullanılıyor
-      if (localFormData.tip === 'TAHSILAT') {
-        return []; // POS kasası yerine banka hesapları kullanılacak
-      } else {
-        return kasalar.filter(k => k.kasaTipi === 'FIRMA_KREDI_KARTI');
-      }
-    }
-    return [];
-  }, [kasalar, localFormData.odemeTipi, localFormData.tip]);
-
-  // 6. Firma kredi kartlarını çek - Kasa seçildiğinde ve ödeme tipi kredi kartı olduğunda
-  useEffect(() => {
-    const fetchFirmaKrediKartlari = async () => {
-      // Sadece ödeme (ODEME) ve kredi kartı (KREDI_KARTI) için firma kredi kartlarını çek
-      if (localFormData.tip === 'ODEME' && localFormData.odemeTipi === 'KREDI_KARTI' && localFormData.kasaId) {
-        try {
-          setFirmaKrediKartlariLoading(true);
-          const response = await axios.get('/firma-kredi-karti', {
-            params: { kasaId: localFormData.kasaId },
-          });
-          setFirmaKrediKartlari(response.data || []);
-        } catch (error) {
-          console.error('Firma kredi kartları yüklenirken hata:', error);
-          setFirmaKrediKartlari([]);
-        } finally {
-          setFirmaKrediKartlariLoading(false);
-        }
-      } else {
-        // Diğer durumlarda firma kredi kartlarını temizle
-        setFirmaKrediKartlari([]);
-        setLocalFormData((prev: any) => ({
-          ...prev,
-          firmaKrediKartiId: '',
-          kartSahibi: '',
-          kartSonDort: '',
-          bankaAdi: '',
-        }));
-      }
-    };
-
-    fetchFirmaKrediKartlari();
-  }, [localFormData.tip, localFormData.odemeTipi, localFormData.kasaId]);
-
-  // 7. Local değişiklik fonksiyonu
-  const handleLocalChange = (field: string, value: any) => {
-    // Firma kredi kartı seçildiğinde, kart bilgilerini de form'a kaydet
-    if (field === 'firmaKrediKartiId' && value) {
-      const selectedKart = firmaKrediKartlari.find((kart) => kart.id === value);
-      if (selectedKart) {
-        setLocalFormData((prev: any) => ({
-          ...prev,
-          [field]: value,
-          kartSahibi: selectedKart.kartAdi || '',
-          kartSonDort: selectedKart.sonDortHane || '',
-          bankaAdi: selectedKart.bankaAdi || '',
-        }));
-        return;
-      }
-    }
-
-    // Ödeme tipi değiştiğinde, kasa ve banka hesabı seçimlerini sıfırla
-    if (field === 'odemeTipi') {
-      setLocalFormData((prev: any) => ({
-        ...prev,
-        [field]: value,
-        kasaId: '',
-        bankaHesapId: '',
-      }));
-      return;
-    }
-
-    // Normal alan değişikliği
-    setLocalFormData((prev: any) => ({ ...prev, [field]: value }));
-  };
-
-  // 8. Local submit - Parent'a sadece burada veri gönderilir
-  const handleLocalSubmit = () => {
-    onSubmit(localFormData);
-  };
-
-  // 9. Hook'lar bittikten SONRA conditional return
-  if (!open) return null;
-
-  // Dialog kapatma handler - Material-UI Dialog event verir
-  const handleDialogClose = (event?: {}, reason?: string) => {
-    // Her durumda dialog'u kapat (backdrop click, escape key, vs.)
-    onClose();
-  };
-
-  return (
-    <Dialog open={open} onClose={handleDialogClose} maxWidth="md" fullWidth>
-      <DialogTitle sx={{
-        bgcolor: localFormData.tip === 'TAHSILAT' ? '#10b981' : '#ef4444',
-        color: 'white',
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-      }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          {localFormData.tip === 'TAHSILAT' ? <TrendingDown /> : <TrendingUp />}
-          {localFormData.tip === 'TAHSILAT' ? 'Tahsilat Ekle' : 'Ödeme Ekle'}
-        </Box>
-        <IconButton
-          onClick={onClose}
-          sx={{
-            color: 'white',
-            '&:hover': {
-              bgcolor: 'rgba(255, 255, 255, 0.1)',
-            },
-          }}
-        >
-          <Close />
-        </IconButton>
-      </DialogTitle>
-      <DialogContent sx={{ mt: 2 }}>
-        <Grid container spacing={2}>
-          {/* Ödeme Tipi - En yukarıda */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth>
-              <InputLabel>Ödeme Tipi *</InputLabel>
-              <Select
-                value={localFormData.odemeTipi}
-                label="Ödeme Tipi *"
-                onChange={(e) => handleLocalChange('odemeTipi', e.target.value)}
-              >
-                <MenuItem value="NAKIT">
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <AttachMoney fontSize="small" />
-                    <Box>
-                      <Typography variant="body2">Nakit</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        Nakit Kasa
-                      </Typography>
-                    </Box>
-                  </Box>
-                </MenuItem>
-                <MenuItem value="KREDI_KARTI">
-                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                    <CreditCard fontSize="small" />
-                    <Box>
-                      <Typography variant="body2">Kredi Kartı</Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {localFormData.tip === 'TAHSILAT' ? 'Pos Kasası (Müşteriden)' : 'Firma Kredi Kartı (Tedarikçiye)'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                </MenuItem>
-              </Select>
-            </FormControl>
-          </Grid>
-
-          {/* Kasa Seçimi - Kredi Kartı Tahsilat durumunda POS Banka Hesapları göster */}
-          {localFormData.odemeTipi === 'KREDI_KARTI' && localFormData.tip === 'TAHSILAT' ? (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth>
-                <InputLabel>POS Banka Hesabı Seçin *</InputLabel>
-                <Select
-                  value={localFormData.bankaHesapId || ''}
-                  label="POS Banka Hesabı Seçin *"
-                  onChange={(e) => handleLocalChange('bankaHesapId', e.target.value)}
-                  disabled={posBankaHesaplariLoading}
-                >
-                  {posBankaHesaplariLoading && (
-                    <MenuItem disabled>
-                      <Typography variant="caption" color="text.secondary">
-                        POS hesapları yükleniyor...
-                      </Typography>
-                    </MenuItem>
-                  )}
-                  {posBankaHesaplari.map((hesap) => (
-                    <MenuItem key={hesap.id} value={hesap.id}>
-                      <Box>
-                        <Typography variant="body2">
-                          {hesap.bankaAdi} - {hesap.hesapAdi || hesap.hesapKodu}
-                        </Typography>
-                        {hesap.kasa && (
-                          <Typography variant="caption" color="text.secondary">
-                            {hesap.kasa.kasaAdi} - {hesap.kasa.kasaKodu}
-                          </Typography>
-                        )}
-                      </Box>
-                    </MenuItem>
-                  ))}
-                  {!posBankaHesaplariLoading && posBankaHesaplari.length === 0 && (
-                    <MenuItem disabled>
-                      <Typography variant="caption" color="error">
-                        POS banka hesabı bulunamadı
-                      </Typography>
-                    </MenuItem>
-                  )}
-                </Select>
-              </FormControl>
-            </Grid>
-          ) : (
-            <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl fullWidth>
-                <InputLabel>Kasa Seçin *</InputLabel>
-                <Select
-                  value={localFormData.kasaId}
-                  label="Kasa Seçin *"
-                  onChange={(e) => handleLocalChange('kasaId', e.target.value)}
-                  disabled={kasalarLoading}
-                >
-                  {kasalarLoading && (
-                    <MenuItem disabled>
-                      <Typography variant="caption" color="text.secondary">
-                        Kasalar yükleniyor...
-                      </Typography>
-                    </MenuItem>
-                  )}
-                  {availableKasalar.map((kasa) => (
-                    <MenuItem key={kasa.id} value={kasa.id}>
-                      <Box>
-                        <Typography variant="body2">
-                          {kasa.kasaAdi} - Bakiye: {formatMoney(kasa.bakiye)}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {kasa.kasaKodu}
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                  {availableKasalar.length === 0 && (
-                    <MenuItem disabled>
-                      <Typography variant="caption" color="error">
-                        {localFormData.odemeTipi === 'NAKIT'
-                          ? 'Nakit kasa bulunamadı'
-                          : 'Firma kredi kartı kasası bulunamadı'}
-                      </Typography>
-                    </MenuItem>
-                  )}
-                </Select>
-              </FormControl>
-            </Grid>
-          )}
-
-          {/* Cari Seçimi */}
-          <Grid size={{ xs: 12 }}>
-            <Autocomplete
-              options={cariler}
-              getOptionLabel={(option) => `${option.cariKodu} - ${option.unvan}`}
-              loading={carilerLoading}
-              loadingText="Cariler yükleniyor..."
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Cari Seçin *"
-                  fullWidth
-                />
-              )}
-              onChange={(e, value) => handleLocalChange('cariId', value?.id || '')}
-              renderOption={(props, option) => {
-                const { key, ...otherProps } = props;
-                return (
-                  <Box component="li" key={key} {...otherProps}>
-                    <Box>
-                      <Typography variant="body2" fontWeight={600}>
-                        {option.cariKodu} - {option.unvan}
-                      </Typography>
-                      <Typography variant="caption" color={option.bakiye >= 0 ? 'success.main' : 'error.main'}>
-                        Bakiye: {formatMoney(option.bakiye)}
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              }}
-            />
-          </Grid>
-
-          {/* Tutar */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Tutar *"
-              type="number"
-              value={localFormData.tutar}
-              onChange={(e) => handleLocalChange('tutar', parseFloat(e.target.value) || 0)}
-              InputProps={{
-                startAdornment: <InputAdornment position="start">₺</InputAdornment>,
-              }}
-              sx={{
-                '& input[type=number]': {
-                  MozAppearance: 'textfield',
-                },
-                '& input[type=number]::-webkit-outer-spin-button': {
-                  WebkitAppearance: 'none',
-                  margin: 0,
-                },
-                '& input[type=number]::-webkit-inner-spin-button': {
-                  WebkitAppearance: 'none',
-                  margin: 0,
-                },
-              }}
-            />
-          </Grid>
-
-          {/* Tarih */}
-          <Grid size={{ xs: 12, md: 6 }}>
-            <TextField
-              fullWidth
-              label="Tarih *"
-              type="date"
-              value={localFormData.tarih}
-              onChange={(e) => handleLocalChange('tarih', e.target.value)}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Grid>
-
-          {/* Bilgilendirme */}
-          <Grid size={{ xs: 12 }}>
-            <Alert severity="info" sx={{ mb: 0 }}>
-              <Typography variant="body2">
-                <strong>Bu sayfada sadece Nakit ve Kredi Kartı işlemleri yapılır.</strong>
-                <br />
-                • Banka Havalesi → <strong>Banka İşlemleri</strong> menüsünde
-                <br />
-                • Çek/Senet → <strong>Bordro (Çek/Senet)</strong> menüsünde
-              </Typography>
-            </Alert>
-          </Grid>
-
-          {/* Firma Kredi Kartı Seçimi - Sadece ödeme (ODEME) ve kredi kartı (KREDI_KARTI) için */}
-          {localFormData.tip === 'ODEME' && localFormData.odemeTipi === 'KREDI_KARTI' && localFormData.kasaId && (
-            <Grid size={{ xs: 12 }}>
-              <FormControl fullWidth>
-                <InputLabel>Firma Kredi Kartı Seçin *</InputLabel>
-                <Select
-                  value={localFormData.firmaKrediKartiId || ''}
-                  label="Firma Kredi Kartı Seçin *"
-                  onChange={(e) => handleLocalChange('firmaKrediKartiId', e.target.value)}
-                  disabled={firmaKrediKartlariLoading}
-                >
-                  {firmaKrediKartlariLoading && (
-                    <MenuItem disabled>
-                      <Typography variant="caption" color="text.secondary">
-                        Firma kredi kartları yükleniyor...
-                      </Typography>
-                    </MenuItem>
-                  )}
-                  {firmaKrediKartlari.filter(kart => kart.aktif).map((kart) => (
-                    <MenuItem key={kart.id} value={kart.id}>
-                      <Box>
-                        <Typography variant="body2" fontWeight={500}>
-                          {kart.kartAdi} - {kart.bankaAdi}
-                        </Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {kart.kartKodu} - Son 4 Hane: {kart.sonDortHane} - Limit: {formatMoney(kart.limit)}
-                        </Typography>
-                      </Box>
-                    </MenuItem>
-                  ))}
-                  {!firmaKrediKartlariLoading && firmaKrediKartlari.filter(kart => kart.aktif).length === 0 && (
-                    <MenuItem disabled>
-                      <Typography variant="caption" color="error">
-                        Bu kasa için aktif firma kredi kartı bulunamadı
-                      </Typography>
-                    </MenuItem>
-                  )}
-                </Select>
-              </FormControl>
-            </Grid>
-          )}
-
-          {/* Kart bilgileri sadece tahsilat için gösterilir (POS ile müşteriden alırken) */}
-          {/* Ödeme için (Firma Kredi Kartı) kart bilgileri kasa içinde zaten var, göstermeye gerek yok */}
-          {localFormData.odemeTipi === 'KREDI_KARTI' && localFormData.tip === 'TAHSILAT' && (
-            <>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Kart Sahibi"
-                  value={localFormData.kartSahibi}
-                  onChange={(e) => handleLocalChange('kartSahibi', e.target.value)}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Kart Son 4 Hanesi"
-                  value={localFormData.kartSonDort}
-                  onChange={(e) => handleLocalChange('kartSonDort', e.target.value)}
-                  inputProps={{ maxLength: 4 }}
-                />
-              </Grid>
-              <Grid size={{ xs: 12, md: 4 }}>
-                <TextField
-                  fullWidth
-                  label="Banka Adı"
-                  value={localFormData.bankaAdi}
-                  onChange={(e) => handleLocalChange('bankaAdi', e.target.value)}
-                />
-              </Grid>
-            </>
-          )}
-
-          <Grid size={{ xs: 12 }}>
-            <TextField
-              fullWidth
-              label="Açıklama"
-              multiline
-              rows={2}
-              value={localFormData.aciklama}
-              onChange={(e) => handleLocalChange('aciklama', e.target.value)}
-            />
-          </Grid>
-        </Grid>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={onClose}>İptal</Button>
-        <Button
-          onClick={handleLocalSubmit}
-          variant="contained"
-          disabled={submitting}
-          sx={{
-            bgcolor: localFormData.tip === 'TAHSILAT' ? '#10b981' : '#ef4444',
-            '&:hover': {
-              bgcolor: localFormData.tip === 'TAHSILAT' ? '#059669' : '#dc2626',
-            }
-          }}
-        >
-          {submitting ? 'Kaydediliyor...' : 'Kaydet'}
-        </Button>
-      </DialogActions>
-    </Dialog>
-  );
-});
-
-TahsilatFormDialog.displayName = 'TahsilatFormDialog';

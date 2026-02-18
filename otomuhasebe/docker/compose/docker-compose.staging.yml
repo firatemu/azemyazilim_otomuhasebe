@@ -3,16 +3,16 @@ version: "3.9"
 services:
   backend-staging:
     build:
-      context: ../..
-      dockerfile: api-stage/server/Dockerfile
+      context: /var/www/api-stage
+      dockerfile: server/Dockerfile
     env_file:
-      - .env.staging
+      - /var/www/.env.staging
     environment:
-      <<: *common_env
+      # <<: *common_env
       PORT: 3000
       API_HEALTH_PATH: /health
-    depends_on:
-      - postgres
+      DATABASE_URL: postgresql://postgres:IKYYJ1R8fUZ3PItqxf6qel12VNbLYiOe@otomuhasebe-postgres:5432/otomuhasebe_stage
+      REDIS_URL: redis://otomuhasebe-redis:6379
     networks: [app_net]
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
@@ -23,12 +23,12 @@ services:
 
   admin-panel-staging:
     build:
-      context: ../..
-      dockerfile: admin-stage/Dockerfile
+      context: /var/www/admin-stage
+      dockerfile: Dockerfile
     env_file:
-      - .env.staging
+      - /var/www/.env.staging
     environment:
-      <<: *common_env
+      # <<: *common_env
       PORT: 3000
       UI_HEALTH_PATH: /
     networks: [app_net]
@@ -41,12 +41,12 @@ services:
 
   landing-page-staging:
     build:
-      context: ../..
-      dockerfile: otomuhasebe-landing/Dockerfile
+      context: /var/www/otomuhasebe-landing
+      dockerfile: Dockerfile
     env_file:
-      - .env.staging
+      - /var/www/.env.staging
     environment:
-      <<: *common_env
+      # <<: *common_env
       PORT: 3000
       NEXT_PUBLIC_API_BASE_URL: https://staging-api.otomuhasebe.com
     networks: [app_net]
@@ -56,3 +56,8 @@ services:
       timeout: 3s
       retries: 12
       start_period: 15s
+
+networks:
+  app_net:
+    name: compose_app_net
+    external: true

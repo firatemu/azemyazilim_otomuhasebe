@@ -102,7 +102,7 @@ export class WorkOrderService {
   constructor(
     private prisma: PrismaService,
     private tenantResolver: TenantResolverService,
-  ) {}
+  ) { }
 
   private async findWorkOrderOrThrow(id: string, tx?: Prisma.TransactionClient) {
     const prisma = tx || this.prisma;
@@ -2080,6 +2080,60 @@ export class WorkOrderService {
         workOrder: await this.findWorkOrderOrThrow(workOrderId, tx),
       };
     });
+  }
+
+  /**
+   * 6. getAllSupplyRequests - Tüm tedarik isteklerini getir
+   */
+  async getAllSupplyRequests(
+    page: number = 1,
+    limit: number = 50,
+    status?: SupplyRequestStatus,
+  ) {
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    const skip = (page - 1) * limit;
+
+    const where: Prisma.WorkOrderLineWhereInput = {
+      workOrder: {
+        ...buildTenantWhereClause(tenantId ?? undefined),
+      },
+      // partSource enum kontrolü yapılmalı, eğer modelde yoksa string olarak kullanılabilir
+      // Şimdilik existing koda göre partSource alanını kontrol ediyoruz
+      partSource: PartSource.SUPPLY_REQUEST,
+    };
+
+    if (status) {
+      where.supplyRequestStatus = status;
+    }
+
+    const [total, data] = await Promise.all([
+      this.prisma.workOrderLine.count({ where }),
+      this.prisma.workOrderLine.findMany({
+        where,
+        include: {
+          workOrder: {
+            include: {
+              vehicle: true,
+              customer: true,
+            },
+          },
+          product: true,
+        },
+        orderBy: { requestedAt: 'desc' },
+        skip,
+        take: limit,
+      }),
+    ]);
+
+    return {
+      data,
+      pagination: {
+        total,
+        page,
+        limit,
+        totalPages: Math.ceil(total / limit),
+      },
+    };
   }
 }
 

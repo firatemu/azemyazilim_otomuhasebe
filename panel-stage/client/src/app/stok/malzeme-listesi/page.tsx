@@ -29,14 +29,89 @@ import {
   InputAdornment,
   FormHelperText,
   CircularProgress,
+  Tooltip,
 } from '@mui/material';
-import { Add, Edit, Delete, Search, FileDownload, History, CompareArrows } from '@mui/icons-material';
-import * as XLSX from 'xlsx';
-import MainLayout from '@/components/Layout/MainLayout';
+import {
+  DataGrid,
+  GridColDef,
+  GridRenderCellParams,
+  GridToolbar,
+  GridToolbarContainer,
+  GridToolbarColumnsButton,
+  GridToolbarFilterButton,
+  GridToolbarDensitySelector,
+  GridToolbarExport,
+} from '@mui/x-data-grid';
+import { trTR } from '@mui/x-data-grid/locales';
+import { Add, Edit, Delete, Search, FileDownload, History, CompareArrows, Warehouse } from '@mui/icons-material';
 import axios from '@/lib/axios';
 import { useDebounce } from '@/hooks/useDebounce';
 import { useStokHareketler } from '@/hooks/useApi';
 import TableSkeleton from '@/components/Loading/TableSkeleton';
+import MainLayout from '@/components/Layout/MainLayout';
+import * as XLSX from 'xlsx';
+
+// Custom Search Bar Component (External to DataGrid to avoid slot issues)
+const MaterialSearchBar = ({ search, setSearch, onSearch }: any) => {
+  return (
+    <Box
+      sx={{
+        p: 1.5,
+        borderBottom: '1px solid var(--border)',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 1.5,
+        width: '100%',
+        bgcolor: 'var(--card)',
+      }}
+    >
+      <TextField
+        size="small"
+        placeholder="Stok kodu, adı, barkod veya OEM kodu ile ara..."
+        value={search || ''}
+        onChange={(e) => setSearch?.(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') {
+            onSearch?.();
+          }
+        }}
+        sx={{
+          width: { xs: '100%', md: 450 },
+          '& .MuiInputBase-root': {
+            bgcolor: 'var(--background)',
+          }
+        }}
+        InputProps={{
+          startAdornment: (
+            <InputAdornment position="start">
+              <Search fontSize="small" sx={{ color: 'var(--primary)' }} />
+            </InputAdornment>
+          ),
+        }}
+      />
+      <Button
+        variant="contained"
+        size="medium"
+        onClick={() => onSearch?.()}
+        startIcon={<Search />}
+        sx={{
+          bgcolor: 'var(--primary)',
+          color: 'var(--primary-foreground)',
+          textTransform: 'none',
+          fontWeight: 600,
+          px: 3,
+          '&:hover': {
+            bgcolor: 'var(--primary)',
+            opacity: 0.9,
+          },
+        }}
+      >
+        Ara
+      </Button>
+    </Box>
+  );
+};
+
 
 interface Malzeme {
   id: string;
@@ -51,8 +126,8 @@ interface Malzeme {
   olcu: string;
   oem: string;
   raf?: string;
-  tedarikciKodu?: string;
   alisFiyati: number;
+  sonAlisFiyati?: number;
   satisFiyati: number;
   // Araç bilgileri
   aracMarka?: string;
@@ -172,13 +247,13 @@ const MalzemeFormDialog = memo(({
       return [];
     }
     const options = kategoriler[localFormData.anaKategori] || [];
-    
+
     // Eğer düzenleme modundaysak ve mevcut altKategori seçenekler arasında yoksa,
     // onu da ekle (malzeme zaten bu değere sahip olabilir)
     if (editingMalzeme && localFormData.altKategori && !options.includes(localFormData.altKategori)) {
       return [...options, localFormData.altKategori];
     }
-    
+
     return options;
   }, [localFormData.anaKategori, localFormData.altKategori, kategoriler, editingMalzeme]);
 
@@ -192,7 +267,7 @@ const MalzemeFormDialog = memo(({
       maxWidth="lg"
       fullWidth
       PaperProps={{
-        sx: { 
+        sx: {
           minHeight: '70vh',
           bgcolor: 'var(--card)',
           backgroundImage: 'none'
@@ -344,9 +419,9 @@ const MalzemeFormDialog = memo(({
             </Grid>
 
             <Grid size={{ xs: 12, md: 6 }}>
-              <FormControl 
-                fullWidth 
-                size="medium" 
+              <FormControl
+                fullWidth
+                size="medium"
                 className="form-control-select"
                 disabled={!localFormData.anaKategori}
                 error={Boolean(localFormData.altKategori && altKategoriOptions.length > 0 && !altKategoriOptions.includes(localFormData.altKategori))}
@@ -666,7 +741,7 @@ export default function MalzemeListesiPage() {
   const [hareketDialogOpen, setHareketDialogOpen] = useState(false);
   const [hareketMalzeme, setHareketMalzeme] = useState<Malzeme | null>(null);
   const [hareketTipiFilter, setHareketTipiFilter] = useState('');
-  
+
   // Eşdeğer ürünler modal state
   const [esdegerDialogOpen, setEsdegerDialogOpen] = useState(false);
   const [esdegerMalzeme, setEsdegerMalzeme] = useState<Malzeme | null>(null);
@@ -679,7 +754,7 @@ export default function MalzemeListesiPage() {
   // Kategoriler ve markalar state
   const [kategoriler, setKategoriler] = useState<Record<string, string[]>>({});
   const [markalar, setMarkalar] = useState<string[]>([]);
-  
+
   // Araç bilgileri state
   const [aracMarkalar, setAracMarkalar] = useState<string[]>([]);
   const [aracModeller, setAracModeller] = useState<string[]>([]);
@@ -1178,6 +1253,7 @@ export default function MalzemeListesiPage() {
   };
 
   const filteredStoklar = useMemo(() => {
+    if (!Array.isArray(stoklar)) return [];
     return stoklar.filter((stok) => {
       const kategoriMatch = selectedKategori ? stok.anaKategori === selectedKategori : true;
       const altKategoriMatch = selectedAltKategori ? stok.altKategori === selectedAltKategori : true;
@@ -1196,9 +1272,12 @@ export default function MalzemeListesiPage() {
   const { data: hareketData, isLoading: hareketlerLoading } = useStokHareketler(
     hareketMalzeme?.id,
     hareketTipiFilter || undefined,
-    100
+    100,
+    !!hareketMalzeme?.id
   );
-  const hareketler = hareketData?.data || [];
+  // useStokHareketler hook already returns the array in data.
+  // The property access here was redundant and causing issues.
+  const hareketler = Array.isArray(hareketData) ? hareketData : [];
 
   const formatHareketDate = (value: string) =>
     new Date(value).toLocaleString('tr-TR', {
@@ -1295,7 +1374,7 @@ export default function MalzemeListesiPage() {
       'Yakıt Tipi': stok.aracYakitTipi || '-',
       Miktar: stok.miktar ?? 0,
       Birim: stok.birim,
-      'Alış Fiyatı': Number(stok.alisFiyati ?? 0),
+      'Son Alış Fiyatı': Number(stok.sonAlisFiyati ?? stok.alisFiyati ?? 0),
       'Satış Fiyatı': Number(stok.satisFiyati ?? 0),
     }));
 
@@ -1311,12 +1390,14 @@ export default function MalzemeListesiPage() {
       return [] as string[];
     }
     return kategoriler[selectedKategori] || [];
-  }, [selectedKategori]);
+  }, [selectedKategori, kategoriler]);
 
   const markaOptions = useMemo(() => {
     const collected = stoklar.map((s) => s.marka).filter(Boolean) as string[];
     return Array.from(new Set([...markalar, ...collected])).sort();
-  }, [stoklar]);
+  }, [stoklar, markalar]);
+
+
 
   return (
     <MainLayout>
@@ -1365,45 +1446,8 @@ export default function MalzemeListesiPage() {
         </Box>
       </Box>
 
-      <Paper sx={{ p: 2.5, mb: 3, bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)' }}>
-        <Box sx={{ display: 'flex', gap: 2, mb: 2, alignItems: 'center' }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Stok kodu, adı, barkod veya OEM kodu ile ara..."
-            className="form-control-textfield"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            onKeyPress={(e) => {
-              if (e.key === 'Enter') {
-                fetchStoklar();
-              }
-            }}
-            InputProps={{
-              startAdornment: (
-                <InputAdornment position="start">
-                  <Search />
-                </InputAdornment>
-              ),
-            }}
-          />
-          <Button
-            variant="contained"
-            onClick={() => fetchStoklar()}
-            sx={{
-            background: '#527575',
-            color: '#0b0b0b',
-            fontWeight: 700,
-            borderRadius: '999px',
-            px: 2.6,
-            boxShadow: '0 8px 18px color-mix(in srgb, #527575 30%, transparent)',
-            '&:hover': { background: 'color-mix(in srgb, #527575 90%, #000 10%)' }
-            }}
-          >
-            Ara
-          </Button>
-        </Box>
-
+      {/* Arama ve Filtreleme Alanı */}
+      <Paper sx={{ mb: 3, p: 2, bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)' }}>
         <Grid container spacing={2}>
           <Grid size={{ xs: 12, md: 3 }}>
             <FormControl fullWidth size="small" className="form-control-select">
@@ -1477,180 +1521,267 @@ export default function MalzemeListesiPage() {
             </FormControl>
           </Grid>
         </Grid>
-      </Paper>
+      </Paper >
 
-      <TableContainer component={Paper} sx={{ bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)' }}>
-        <Table>
-          <TableHead sx={{ bgcolor: 'var(--muted)' }}>
-            <TableRow>
-              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Stok Kodu</strong></TableCell>
-              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Stok Adı</strong></TableCell>
-              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Marka</strong></TableCell>
-              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Raf Adresi</strong></TableCell>
-              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Ölçü</strong></TableCell>
-              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>OEM</strong></TableCell>
-              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Araç Bilgileri</strong></TableCell>
-              <TableCell align="center" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Miktar</strong></TableCell>
-              <TableCell sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Birim</strong></TableCell>
-              <TableCell align="right" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Alış Fiyatı</strong></TableCell>
-              <TableCell align="right" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>Satış Fiyatı</strong></TableCell>
-              <TableCell align="center" sx={{ color: 'var(--foreground)', fontWeight: 700 }}><strong>İşlemler</strong></TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              <TableSkeleton rows={5} columns={12} />
-            ) : filteredStoklar.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={12} align="center">
-                  <Typography variant="body2" sx={{ py: 3, color: 'var(--muted-foreground)' }}>
-                    Stok bulunamadı
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredStoklar.map((stok: any) => (
-                  <TableRow 
-                  key={stok.id} 
-                  hover 
-                  sx={{ 
-                    '&:hover': { bgcolor: 'var(--muted)' },
-                    borderBottom: '1px solid var(--border)',
-                  }}
-                >
-                  <TableCell sx={{ color: 'var(--foreground)' }}>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--primary)' }}>
-                        {stok.stokKodu}
-                      </Typography>
+      <Paper sx={{ width: '100%', bgcolor: 'var(--card)', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)', overflow: 'hidden' }}>
+        <MaterialSearchBar
+          search={search}
+          setSearch={setSearch}
+          onSearch={fetchStoklar}
+        />
+        <Box sx={{ height: 600, width: '100%' }}>
+          <DataGrid
+            rows={filteredStoklar}
+            columns={[
+              {
+                field: 'stokKodu',
+                headerName: 'Stok Kodu',
+                flex: 1.5,
+                minWidth: 150,
+                renderCell: (params: GridRenderCellParams) => (
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, width: '100%', height: '100%' }}>
+                    <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {params.value}
+                    </Typography>
+                    <Tooltip title="Eşdeğer ürünleri göster">
                       <IconButton
                         size="small"
-                        onClick={() => handleOpenEsdegerDialog(stok)}
-                        sx={{ 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenEsdegerDialog(params.row);
+                        }}
+                        sx={{
                           padding: '4px',
                           color: 'var(--primary)',
-                          '&:hover': { 
+                          '&:hover': {
                             bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
                           },
                         }}
-                        title="Eşdeğer ürünleri göster"
                       >
                         <CompareArrows fontSize="small" />
                       </IconButton>
-                    </Box>
-                  </TableCell>
-                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.stokAdi}</TableCell>
-                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.marka || '-'}</TableCell>
-                  <TableCell sx={{ color: 'var(--foreground)' }}>
-                    {stok.raf && stok.raf.trim() !== '' ? (
-                      <Chip
-                        label={stok.raf}
-                        size="small"
-                        variant="outlined"
-                        sx={{ 
-                          fontSize: '0.75rem',
-                          borderColor: 'var(--primary)',
-                          color: 'var(--primary)',
-                          bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-                        }}
-                      />
-                    ) : (
-                      <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
-                        Raf atanmamış
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.olcu || '-'}</TableCell>
-                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.oem || '-'}</TableCell>
-                  <TableCell sx={{ color: 'var(--foreground)' }}>
-                    {stok.aracMarka || stok.aracModel || stok.aracMotorHacmi || stok.aracYakitTipi ? (
-                      <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-                        {stok.aracMarka && (
-                          <Typography variant="caption" fontWeight="600" sx={{ color: 'var(--chart-1)' }}>
-                            {stok.aracMarka}
-                          </Typography>
-                        )}
-                        {stok.aracModel && (
-                          <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
-                            {stok.aracModel}
-                          </Typography>
-                        )}
-                        {(stok.aracMotorHacmi || stok.aracYakitTipi) && (
-                          <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontSize: '0.7rem' }}>
-                            {[stok.aracMotorHacmi, stok.aracYakitTipi].filter(Boolean).join(' / ')}
-                          </Typography>
-                        )}
-                      </Box>
-                    ) : (
-                      <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
-                        -
-                      </Typography>
-                    )}
-                  </TableCell>
-                  <TableCell align="center">
+                    </Tooltip>
+                  </Box>
+                ),
+              },
+              {
+                field: 'stokAdi',
+                headerName: 'Stok Adı',
+                flex: 2,
+                minWidth: 200,
+              },
+              {
+                field: 'marka',
+                headerName: 'Marka',
+                flex: 1,
+                minWidth: 100,
+                valueFormatter: (value) => value || '-',
+              },
+              {
+                field: 'raf',
+                headerName: 'Raf Adresi',
+                flex: 1,
+                minWidth: 120,
+                renderCell: (params: GridRenderCellParams) => (
+                  params.value ? (
                     <Chip
-                      label={stok.miktar || 0}
+                      label={params.value}
                       size="small"
+                      variant="outlined"
                       sx={{
-                        bgcolor: stok.miktar > 0 
-                          ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)' 
-                          : 'color-mix(in srgb, var(--destructive) 15%, transparent)',
-                        color: stok.miktar > 0 ? 'var(--chart-2)' : 'var(--destructive)',
-                        fontWeight: 600,
+                        fontSize: '0.75rem',
+                        borderColor: 'var(--primary)',
+                        color: 'var(--primary)',
+                        bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
                       }}
                     />
-                  </TableCell>
-                  <TableCell sx={{ color: 'var(--foreground)' }}>{stok.birim}</TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--foreground)' }}>
-                      ₺{Number(stok.alisFiyati ?? 0).toLocaleString('tr-TR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
+                  ) : (
+                    <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
+                      Raf atanmamış
                     </Typography>
-                  </TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--primary)' }}>
-                      ₺{Number(stok.satisFiyati ?? 0).toLocaleString('tr-TR', {
-                        minimumFractionDigits: 2,
-                        maximumFractionDigits: 2,
-                      })}
-                    </Typography>
-                  </TableCell>
-                  <TableCell align="center">
-                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                  )
+                ),
+              },
+              {
+                field: 'aracBilgisi',
+                headerName: 'Araç Bilgileri',
+                flex: 1.5,
+                minWidth: 180,
+                renderCell: (params: GridRenderCellParams) => {
+                  const row = params.row;
+                  if (!row.aracMarka && !row.aracModel && !row.aracMotorHacmi && !row.aracYakitTipi) {
+                    return <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>-</Typography>;
+                  }
+                  return (
+                    <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
+                      {row.aracMarka && (
+                        <Typography variant="caption" fontWeight="600" sx={{ color: 'var(--chart-1)', lineHeight: 1.2 }}>
+                          {row.aracMarka}
+                        </Typography>
+                      )}
+                      {row.aracModel && (
+                        <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', lineHeight: 1.2 }}>
+                          {row.aracModel}
+                        </Typography>
+                      )}
+                    </Box>
+                  );
+                },
+              },
+              {
+                field: 'miktar',
+                headerName: 'Miktar',
+                type: 'number',
+                width: 100,
+                align: 'center',
+                headerAlign: 'center',
+                renderCell: (params: GridRenderCellParams) => (
+                  <Chip
+                    label={params.value || 0}
+                    size="small"
+                    sx={{
+                      bgcolor: (params.value || 0) > 0
+                        ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)'
+                        : 'color-mix(in srgb, var(--destructive) 15%, transparent)',
+                      color: (params.value || 0) > 0 ? 'var(--chart-2)' : 'var(--destructive)',
+                      fontWeight: 600,
+                      width: '100%',
+                      justifyContent: 'center',
+                    }}
+                  />
+                ),
+              },
+              {
+                field: 'birim',
+                headerName: 'Birim',
+                width: 80,
+              },
+              {
+                field: 'sonAlisFiyati',
+                headerName: 'Son Alış Fiyatı',
+                type: 'number',
+                width: 140,
+                align: 'right',
+                headerAlign: 'right',
+                valueGetter: (value, row) => value ?? row.alisFiyati,
+                valueFormatter: (value) => {
+                  if (value == null) return '';
+                  return `₺${Number(value).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+                },
+              },
+              {
+                field: 'satisFiyati',
+                headerName: 'Satış Fiyatı',
+                type: 'number',
+                width: 120,
+                align: 'right',
+                headerAlign: 'right',
+                renderCell: (params: GridRenderCellParams) => (
+                  <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--primary)', width: '100%', textAlign: 'right' }}>
+                    ₺{Number(params.value || 0).toLocaleString('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                  </Typography>
+                ),
+              },
+              {
+                field: 'actions',
+                headerName: 'İşlemler',
+                width: 160,
+                sortable: false,
+                filterable: false,
+                renderCell: (params: GridRenderCellParams) => (
+                  <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center', width: '100%' }}>
+                    <Tooltip title="Düzenle">
                       <IconButton
                         size="small"
                         color="primary"
-                        onClick={() => handleOpenDialog(stok)}
-                        title="Düzenle"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDialog(params.row);
+                        }}
                       >
                         <Edit fontSize="small" />
                       </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Ambar Toplamları">
+                      <IconButton
+                        size="small"
+                        color="info"
+                        href={`/stok/${params.row.id}/ambar-toplamlari`}
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <Warehouse fontSize="small" />
+                      </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Hareketler">
                       <IconButton
                         size="small"
                         color="secondary"
-                        onClick={() => handleOpenHareketDialog(stok)}
-                        title="Hareketler"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenHareketDialog(params.row);
+                        }}
                       >
                         <History fontSize="small" />
                       </IconButton>
+                    </Tooltip>
+                    <Tooltip title="Sil">
                       <IconButton
                         size="small"
                         color="error"
-                        onClick={() => handleDelete(stok.id)}
-                        title="Sil"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleDelete(params.row.id);
+                        }}
                       >
                         <Delete fontSize="small" />
                       </IconButton>
-                    </Box>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+                    </Tooltip>
+                  </Box>
+                )
+              },
+            ]}
+            initialState={{
+              pagination: {
+                paginationModel: { pageSize: 25, page: 0 },
+              },
+            }}
+            pageSizeOptions={[25, 50, 100]}
+            disableRowSelectionOnClick
+            loading={loading}
+            localeText={trTR.components.MuiDataGrid.defaultProps.localeText}
+            slots={{
+              toolbar: GridToolbar
+            }}
+            slotProps={{
+              toolbar: {
+                showQuickFilter: false,
+              }
+            }}
+            sx={{
+              border: 'none',
+              '& .MuiDataGrid-cell': {
+                borderColor: 'var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+              },
+              '& .MuiDataGrid-columnHeaders': {
+                bgcolor: 'var(--muted)',
+                borderBottom: '1px solid var(--border)',
+              },
+              '& .MuiDataGrid-columnHeaderTitle': {
+                fontWeight: 700,
+                color: 'var(--foreground)',
+              },
+              '& .MuiDataGrid-row:hover': {
+                bgcolor: 'var(--muted)',
+              },
+              '& .MuiDataGrid-footerContainer': {
+                borderTop: '1px solid var(--border)',
+              },
+            }}
+          />
+        </Box>
+      </Paper>
 
       <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
         <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
@@ -1711,6 +1842,8 @@ export default function MalzemeListesiPage() {
                     <TableRow>
                       <TableCell><strong>Tarih</strong></TableCell>
                       <TableCell><strong>Hareket Tipi</strong></TableCell>
+                      <TableCell><strong>Ambar</strong></TableCell>
+                      <TableCell><strong>Ambar</strong></TableCell>
                       <TableCell align="right"><strong>Miktar</strong></TableCell>
                       <TableCell align="right"><strong>Birim Fiyat</strong></TableCell>
                       <TableCell align="right"><strong>Toplam</strong></TableCell>
@@ -1744,6 +1877,11 @@ export default function MalzemeListesiPage() {
                                 color={getHareketColor(hareket.hareketTipi)}
                                 size="small"
                               />
+                            </TableCell>
+                            <TableCell>
+                              <Typography variant="body2">
+                                {hareket.warehouse?.name || '-'}
+                              </Typography>
                             </TableCell>
                             <TableCell align="right">
                               <Typography variant="body2" fontWeight="600">
@@ -1784,7 +1922,7 @@ export default function MalzemeListesiPage() {
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, py: 2 }}>
-          <Button onClick={handleCloseHareketDialog}>Kapat</Button>
+          <Button onClick={handleCloseHareketDialog} autoFocus>Kapat</Button>
         </DialogActions>
       </Dialog>
 
@@ -1818,9 +1956,9 @@ export default function MalzemeListesiPage() {
           },
         }}
       >
-        <DialogTitle sx={{ 
-          bgcolor: 'var(--secondary)', 
-          color: 'var(--secondary-foreground)', 
+        <DialogTitle sx={{
+          bgcolor: 'var(--secondary)',
+          color: 'var(--secondary-foreground)',
           py: 2,
           borderBottom: '1px solid var(--border)',
         }}>
@@ -1875,8 +2013,8 @@ export default function MalzemeListesiPage() {
                 </TableHead>
                 <TableBody>
                   {esdegerUrunler.map((urun: any) => (
-                    <TableRow 
-                      key={urun.id} 
+                    <TableRow
+                      key={urun.id}
                       hover
                       sx={{
                         bgcolor: 'var(--background)',
@@ -1898,8 +2036,8 @@ export default function MalzemeListesiPage() {
                           label={urun.miktar ?? 0}
                           size="small"
                           sx={{
-                            bgcolor: urun.miktar > 0 
-                              ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)' 
+                            bgcolor: urun.miktar > 0
+                              ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)'
                               : 'color-mix(in srgb, var(--destructive) 15%, transparent)',
                             color: urun.miktar > 0 ? 'var(--chart-2)' : 'var(--destructive)',
                             borderColor: urun.miktar > 0 ? 'var(--chart-2)' : 'var(--destructive)',
@@ -1931,9 +2069,10 @@ export default function MalzemeListesiPage() {
           )}
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 2, bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
-          <Button 
-            onClick={handleCloseEsdegerDialog} 
+          <Button
+            onClick={handleCloseEsdegerDialog}
             variant="outlined"
+            autoFocus
             sx={{
               borderColor: 'var(--border)',
               color: 'var(--foreground)',
@@ -1947,7 +2086,7 @@ export default function MalzemeListesiPage() {
           </Button>
         </DialogActions>
       </Dialog>
-    </MainLayout>
+    </MainLayout >
   );
 }
 

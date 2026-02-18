@@ -9,6 +9,7 @@ import {
   Box,
   Button,
   CircularProgress,
+  Chip,
   Divider,
   FormControl,
   IconButton,
@@ -42,9 +43,10 @@ interface Stok {
   id: string;
   stokKodu: string;
   stokAdi: string;
-  satisFiyati: number;
+  alisFiyati: number;
   kdvOrani: number;
   barkod?: string;
+  miktar: number;
 }
 
 interface IrsaliyeKalemi {
@@ -66,6 +68,7 @@ function YeniSatisIrsaliyesiPageContent() {
 
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSiparis, setLoadingSiparis] = useState(false);
 
@@ -79,6 +82,7 @@ function YeniSatisIrsaliyesiPageContent() {
     genelIskontoOran: 0,
     genelIskontoTutar: 0,
     aciklama: '',
+    warehouseId: '',
     kalemler: [] as IrsaliyeKalemi[],
   });
 
@@ -88,6 +92,7 @@ function YeniSatisIrsaliyesiPageContent() {
   useEffect(() => {
     fetchCariler();
     fetchStoklar();
+    fetchWarehouses();
 
     if (siparisId) {
       fetchSiparisBilgileri(siparisId);
@@ -119,6 +124,28 @@ function YeniSatisIrsaliyesiPageContent() {
     }
   };
 
+  const fetchWarehouses = async () => {
+    try {
+      const response = await axios.get('/warehouse?active=true');
+      const warehouseList = response.data || [];
+      setWarehouses(warehouseList);
+
+      if (warehouseList.length === 0) {
+        showSnackbar('Sistemde tanımlı ambar bulunamadı! Lütfen önce bir ambar tanımlayın.', 'error');
+        return;
+      }
+
+      const defaultWarehouse = warehouseList.find((w: any) => w.isDefault);
+      if (defaultWarehouse && !formData.warehouseId) {
+        setFormData(prev => ({ ...prev, warehouseId: defaultWarehouse.id }));
+      } else if (warehouseList.length === 1 && !formData.warehouseId) {
+        setFormData(prev => ({ ...prev, warehouseId: warehouseList[0].id }));
+      }
+    } catch (error) {
+      console.error('Ambar listesi alınamadı:', error);
+    }
+  };
+
   const fetchSiparisBilgileri = async (id: string) => {
     try {
       setLoadingSiparis(true);
@@ -133,6 +160,7 @@ function YeniSatisIrsaliyesiPageContent() {
           aciklama: siparis.aciklama || prev.aciklama,
           kaynakTip: 'SIPARIS',
           kaynakId: siparis.id,
+          warehouseId: siparis.warehouseId || prev.warehouseId,
         }));
       }
 
@@ -190,7 +218,7 @@ function YeniSatisIrsaliyesiPageContent() {
 
   const generateIrsaliyeNo = async () => {
     try {
-      const templateResponse = await axios.get('/code-template/next-code/DELIVERY_NOTE_SALES');
+      const templateResponse = await axios.get('/code-template/next-code/DELIVERY_NOTE_PURCHASE');
       if (templateResponse.data?.nextCode) {
         setFormData(prev => ({
           ...prev,
@@ -203,7 +231,7 @@ function YeniSatisIrsaliyesiPageContent() {
     }
 
     try {
-      const response = await axios.get('/satis-irsaliyesi', {
+      const response = await axios.get('/satin-alma-irsaliyesi', {
         params: { page: '1', limit: '1' },
       });
       const irsaliyeler = response.data?.data || [];
@@ -388,6 +416,12 @@ function YeniSatisIrsaliyesiPageContent() {
         return;
       }
 
+      if (!formData.warehouseId) {
+        showSnackbar('Ambar seçimi zorunludur. Lütfen bir ambar seçiniz.', 'error');
+        return;
+      }
+
+      // Boş stok satırlarını filtrele (stokId boş olanları sil)
       const validKalemler = formData.kalemler.filter(k => k.stokId && k.stokId.trim() !== '');
 
       if (validKalemler.length === 0) {
@@ -409,7 +443,7 @@ function YeniSatisIrsaliyesiPageContent() {
       }, 0);
       const toplamIskonto = toplamKalemIskontosu + (formData.genelIskontoTutar || 0);
 
-      await axios.post('/satis-irsaliyesi', {
+      await axios.post('/satin-alma-irsaliyesi', {
         irsaliyeNo: formData.irsaliyeNo,
         irsaliyeTarihi: new Date(formData.irsaliyeTarihi).toISOString(),
         cariId: formData.cariId,
@@ -418,17 +452,20 @@ function YeniSatisIrsaliyesiPageContent() {
         durum: formData.durum,
         iskonto: toplamIskonto,
         aciklama: formData.aciklama || null,
+        warehouseId: formData.warehouseId || null,
         kalemler: validKalemler.map(k => ({
           stokId: k.stokId,
           miktar: Number(k.miktar),
           birimFiyat: Number(k.birimFiyat),
           kdvOrani: Number(k.kdvOrani),
+          iskontoOrani: Number(k.iskontoOran) || 0,
+          iskontoTutari: Number(k.iskontoTutar) || 0,
         })),
       });
 
       showSnackbar('İrsaliye başarıyla oluşturuldu', 'success');
       setTimeout(() => {
-        router.push('/satis-irsaliyesi');
+        router.push('/satin-alma-irsaliyesi');
       }, 1500);
     } catch (error: any) {
       showSnackbar(error.response?.data?.message || 'İşlem sırasında hata oluştu', 'error');
@@ -497,7 +534,12 @@ function YeniSatisIrsaliyesiPageContent() {
               <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
                 İrsaliye Bilgileri
               </Typography>
-              <Divider sx={{ mb: 2 }} />
+              <Divider sx={{ mb: 2, borderColor: 'var(--border)' }} />
+              {warehouses.length === 0 && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  Sistemde tanımlı ambar bulunmamaktadır. İşlem yapabilmek için lütfen önce ambar tanımlayınız.
+                </Alert>
+              )}
             </Box>
 
             <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
@@ -517,7 +559,21 @@ function YeniSatisIrsaliyesiPageContent() {
                 InputLabelProps={{ shrink: true }}
                 required
               />
-              <FormControl sx={{ flex: '1 1 200px' }} required>
+              <FormControl sx={{ flex: '1 1 200px' }} className="form-control-select" required>
+                <InputLabel>Ambar</InputLabel>
+                <Select
+                  value={formData.warehouseId}
+                  onChange={(e) => setFormData({ ...formData, warehouseId: e.target.value })}
+                  label="Ambar"
+                >
+                  {warehouses.map((warehouse) => (
+                    <MenuItem key={warehouse.id} value={warehouse.id}>
+                      {warehouse.name} {warehouse.isDefault && '(Varsayılan)'}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+              <FormControl sx={{ flex: '1 1 200px' }} className="form-control-select" required>
                 <InputLabel>Durum</InputLabel>
                 <Select
                   value={formData.durum}
@@ -635,12 +691,29 @@ function YeniSatisIrsaliyesiPageContent() {
                               }}
                               renderOption={(props, option) => {
                                 const { key, ...otherProps } = props;
+                                let stockColor = 'var(--success)';
+                                if (option.miktar <= 0) stockColor = 'var(--destructive)';
+                                else if (option.miktar < 10) stockColor = 'var(--warning)';
+
                                 return (
                                   <Box component="li" key={key} {...otherProps}>
-                                    <Box>
-                                      <Typography variant="body2" fontWeight="600">
-                                        {option.stokAdi}
-                                      </Typography>
+                                    <Box sx={{ width: '100%' }}>
+                                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                        <Typography variant="body2" fontWeight="600">
+                                          {option.stokAdi}
+                                        </Typography>
+                                        <Chip
+                                          label={`Stok: ${option.miktar}`}
+                                          size="small"
+                                          sx={{
+                                            height: 20,
+                                            fontSize: '0.7rem',
+                                            bgcolor: `color-mix(in srgb, ${stockColor} 10%, transparent)`,
+                                            color: stockColor,
+                                            border: `1px solid ${stockColor}`,
+                                          }}
+                                        />
+                                      </Box>
                                       <Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}>
                                         <Typography variant="caption" color="text.secondary">
                                           Kod: {option.stokKodu}

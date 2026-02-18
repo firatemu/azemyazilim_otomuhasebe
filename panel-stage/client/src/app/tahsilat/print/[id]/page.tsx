@@ -17,6 +17,7 @@ import {
 import { Print, Close, PictureAsPdf, ZoomIn, ZoomOut } from '@mui/icons-material';
 import { useReactToPrint } from 'react-to-print';
 import axios from '@/lib/axios';
+import { numberToTurkishText } from '@/lib/number-to-text';
 
 interface TahsilatDetail {
   id: string;
@@ -42,6 +43,26 @@ interface TahsilatDetail {
   fatura?: {
     faturaNo: string | null;
   } | null;
+  kalanBakiye?: number;
+}
+
+interface TenantSettings {
+  logoUrl?: string;
+  companyName?: string;
+  address?: string;
+  phone?: string;
+  email?: string;
+  taxNo?: string;
+  taxOffice?: string;
+  mersisNo?: string;
+  tradeRegistryNo?: string;
+  website?: string;
+}
+
+interface Tenant {
+  id: string;
+  name: string;
+  settings?: TenantSettings;
 }
 
 type PaperSize = 'A4' | 'A5' | 'A5-landscape';
@@ -54,12 +75,12 @@ const formatDate = (dateString: string) => {
   });
 };
 
-const formatMoney = (amount: number) =>
+const formatMoney = (amount: number | string) =>
   new Intl.NumberFormat('tr-TR', {
     style: 'currency',
     currency: 'TRY',
     minimumFractionDigits: 2,
-  }).format(amount);
+  }).format(Number(amount));
 
 const formatOdemeTipi = (tip: string) => {
   const map: Record<string, string> = {
@@ -78,27 +99,33 @@ export default function TahsilatPrintPage() {
   const id = params.id as string;
 
   const [tahsilat, setTahsilat] = useState<TahsilatDetail | null>(null);
+  const [tenant, setTenant] = useState<Tenant | null>(null);
   const [loading, setLoading] = useState(true);
+  const [exportLoading, setExportLoading] = useState(false);
   const [paperSize, setPaperSize] = useState<PaperSize>('A5');
   const [zoom, setZoom] = useState(100);
 
   const printRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
-    const fetchTahsilat = async () => {
+    const fetchData = async () => {
       try {
         setLoading(true);
-        const response = await axios.get(`/tahsilat/${id}`);
-        setTahsilat(response.data);
+        const [tahsilatRes, tenantRes] = await Promise.all([
+          axios.get(`/tahsilat/${id}`),
+          axios.get('/tenants/current'),
+        ]);
+        setTahsilat(tahsilatRes.data);
+        setTenant(tenantRes.data);
       } catch (error) {
-        console.error('Tahsilat kaydı alınamadı:', error);
+        console.error('Veri alınamadı:', error);
       } finally {
         setLoading(false);
       }
     };
 
     if (id) {
-      void fetchTahsilat();
+      void fetchData();
     }
   }, [id]);
 
@@ -111,13 +138,16 @@ export default function TahsilatPrintPage() {
     if (!printRef.current || !tahsilat) return;
 
     try {
+      setExportLoading(true);
       const html2canvas = (await import('html2canvas')).default;
-      const jsPDF = (await import('jspdf')).default;
+      const { jsPDF } = await import('jspdf');
 
-      const canvas = await html2canvas(printRef.current, {
+      const element = printRef.current;
+      const canvas = await html2canvas(element, {
         scale: 2,
         useCORS: true,
         logging: false,
+        backgroundColor: '#ffffff',
       });
 
       const imgData = canvas.toDataURL('image/png');
@@ -125,16 +155,19 @@ export default function TahsilatPrintPage() {
         orientation: paperSize === 'A5-landscape' ? 'landscape' : 'portrait',
         unit: 'mm',
         format: paperSize === 'A4' ? 'a4' : 'a5',
+        compress: true,
       });
 
       const pdfWidth = pdf.internal.pageSize.getWidth();
       const pdfHeight = pdf.internal.pageSize.getHeight();
 
-      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight);
+      pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, pdfHeight, undefined, 'FAST');
       pdf.save(`Makbuz-${receiptNo(tahsilat.id)}.pdf`);
     } catch (error) {
       console.error('PDF oluşturulamadı:', error);
-      alert('PDF oluşturulurken bir hata oluştu');
+      alert('PDF oluşturulurken bir hata oluştu: ' + (error instanceof Error ? error.message : String(error)));
+    } finally {
+      setExportLoading(false);
     }
   };
 
@@ -203,17 +236,12 @@ export default function TahsilatPrintPage() {
               variant="contained"
               startIcon={<PictureAsPdf />}
               onClick={handleDownloadPDF}
+              disabled={exportLoading}
               sx={{ bgcolor: '#dc2626', '&:hover': { bgcolor: '#b91c1c' } }}
             >
-              PDF İndir
+              {exportLoading ? 'Hazırlanıyor...' : 'PDF İndir'}
             </Button>
-            <Button
-              variant="outlined"
-              startIcon={<Close />}
-              onClick={() => router.back()}
-            >
-              Kapat
-            </Button>
+
           </Stack>
         </Stack>
       </Paper>
@@ -230,6 +258,7 @@ export default function TahsilatPrintPage() {
         <div ref={printRef}>
           <ReceiptTemplate
             tahsilat={tahsilat}
+            tenant={tenant}
             paperSize={paperSize}
             formatDate={formatDate}
             formatMoney={formatMoney}
@@ -259,194 +288,281 @@ function receiptNo(id: string) {
 
 function ReceiptTemplate({
   tahsilat,
+  tenant,
   paperSize,
   formatDate,
   formatMoney,
 }: {
   tahsilat: TahsilatDetail;
+  tenant: Tenant | null;
   paperSize: PaperSize;
   formatDate: (date: string) => string;
-  formatMoney: (amount: number) => string;
+  formatMoney: (amount: number | string) => string;
 }) {
+  const isLandscape = paperSize === 'A5-landscape';
   const width = paperSize === 'A4' ? '210mm' : paperSize === 'A5' ? '148mm' : '210mm';
   const height = paperSize === 'A4' ? '297mm' : paperSize === 'A5' ? '210mm' : '148mm';
-  const fontSize = paperSize === 'A4' ? '11pt' : '9pt';
+  const fontSize = paperSize === 'A4' ? '10pt' : isLandscape ? '8.5pt' : '9pt';
   const makbuzNo = receiptNo(tahsilat.id);
+  const amountInWords = numberToTurkishText(tahsilat.tutar);
+
+  // Design tokens
+  const colors = {
+    primary: '#1e293b', // Slate 800
+    secondary: '#64748b', // Slate 500
+    accent: '#0f172a', // Slate 900
+    border: '#e2e8f0', // Slate 200
+    bgLight: '#f8fafc', // Slate 50
+    bgAmount: 'white',
+  };
+
+  // Logo URL construction
+  const logoUrl = tenant?.settings?.logoUrl;
+  const fullLogoUrl = logoUrl ? (logoUrl.startsWith('http') ? logoUrl : logoUrl) : null;
 
   return (
     <Paper
       sx={{
         width,
         height,
-        p: paperSize === 'A4' ? 4 : 2,
+        p: 0,
         bgcolor: 'white',
         boxShadow: 4,
         fontSize,
-        fontFamily: 'Arial, sans-serif',
+        fontFamily: '"Inter", "Roboto", "Arial", sans-serif',
         position: 'relative',
+        display: 'flex',
+        flexDirection: 'column',
+        overflow: 'hidden',
         '@media print': {
           boxShadow: 'none',
-          p: paperSize === 'A4' ? 3 : 1.5,
+          p: 0,
         },
       }}
     >
-      <Box sx={{ borderBottom: '3px solid #0f172a', pb: 2, mb: 3 }}>
-        <Stack direction="row" justifyContent="space-between" alignItems="flex-start">
+      {/* Header */}
+      <Box sx={{
+        bgcolor: colors.bgLight,
+        p: isLandscape ? 2 : 3,
+        borderBottom: `1px solid ${colors.border}`,
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center'
+      }}>
+        <Stack direction="row" spacing={2} alignItems="center">
+          {fullLogoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img
+              src={fullLogoUrl}
+              alt="Logo"
+              style={{ height: isLandscape ? '40px' : '50px', objectFit: 'contain' }}
+            />
+          ) : (
+            <Box sx={{
+              width: isLandscape ? 40 : 50,
+              height: isLandscape ? 40 : 50,
+              bgcolor: colors.accent,
+              color: 'white',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              borderRadius: 1,
+              fontWeight: 'bold',
+              fontSize: isLandscape ? '1rem' : '1.2rem'
+            }}>
+              {tenant?.name?.substring(0, 2).toUpperCase() || 'OM'}
+            </Box>
+          )}
           <Box>
-            <Typography
-              variant="h4"
-              sx={{
-                color: '#0f172a',
-                fontWeight: 'bold',
-                fontSize: paperSize === 'A4' ? '24pt' : '18pt',
-              }}
-            >
-              YEDEK PARÇA
+            <Typography variant="subtitle1" sx={{ fontWeight: 700, color: colors.primary, lineHeight: 1.2 }}>
+              {tenant?.settings?.companyName || tenant?.name || 'Firma Adı'}
             </Typography>
-            <Typography variant="body2" sx={{ color: '#475569', mt: 0.5 }}>
-              Otomasyon Sistemi
+            <Typography variant="caption" sx={{ color: colors.secondary, display: 'block', maxWidth: isLandscape ? '400px' : '300px', fontSize: '0.75rem' }}>
+              {tenant?.settings?.address}
             </Typography>
-          </Box>
-          <Box sx={{ textAlign: 'right' }}>
-            <Typography
-              variant="h5"
-              sx={{
-                color: '#0f172a',
-                fontWeight: 'bold',
-                fontSize: paperSize === 'A4' ? '18pt' : '14pt',
-              }}
-            >
-              {tahsilat.tip === 'TAHSILAT' ? 'TAHSİLAT MAKBUZU' : 'ÖDEME MAKBUZU'}
-            </Typography>
-            <Typography variant="body2" sx={{ mt: 1 }}>
-              <strong>Makbuz No:</strong> {makbuzNo}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Tarih:</strong> {formatDate(tahsilat.tarih)}
-            </Typography>
+            {(tenant?.settings?.phone || tenant?.settings?.email) && (
+              <Typography variant="caption" sx={{ color: colors.secondary, display: 'block', fontSize: '0.7rem' }}>
+                {[tenant?.settings?.phone, tenant?.settings?.email].filter(Boolean).join(' • ')}
+              </Typography>
+            )}
           </Box>
         </Stack>
+
+        <Box sx={{ textAlign: 'right' }}>
+          <Typography
+            variant={isLandscape ? 'h6' : 'h5'}
+            sx={{
+              color: colors.accent,
+              fontWeight: 800,
+              letterSpacing: '0.02em',
+              textTransform: 'uppercase'
+            }}
+          >
+            {tahsilat.tip === 'TAHSILAT' ? 'TAHSİLAT MAKBUZU' : 'ÖDEME MAKBUZU'}
+          </Typography>
+          <Stack direction="row" spacing={1} justifyContent="flex-end" sx={{ mt: 0.5 }}>
+            <Typography variant="caption" sx={{ color: colors.secondary }}>No: <strong>{makbuzNo}</strong></Typography>
+            <Typography variant="caption" sx={{ color: colors.secondary }}> | </Typography>
+            <Typography variant="caption" sx={{ color: colors.secondary }}>Tarih: <strong>{formatDate(tahsilat.tarih)}</strong></Typography>
+          </Stack>
+        </Box>
       </Box>
 
-      <Grid container spacing={2} sx={{ mb: 3 }}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#0f172a', mb: 1 }}>
-              CARİ BİLGİLERİ
-            </Typography>
-            <Typography variant="body2">
-              <strong>Cari Kodu:</strong> {tahsilat.cari.cariKodu}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Ünvan:</strong> {tahsilat.cari.unvan}
-            </Typography>
-            {tahsilat.cari.vergiNo && (
-              <Typography variant="body2">
-                <strong>Vergi No:</strong> {tahsilat.cari.vergiNo} ({tahsilat.cari.vergiDairesi || '-'})
-              </Typography>
-            )}
-            {tahsilat.cari.telefon && (
-              <Typography variant="body2">
-                <strong>Telefon:</strong> {tahsilat.cari.telefon}
-              </Typography>
-            )}
-            {tahsilat.cari.adres && (
-              <Typography variant="body2">
-                <strong>Adres:</strong> {tahsilat.cari.adres}
-              </Typography>
-            )}
-          </Box>
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 1 }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#0f172a', mb: 1 }}>
-              MAKBUZ BİLGİLERİ
-            </Typography>
-            <Typography variant="body2">
-              <strong>Makbuz Tipi:</strong> {tahsilat.tip === 'TAHSILAT' ? 'Tahsilat' : 'Ödeme'}
-            </Typography>
-            <Typography variant="body2">
-              <strong>Ödeme Şekli:</strong> {formatOdemeTipi(tahsilat.odemeTipi)}
-            </Typography>
-            {tahsilat.kasa && (
-              <Typography variant="body2">
-                <strong>Kasa:</strong> {tahsilat.kasa.kasaAdi} ({tahsilat.kasa.kasaKodu})
-              </Typography>
-            )}
-            {tahsilat.fatura && tahsilat.fatura.faturaNo && (
-              <Typography variant="body2">
-                <strong>İlgili Fatura:</strong> {tahsilat.fatura.faturaNo}
-              </Typography>
-            )}
-          </Box>
-        </Grid>
-      </Grid>
+      {/* Content Area */}
+      <Box sx={{ p: isLandscape ? 2 : 3, flex: 1, display: 'flex', flexDirection: 'column' }}>
 
-      <Box sx={{ mb: 3 }}>
-        <Paper
-          variant="outlined"
-          sx={{
-            bgcolor: '#0f172a',
-            color: 'white',
-            p: 2,
-            borderRadius: 2,
-          }}
-        >
-          <Stack direction={{ xs: 'column', sm: 'row' }} justifyContent="space-between" spacing={2} alignItems="center">
-            <Box>
-              <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                Tahsil Edilen Tutar
+        {/* Info Grid */}
+        <Grid container spacing={isLandscape ? 2 : 3} sx={{ mb: isLandscape ? 2 : 4 }}>
+          <Grid size={{ xs: 6 }}>
+            <Box sx={{
+              p: 2,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 2,
+              height: '100%',
+              position: 'relative',
+              '&::before': {
+                content: '"SAYIN"',
+                position: 'absolute',
+                top: -10,
+                left: 12,
+                bgcolor: 'white',
+                px: 1,
+                fontSize: '0.65rem',
+                fontWeight: 700,
+                color: colors.secondary,
+                letterSpacing: '0.05em'
+              }
+            }}>
+              <Typography variant="subtitle2" sx={{ fontWeight: 700, color: colors.primary, mb: 0.5 }}>
+                {tahsilat.cari.unvan}
               </Typography>
-              <Typography variant="h4" sx={{ fontWeight: 'bold' }}>
+              {tahsilat.cari.adres && (
+                <Typography variant="body2" sx={{ color: colors.primary, mb: 0.5, fontSize: '0.8rem', opacity: 0.8 }}>
+                  {tahsilat.cari.adres}
+                </Typography>
+              )}
+              {tahsilat.cari.vergiNo && (
+                <Typography variant="caption" sx={{ color: colors.secondary, fontSize: '0.75rem', display: 'block', mt: 1 }}>
+                  <strong>VN:</strong> {tahsilat.cari.vergiNo} <strong>VD:</strong> {tahsilat.cari.vergiDairesi || '-'}
+                </Typography>
+              )}
+            </Box>
+          </Grid>
+
+          <Grid size={{ xs: 6 }}>
+            <Box sx={{
+              p: 2,
+              border: `1px solid ${colors.border}`,
+              borderRadius: 2,
+              height: '100%',
+              bgcolor: colors.bgLight
+            }}>
+              <Stack spacing={1}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', borderBottom: `1px dashed ${colors.border}`, pb: 0.5 }}>
+                  <Typography variant="caption" sx={{ color: colors.secondary, fontWeight: 600 }}>ÖDEME ŞEKLİ</Typography>
+                  <Typography variant="caption" sx={{ fontWeight: 700, color: colors.primary }}>{formatOdemeTipi(tahsilat.odemeTipi)}</Typography>
+                </Box>
+                {(tahsilat.kasa || (tahsilat.fatura && tahsilat.fatura.faturaNo) || tahsilat.kalanBakiye !== undefined) && (
+                  <>
+                    {tahsilat.kasa && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', borderBottom: `1px dashed ${colors.border}`, pb: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: colors.secondary, fontWeight: 600 }}>KASA / HESAP</Typography>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: colors.primary }}>{tahsilat.kasa.kasaAdi}</Typography>
+                      </Box>
+                    )}
+                    {tahsilat.fatura && tahsilat.fatura.faturaNo && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Typography variant="caption" sx={{ color: colors.secondary, fontWeight: 600 }}>İLGİLİ FATURA</Typography>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: colors.primary }}>{tahsilat.fatura.faturaNo}</Typography>
+                      </Box>
+                    )}
+                    {tahsilat.kalanBakiye !== undefined && (
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', borderTop: `1px dashed ${colors.border}`, pt: 0.5 }}>
+                        <Typography variant="caption" sx={{ color: colors.secondary, fontWeight: 600 }}>KALAN BAKİYE</Typography>
+                        <Typography variant="caption" sx={{ fontWeight: 700, color: colors.primary }}>{formatMoney(tahsilat.kalanBakiye)}</Typography>
+                      </Box>
+                    )}
+                  </>
+                )}
+              </Stack>
+            </Box>
+          </Grid>
+        </Grid>
+
+        {/* Amount Section */}
+        <Box sx={{ mb: isLandscape ? 2 : 4 }}>
+          <Grid container spacing={0} sx={{ border: `2px solid ${colors.accent}`, borderRadius: 2, overflow: 'hidden' }}>
+            <Grid size={{ xs: 8 }} sx={{ p: 2, bgcolor: 'white', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              <Typography variant="caption" sx={{ color: colors.secondary, fontWeight: 700, mb: 0.5, letterSpacing: '0.05em' }}>
+                YALNIZ
+              </Typography>
+              <Typography variant="body1" sx={{ fontWeight: 600, color: colors.primary, fontStyle: 'italic' }}>
+                # {amountInWords} #
+              </Typography>
+            </Grid>
+            <Grid size={{ xs: 4 }} sx={{ bgcolor: colors.bgAmount, color: colors.accent, p: 2, display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'flex-end' }}>
+              <Typography variant="caption" sx={{ color: colors.secondary, fontWeight: 600, mb: 0.5 }}>
+                TOPLAM TUTAR
+              </Typography>
+              <Typography variant={isLandscape ? 'h5' : 'h4'} sx={{ fontWeight: 800 }}>
                 {formatMoney(tahsilat.tutar)}
               </Typography>
-            </Box>
-            <Box sx={{ textAlign: { xs: 'left', sm: 'right' } }}>
-              <Typography variant="body2" sx={{ opacity: 0.75 }}>
-                Yazı ile
-              </Typography>
-              <Typography variant="body1" sx={{ fontWeight: 'bold' }}>
-                {formatMoney(tahsilat.tutar)} ({formatOdemeTipi(tahsilat.odemeTipi)})
-              </Typography>
-            </Box>
-          </Stack>
-        </Paper>
-      </Box>
-
-      {tahsilat.aciklama && (
-        <Box sx={{ mb: 3 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#0f172a', mb: 1 }}>
-            Açıklama
-          </Typography>
-          <Paper variant="outlined" sx={{ p: 2 }}>
-            <Typography variant="body2">{tahsilat.aciklama}</Typography>
-          </Paper>
+            </Grid>
+          </Grid>
         </Box>
-      )}
 
-      <Grid container spacing={4} sx={{ mt: 6 }}>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#0f172a', mb: 1 }}>
-            Teslim Eden
-          </Typography>
-          <Paper variant="outlined" sx={{ p: 3, minHeight: '100px' }}>
-            <Typography variant="body2" color="text.secondary">
-              İmza / Kaşe
+        {/* Description */}
+        {tahsilat.aciklama && (
+          <Box sx={{ mb: isLandscape ? 1 : 4 }}>
+            <Typography variant="caption" sx={{ color: colors.secondary, fontWeight: 700, letterSpacing: '0.05em', mb: 0.5, display: 'block' }}>
+              AÇIKLAMA / NOTLAR
             </Typography>
-          </Paper>
-        </Grid>
-        <Grid size={{ xs: 12, md: 6 }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 'bold', color: '#0f172a', mb: 1 }}>
-            Teslim Alan
-          </Typography>
-          <Paper variant="outlined" sx={{ p: 3, minHeight: '100px' }}>
-            <Typography variant="body2" color="text.secondary">
-              İmza / Kaşe
+            <Box sx={{ p: 1.5, border: `1px solid ${colors.border}`, borderRadius: 2, bgcolor: 'white' }}>
+              <Typography variant="body2" sx={{ fontSize: '0.85rem', color: colors.primary }}>{tahsilat.aciklama}</Typography>
+            </Box>
+          </Box>
+        )}
+
+        {/* Footer / Signatures */}
+        <Box sx={{ mt: 'auto', pt: isLandscape ? 1 : 2 }}>
+          <Grid container spacing={4}>
+            <Grid size={{ xs: 6 }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: colors.secondary, mb: isLandscape ? 2 : 4, display: 'block', textTransform: 'uppercase' }}>
+                  {tahsilat.tip === 'TAHSILAT' ? 'TAHSİL EDEN' : 'ÖDEME YAPAN'}
+                </Typography>
+                <Box sx={{ height: isLandscape ? 30 : 50, borderBottom: `1px solid ${colors.secondary}`, width: '70%', mx: 'auto', opacity: 0.3 }} />
+                <Typography variant="caption" sx={{ color: colors.secondary, display: 'block', mt: 1, fontSize: '0.65rem' }}>
+                  İmza / Kaşe
+                </Typography>
+              </Box>
+            </Grid>
+            <Grid size={{ xs: 6 }}>
+              <Box sx={{ textAlign: 'center' }}>
+                <Typography variant="caption" sx={{ fontWeight: 700, color: colors.secondary, mb: isLandscape ? 2 : 4, display: 'block', textTransform: 'uppercase' }}>
+                  {tahsilat.tip === 'TAHSILAT' ? 'ÖDEME YAPAN' : 'TAHSİL EDEN'}
+                </Typography>
+                <Box sx={{ height: isLandscape ? 30 : 50, borderBottom: `1px solid ${colors.secondary}`, width: '70%', mx: 'auto', opacity: 0.3 }} />
+                <Typography variant="caption" sx={{ color: colors.secondary, display: 'block', mt: 1, fontSize: '0.65rem' }}>
+                  İmza
+                </Typography>
+              </Box>
+            </Grid>
+          </Grid>
+
+          <Box sx={{
+            mt: isLandscape ? 2 : 4,
+            pt: 1.5,
+            borderTop: `1px solid ${colors.border}`,
+            display: 'flex',
+            justifyContent: 'center'
+          }}>
+            <Typography variant="caption" sx={{ color: colors.secondary, fontSize: '0.65rem', opacity: 0.6 }}>
+              Bu belge dijital olarak <strong>OTOMUHASEBE</strong> üzerinden oluşturulmuştur.
             </Typography>
-          </Paper>
-        </Grid>
-      </Grid>
+          </Box>
+        </Box>
+      </Box>
     </Paper>
   );
 }
-

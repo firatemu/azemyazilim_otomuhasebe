@@ -60,11 +60,7 @@ export default defineConfig({
     host: true, // Tüm network interface'lerinden erişilebilir
     open: false, // Otomatik browser açma
     // Development mode'da cache'i tamamen kapat
-    hmr: {
-      overlay: true,
-      // HMR'i her zaman aktif tut
-      clientPort: DEV_SERVER_PORT,
-    },
+    hmr: false, // Hot Module Replacement devre dışı
     // Cache'i tamamen devre dışı bırak
     headers: {
       'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0, s-maxage=0',
@@ -74,12 +70,8 @@ export default defineConfig({
     },
     // Middleware ile tüm response'lara no-cache header'ı ekle
     middlewareMode: false,
-    // Watch mode - dosya değişikliklerini izle
-    watch: {
-      // Tüm dosya değişikliklerini izle
-      usePolling: true,
-      interval: 100,
-    },
+    // Watch mode - dosya değişikliklerini izleme (hot reload kapalı)
+    watch: null,
     // 404 hatalarını önlemek için fallback
     fs: {
       strict: false, // Dosya sistemi kontrollerini gevşet

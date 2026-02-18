@@ -4,13 +4,14 @@ import { HareketTipi, Prisma } from '@prisma/client';
 
 @Injectable()
 export class StokHareketService {
-  constructor(private prisma: PrismaService) {}
+  constructor(private prisma: PrismaService) { }
 
   async findAll(
     page = 1,
     limit = 100,
     stokId?: string,
     hareketTipi?: HareketTipi,
+    tenantId?: string,
   ) {
     const skip = (page - 1) * limit;
 
@@ -18,6 +19,13 @@ export class StokHareketService {
 
     if (stokId) {
       where.stokId = stokId;
+    }
+
+    // Tenant filtresi (Stok üzerinden)
+    if (tenantId) {
+      where.stok = {
+        tenantId: tenantId
+      };
     }
 
     if (hareketTipi) {
@@ -38,6 +46,13 @@ export class StokHareketService {
               stokAdi: true,
               marka: true,
               birim: true,
+            },
+          },
+          warehouse: {
+            select: {
+              id: true,
+              name: true,
+              code: true,
             },
           },
         },

@@ -87,6 +87,7 @@ wait_http_inside "backend-staging" "$API_HEALTH_PATH" "$WAIT_HTTP_SECONDS" || fa
 # 6) Admin + Landing
 log "Admin & Landing build + up"
 $COMPOSE -f "$BASE" -f "$STG" up -d --build admin-panel-staging
+$COMPOSE -f "$BASE" -f "$STG" up -d --build user-panel-staging
 $COMPOSE -f "$BASE" -f "$STG" up -d --build landing-page-staging
 $COMPOSE -f "$BASE" -f "$STG" ps
 

@@ -1,17 +1,73 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Query, Request, UseGuards } from '@nestjs/common';
-import { FaturaTipi } from '@prisma/client';
+import { Body, Controller, Delete, Get, Param, Post, Put, Query, Request, Res, UseGuards } from '@nestjs/common';
+import { FaturaDurum, FaturaTipi } from '@prisma/client';
+import type { Response } from 'express';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { HizliService } from '../hizli/hizli.service';
 import { CreateFaturaDto } from './dto/create-fatura.dto';
 import { UpdateFaturaDto } from './dto/update-fatura.dto';
 import { FaturaService } from './fatura.service';
+import { FaturaExportService } from './fatura-export.service';
 
 @Controller('fatura')
 export class FaturaController {
   constructor(
     private readonly faturaService: FaturaService,
     private readonly hizliService: HizliService,
+    private readonly faturaExportService: FaturaExportService,
   ) { }
+
+  @Get('stats')
+  @UseGuards(JwtAuthGuard)
+  async getStats(@Query('faturaTipi') faturaTipi?: FaturaTipi) {
+    return this.faturaService.getSalesStats(faturaTipi);
+  }
+
+  @Get('vade-analiz')
+  @UseGuards(JwtAuthGuard)
+  async getVadeAnaliz(@Query('cariId') cariId?: string) {
+    return this.faturaService.getVadeAnaliz(cariId);
+  }
+
+  @Get('price-history')
+  @UseGuards(JwtAuthGuard)
+  async getPriceHistory(
+    @Query('cariId') cariId: string,
+    @Query('stokId') stokId: string,
+  ) {
+    return this.faturaService.getPriceHistory(cariId, stokId);
+  }
+
+  @Get('exchange-rate')
+  @UseGuards(JwtAuthGuard)
+  async getExchangeRate(@Query('currency') currency: string) {
+    const rate = await this.faturaService.getExchangeRate(currency);
+    return { rate };
+  }
+
+  @Get('export/excel')
+  @UseGuards(JwtAuthGuard)
+  async exportExcel(
+    @Query('faturaTipi') faturaTipi: string,
+    @Query('startDate') startDate: string,
+    @Query('endDate') endDate: string,
+    @Query('durum') durum: string,
+    @Query('search') search: string,
+    @Query('satisElemaniId') satisElemaniId: string,
+    @Res() res: Response,
+  ) {
+    const buffer = await this.faturaExportService.generateSalesInvoiceExcel(
+      faturaTipi as FaturaTipi || undefined,
+      startDate || undefined,
+      endDate || undefined,
+      durum || undefined,
+      search || undefined,
+      satisElemaniId || undefined,
+    );
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename=faturalar_${new Date().toISOString().split('T')[0]}.xlsx`);
+    res.send(buffer);
+  }
 
   @Get()
   async findAll(
@@ -22,15 +78,16 @@ export class FaturaController {
     @Query('cariId') cariId?: string,
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
+    @Query('startDate') startDate?: string,
+    @Query('endDate') endDate?: string,
+    @Query('durum') durum?: string,
+    @Query('satisElemaniId') satisElemaniId?: string,
   ) {
-    // #region agent log
-    fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.controller.ts:17',message:'findAll endpoint called',data:{page,limit,faturaTipi,search,cariId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 50;
 
     try {
-      const result = await this.faturaService.findAll(
+      const result = await this.faturaService.findAllAdvanced(
         pageNum,
         limitNum,
         faturaTipi,
@@ -38,11 +95,11 @@ export class FaturaController {
         cariId,
         sortBy,
         sortOrder,
+        startDate,
+        endDate,
+        durum,
+        satisElemaniId,
       );
-
-      // #region agent log
-      fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.controller.ts:35',message:'findAll succeeded',data:{resultDataCount:result.data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
 
       return {
         success: true,
@@ -52,9 +109,6 @@ export class FaturaController {
         limit: limitNum,
       };
     } catch (error) {
-      // #region agent log
-      fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.controller.ts:42',message:'findAll controller error',data:{errorMessage:error?.message,errorStatus:error?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       throw error;
     }
   }
@@ -73,6 +127,16 @@ export class FaturaController {
   @Get(':id')
   async findOne(@Param('id') id: string) {
     return this.faturaService.findOne(id);
+  }
+
+  @UseGuards(JwtAuthGuard)
+  @Put('bulk/durum')
+  async bulkUpdateDurum(
+    @Body() body: { ids: string[]; durum: FaturaDurum },
+    @Request() req,
+  ) {
+    const userId = req.user?.id;
+    return this.faturaService.bulkUpdateDurum(body.ids, body.durum, userId);
   }
 
   @UseGuards(JwtAuthGuard)

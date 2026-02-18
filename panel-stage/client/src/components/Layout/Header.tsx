@@ -12,6 +12,7 @@ import {
   MenuItem,
   Chip,
   Divider,
+  Tooltip,
 } from '@mui/material';
 import {
   Logout,
@@ -24,9 +25,12 @@ import {
   Notifications,
   LightMode,
   DarkMode,
+  AddCircleOutline,
 } from '@mui/icons-material';
+import * as Icons from '@mui/icons-material';
 import { useAuthStore } from '@/stores/authStore';
 import { useThemeStore } from '@/stores/themeStore';
+import { useQuickMenuStore } from '@/stores/quickMenuStore';
 import { useRouter } from 'next/navigation';
 import { SIDEBAR_WIDTH } from './Sidebar';
 
@@ -39,9 +43,14 @@ interface HeaderProps {
 export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPinned }: HeaderProps) {
   const [anchorEl, setAnchorEl] = React.useState<null | HTMLElement>(null);
   const [currentDateTime, setCurrentDateTime] = useState('');
-  const { user, clearAuth } = useAuthStore();
-  const { isDarkMode, toggleDarkMode } = useThemeStore();
+  const { user, clearAuth } = (useAuthStore as any)();
+  const { isDarkMode, toggleDarkMode } = (useThemeStore as any)();
+  const { items: quickMenuItems, fetchQuickMenuItems } = (useQuickMenuStore as any)();
   const router = useRouter();
+
+  useEffect(() => {
+    fetchQuickMenuItems();
+  }, [fetchQuickMenuItems]);
 
   // Sistem tarih/saat güncelleme
   useEffect(() => {
@@ -128,11 +137,11 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
         </Box>
 
         {/* Center Section - Page Title (will be populated by TabBar) */}
-        <Typography 
-          variant="h6" 
-          noWrap 
-          component="div" 
-          sx={{ 
+        <Typography
+          variant="h6"
+          noWrap
+          component="div"
+          sx={{
             flexGrow: 1,
             ml: 2,
             fontWeight: 600,
@@ -195,6 +204,41 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
             }}
           />
 
+          {/* Quick Actions */}
+          <Box sx={{ display: { xs: 'none', lg: 'flex' }, alignItems: 'center', gap: 1 }}>
+            {quickMenuItems
+              .filter((item: any) => item.enabled)
+              .sort((a: any, b: any) => a.order - b.order)
+              .map((item: any) => {
+                const IconComponent = (Icons as any)[item.icon];
+                return (
+                  <Tooltip key={item.id} title={item.label} arrow>
+                    <IconButton
+                      size="small"
+                      onClick={() => router.push(item.path)}
+                      sx={{
+                        color: item.color,
+                        bgcolor: 'var(--muted)',
+                        border: '1px solid var(--border)',
+                        '&:hover': {
+                          bgcolor: 'var(--accent)',
+                          borderColor: item.color,
+                          transform: 'scale(1.05)',
+                        },
+                        transition: 'all 0.2s ease',
+                      }}
+                    >
+                      {IconComponent ? (
+                        <IconComponent sx={{ fontSize: 20 }} />
+                      ) : (
+                        <AddCircleOutline sx={{ fontSize: 20 }} />
+                      )}
+                    </IconButton>
+                  </Tooltip>
+                );
+              })}
+          </Box>
+
           {/* Notifications Button */}
           <IconButton
             size="small"
@@ -211,10 +255,10 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
           </IconButton>
 
           {/* User Info */}
-          <Box 
-            sx={{ 
-              display: 'flex', 
-              alignItems: 'center', 
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'center',
               gap: 1.5,
               px: 1.5,
               py: 0.75,
@@ -228,9 +272,9 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
             onClick={handleMenu}
           >
             <Box sx={{ textAlign: 'right', display: { xs: 'none', sm: 'block' } }}>
-              <Typography 
-                variant="body2" 
-                sx={{ 
+              <Typography
+                variant="body2"
+                sx={{
                   fontWeight: 600,
                   fontSize: '0.875rem',
                   color: 'var(--foreground)',
@@ -239,9 +283,9 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
               >
                 {user?.fullName || 'Kullanıcı'}
               </Typography>
-              <Typography 
-                variant="caption" 
-                sx={{ 
+              <Typography
+                variant="caption"
+                sx={{
                   fontSize: '0.75rem',
                   color: 'var(--muted-foreground)',
                   display: 'block',
@@ -304,7 +348,7 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
               </Typography>
             </Box>
             <Divider sx={{ borderColor: 'var(--border)' }} />
-            <MenuItem 
+            <MenuItem
               onClick={handleClose}
               sx={{
                 py: 1.25,
@@ -317,7 +361,7 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
               <Person sx={{ mr: 1.5, fontSize: 18, color: 'var(--muted-foreground)' }} />
               <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Profil</Typography>
             </MenuItem>
-            <MenuItem 
+            <MenuItem
               onClick={handleClose}
               sx={{
                 py: 1.25,
@@ -331,7 +375,7 @@ export default function Header({ onToggleSidebar, onToggleSidebarPin, sidebarPin
               <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Ayarlar</Typography>
             </MenuItem>
             <Divider sx={{ borderColor: 'var(--border)' }} />
-            <MenuItem 
+            <MenuItem
               onClick={handleLogout}
               sx={{
                 py: 1.25,

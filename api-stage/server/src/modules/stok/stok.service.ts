@@ -10,6 +10,7 @@ import { TenantResolverService } from '../../common/services/tenant-resolver.ser
 import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateStokDto, UpdateStokDto } from './dto';
 import { CodeTemplateService } from '../code-template/code-template.service';
+import { DeletionProtectionService } from '../../common/services/deletion-protection.service';
 import { HareketTipi } from '@prisma/client';
 
 @Injectable()
@@ -19,7 +20,8 @@ export class StokService {
     private tenantResolver: TenantResolverService,
     @Inject(forwardRef(() => CodeTemplateService))
     private codeTemplateService: CodeTemplateService,
-  ) {}
+    private deletionProtection: DeletionProtectionService,
+  ) { }
 
   async create(dto: CreateStokDto) {
     const tenantId = await this.tenantResolver.resolveForCreate({ allowNull: true });
@@ -53,9 +55,11 @@ export class StokService {
         stokKodu,
         ...(finalTenantId != null && { tenantId: finalTenantId }),
       };
-      return await this.prisma.stok.create({
+      const createdStok = await this.prisma.stok.create({
         data: createData,
       });
+
+      return createdStok;
     } catch (error: any) {
       if (error?.code === 'P2002') {
         const field = error?.meta?.target?.[0] || 'alan';
@@ -102,6 +106,42 @@ export class StokService {
       ]);
 
 
+      // Eşdeğer ürünleri getir
+      const esdegerGrupIds = initialData
+        .map((s) => s.esdegerGrupId)
+        .filter((id) => id !== null) as string[];
+
+      let esdegerUrunlerMap = new Map<string, any[]>();
+
+      if (esdegerGrupIds.length > 0) {
+        console.log('🔍 [findAll] Found groups:', esdegerGrupIds);
+        const esdegerUrunler = await this.prisma.stok.findMany({
+          where: {
+            esdegerGrupId: { in: esdegerGrupIds },
+          },
+          select: {
+            id: true,
+            stokKodu: true,
+            stokAdi: true,
+            esdegerGrupId: true,
+            oem: true,
+            marka: true,
+          },
+        });
+        console.log('✅ [findAll] Fetched related products count:', esdegerUrunler.length);
+
+        esdegerUrunler.forEach((u) => {
+          if (u.esdegerGrupId) {
+            if (!esdegerUrunlerMap.has(u.esdegerGrupId)) {
+              esdegerUrunlerMap.set(u.esdegerGrupId, []);
+            }
+            esdegerUrunlerMap.get(u.esdegerGrupId)?.push(u);
+          }
+        });
+      } else {
+        console.log('ℹ️ [findAll] No groups found in current page data');
+      }
+
       // Eğer raf field'ı boşsa, productLocationStocks'ten al ve miktar hesapla
       const dataWithDetails = await Promise.all(
         initialData.map(async (stok) => {
@@ -126,12 +166,49 @@ export class StokService {
             }
           });
 
+          // Eşleşik ürünleri hazırla
+          const esdegerGrupId = stok.esdegerGrupId;
+          let eslesikUrunler: string[] = [];
+          let eslesikUrunDetaylari: any[] = [];
+
+          if (esdegerGrupId && esdegerUrunlerMap.has(esdegerGrupId)) {
+            const grupUrunleri = esdegerUrunlerMap.get(esdegerGrupId) || [];
+            // Kendisi hariç diğerleri
+            const digerleri = grupUrunleri.filter(u => u.id !== stok.id);
+            eslesikUrunler = digerleri.map(u => u.id);
+            eslesikUrunDetaylari = digerleri;
+          }
+
+          // Son satınalma fiyatını bul
+          const lastPurchase = await this.prisma.faturaKalemi.findFirst({
+            where: {
+              stokId: stok.id,
+              fatura: {
+                faturaTipi: 'ALIS',
+                tenantId: stok.tenantId,
+              },
+            },
+            orderBy: { createdAt: 'desc' },
+            select: {
+              birimFiyat: true,
+              miktar: true,
+              tutar: true,
+            },
+          });
+
+          const sonAlisFiyati = lastPurchase
+            ? Number(lastPurchase.tutar) / lastPurchase.miktar
+            : Number(stok.alisFiyati);
+
           return {
             ...stok,
             raf:
               stok.raf ||
               (stok.productLocationStocks?.[0]?.location?.code ?? null),
             miktar,
+            eslesikUrunler,
+            eslesikUrunDetaylari,
+            sonAlisFiyati,
           };
         }),
       );
@@ -314,17 +391,10 @@ export class StokService {
   }
 
   async remove(id: string) {
-    await this.findOne(id);
+    const tenantId = await this.tenantResolver.resolveForQuery();
+    if (!tenantId) throw new BadRequestException('Tenant ID bulunamadı.');
 
-    const canDeleteResult = await this.canDelete(id);
-
-    if (!canDeleteResult.canDelete) {
-      throw new BadRequestException(
-        `Bu malzeme silinemez. Malzeme ${canDeleteResult.toplamHareketSayisi} işlemde kullanılmıştır. ` +
-          `(Hareket: ${canDeleteResult.hareketSayisi}, Fatura: ${canDeleteResult.faturaKalemSayisi}, Sipariş: ${canDeleteResult.siparisKalemSayisi}, ` +
-          `Teklif: ${canDeleteResult.teklifKalemSayisi}, Sayım: ${canDeleteResult.sayimKalemSayisi}, Depo Hareketi: ${canDeleteResult.stockMoveSayisi})`,
-      );
-    }
+    await this.deletionProtection.checkStokDeletion(id, tenantId);
 
     return this.prisma.stok.delete({
       where: { id },
@@ -368,6 +438,8 @@ export class StokService {
     // Ana ürünü kontrol et
     const anaUrun = await this.findOne(anaUrunId);
 
+    console.log('🔗 [StokService] eslestirUrunler started', { anaUrunId, esUrunIds, anaUrunGrupId: anaUrun.esdegerGrupId });
+
     // Eş ürünleri kontrol et
     const esUrunler = await this.prisma.stok.findMany({
       where: { id: { in: esUrunIds } },
@@ -395,6 +467,16 @@ export class StokService {
 
     if (mevcutGrupIds.size === 0) {
       // Hiçbir ürünün grubu yok, yeni grup oluştur
+      // EĞER esUrunIds boş ise ve ana ürünün de grubu yoksa, işlem yapmaya gerek yok
+      if (esUrunIds.length === 0) {
+        return {
+          message: 'Eşleşme bulunamadı veya değişiklik yapılmadı',
+          grupId: null,
+          toplamUrun: 0,
+          urunler: [],
+        }
+      }
+
       const yeniGrup = await this.prisma.esdegerGrup.create({
         data: {
           grupAdi: `Grup - ${anaUrun.stokKodu}`,
@@ -429,7 +511,7 @@ export class StokService {
       data: { esdegerGrupId: hedefGrupId },
     });
 
-    // Eş ürünleri gruba ekle (tümünü güncelle)
+    // Eş ürünleri gruba ekle (seçilenleri güncelle)
     if (esUrunIds.length > 0) {
       await this.prisma.stok.updateMany({
         where: {
@@ -439,7 +521,59 @@ export class StokService {
       });
     }
 
-    // Grup içindeki tüm ürünleri getir
+    // Grupta olup listede olmayan ürünleri gruptan çıkar
+    // 1. Gruptaki tüm ürünleri bul
+    const gruptakiTumUrunler = await this.prisma.stok.findMany({
+      where: { esdegerGrupId: hedefGrupId },
+      select: { id: true }
+    });
+
+    console.log('🔍 [eslestirUrunler] Group members before cleanup:', gruptakiTumUrunler.map(u => u.id));
+
+    // 2. Listede olmayanları belirle (Ana ürün hariç)
+    const gruptanCikarilacakIds = gruptakiTumUrunler
+      .map(u => u.id)
+      .filter(id => !esUrunIds.includes(id) && id !== anaUrunId);
+
+    console.log('🔍 [eslestirUrunler] IDs to remove:', gruptanCikarilacakIds);
+
+    // 3. Bu ürünlerin grup bağlantısını kes
+    if (gruptanCikarilacakIds.length > 0) {
+      await this.prisma.stok.updateMany({
+        where: {
+          id: { in: gruptanCikarilacakIds }
+        },
+        data: { esdegerGrupId: null }
+      });
+      console.log('✅ [eslestirUrunler] Removed products from group');
+    }
+
+    // GRUP TEMİZLİĞİ: Eğer grupta 2'den az ürün kaldıysa, grubu dağıt
+    const gruptakiSonUrunler = await this.prisma.stok.count({
+      where: { esdegerGrupId: hedefGrupId }
+    });
+
+    if (gruptakiSonUrunler < 2) {
+      // Grubu dağıt (kalan ürünlerin bağlantısını kes)
+      await this.prisma.stok.updateMany({
+        where: { esdegerGrupId: hedefGrupId },
+        data: { esdegerGrupId: null }
+      });
+
+      // Grubu sil
+      await this.prisma.esdegerGrup.delete({
+        where: { id: hedefGrupId }
+      });
+
+      return {
+        message: 'Eşleşmeler kaldırıldı',
+        grupId: null,
+        toplamUrun: 0,
+        urunler: [],
+      };
+    }
+
+    // Grup içindeki tüm ürünleri getir (son durum - eğer grup hala varsa)
     const grupUrunler = await this.prisma.stok.findMany({
       where: { esdegerGrupId: hedefGrupId },
       select: {

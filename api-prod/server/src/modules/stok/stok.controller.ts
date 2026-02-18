@@ -22,30 +22,10 @@ export class StokController {
   @Post()
   create(@Body() dto: CreateStokDto) {
     try {
-      // #region agent log
-      console.log('[DEBUG stok.controller.create] Request received:', {
-        stokAdi: dto.stokAdi,
-        stokKodu: dto.stokKodu,
-        birim: dto.birim,
-        alisFiyati: dto.alisFiyati,
-        satisFiyati: dto.satisFiyati,
-        alisFiyatiType: typeof dto.alisFiyati,
-        satisFiyatiType: typeof dto.satisFiyati,
-        aciklama: dto.aciklama?.substring(0, 50),
-      });
-      // #endregion
 
       console.log('🔍 [Stok Controller] create çağrıldı', { dto: { ...dto, aciklama: dto.aciklama?.substring(0, 50) } });
       return this.stokService.create(dto);
     } catch (error: any) {
-      // #region agent log
-      console.error('[DEBUG stok.controller.create] ERROR:', {
-        message: error?.message,
-        status: error?.status,
-        response: error?.response,
-        stack: error?.stack?.split('\n').slice(0, 5).join('\n'),
-      });
-      // #endregion
 
       console.error('❌ [Stok Controller] create hatası:', error);
       throw error;

@@ -23,9 +23,6 @@ export class FaturaController {
     @Query('sortBy') sortBy?: string,
     @Query('sortOrder') sortOrder?: 'asc' | 'desc',
   ) {
-    // #region agent log
-    fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.controller.ts:17',message:'findAll endpoint called',data:{page,limit,faturaTipi,search,cariId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'E'})}).catch(()=>{});
-    // #endregion
     const pageNum = page ? parseInt(page, 10) : 1;
     const limitNum = limit ? parseInt(limit, 10) : 50;
 
@@ -40,9 +37,6 @@ export class FaturaController {
         sortOrder,
       );
 
-      // #region agent log
-      fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.controller.ts:35',message:'findAll succeeded',data:{resultDataCount:result.data?.length},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'F'})}).catch(()=>{});
-      // #endregion
 
       return {
         success: true,
@@ -52,9 +46,6 @@ export class FaturaController {
         limit: limitNum,
       };
     } catch (error) {
-      // #region agent log
-      fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.controller.ts:42',message:'findAll controller error',data:{errorMessage:error?.message,errorStatus:error?.status},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'G'})}).catch(()=>{});
-      // #endregion
       throw error;
     }
   }

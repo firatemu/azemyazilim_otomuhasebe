@@ -19,7 +19,7 @@ export class SatınAlmaIrsaliyesiService {
     private prisma: PrismaService,
     private tenantResolver: TenantResolverService,
     private codeTemplateService: CodeTemplateService,
-  ) {}
+  ) { }
 
   private async createLog(
     irsaliyeId: string,
@@ -355,7 +355,7 @@ export class SatınAlmaIrsaliyesiService {
     }
 
     // Faturaya bağlı irsaliye güncellenemez
-    if (existingIrsaliye.faturalar && existingIrsaliye.faturalar.length > 0) {
+    if (existingIrsaliye.faturalar) {
       throw new BadRequestException('Faturaya bağlı irsaliye güncellenemez');
     }
 
@@ -492,7 +492,7 @@ export class SatınAlmaIrsaliyesiService {
     }
 
     // Faturaya bağlı irsaliye silinemez
-    if (irsaliye.faturalar && irsaliye.faturalar.length > 0) {
+    if (irsaliye.faturalar) {
       throw new BadRequestException('Faturaya bağlı irsaliye silinemez');
     }
 

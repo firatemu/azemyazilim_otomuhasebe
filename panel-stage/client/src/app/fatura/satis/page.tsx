@@ -1,39 +1,78 @@
 'use client';
 
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo } from 'react';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
 import { getProfitByInvoice, type ProfitByInvoiceResponse } from '@/services/invoiceProfitService';
-import { Add, Assignment, Close, Delete, Edit, Print, Search, Undo, Visibility, Send, CheckCircle, Error as ErrorIcon, HourglassEmpty, CloudUpload, LocalShipping, Cancel, ArrowUpward, ArrowDownward, MoreVert, TrendingUp } from '@mui/icons-material';
+import { useTabStore } from '@/stores/tabStore';
+import {
+  Add,
+  Assessment,
+  Close,
+  Delete,
+  Edit,
+  Print,
+  Search,
+  Undo,
+  Visibility,
+  Send,
+  CheckCircle,
+  Error as ErrorIcon,
+  HourglassEmpty,
+  CloudUpload,
+  LocalShipping,
+  Cancel,
+  MoreVert,
+  TrendingUp,
+  ContentCopy,
+  Description,
+  FileDownload,
+  FilterList,
+  History
+} from '@mui/icons-material';
 import {
   Alert,
   Box,
   Button,
+  Card,
+  CardContent,
+  Checkbox,
   Chip,
   CircularProgress,
+  Collapse,
   Dialog,
   DialogActions,
   DialogContent,
   DialogTitle,
+  Divider,
   FormControl,
+  Grid,
   IconButton,
   InputLabel,
-  Link,
+  ListItemIcon,
+  Link as MuiLink,
   Menu,
   MenuItem,
   Paper,
+  Popover,
   Select,
   Snackbar,
+  TextField,
+  Tooltip,
+  Typography,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  TextField,
-  Typography
 } from '@mui/material';
-import { useRouter } from 'next/navigation';
-import { useEffect, useState } from 'react';
+import { GridColDef, GridRenderCellParams, GridPaginationModel, GridSortModel, GridFilterModel } from '@mui/x-data-grid';
+import KPIHeader from '@/components/Fatura/KPIHeader';
+import InvoiceDataGrid from '@/components/Fatura/InvoiceDataGrid';
+import StatusBadge from '@/components/Fatura/StatusBadge';
 
 interface Cari {
   id: string;
@@ -56,6 +95,8 @@ interface FaturaKalemi {
   miktar: number;
   birimFiyat: number;
   kdvOrani: number;
+  iskontoOrani: number;
+  iskontoTutari: number;
   tutar?: number;
   kdvTutar?: number;
 }
@@ -70,52 +111,69 @@ interface Fatura {
   toplamTutar: number;
   kdvTutar: number;
   genelToplam: number;
+  dovizCinsi?: string;
+  dovizKuru?: number;
+  dovizToplam?: number;
   durum: 'ACIK' | 'ONAYLANDI' | 'KISMEN_ODENDI' | 'KAPALI' | 'IPTAL';
   iskonto?: number;
   aciklama?: string;
   kalemler?: FaturaKalemi[];
-  odenenTutar?: number;    // FIFO: Ödenen tutar
-  odenecekTutar?: number;  // FIFO: Kalan tutar
+  odenenTutar?: number;
+  odenecekTutar?: number;
   efaturaStatus?: 'PENDING' | 'SENT' | 'ERROR' | 'DRAFT';
   efaturaEttn?: string;
   deliveryNoteId?: string;
+  satisElemaniId?: string;
+  satisElemani?: { id: string; adSoyad: string };
   irsaliye?: {
     id: string;
     irsaliyeNo: string;
-    kaynakSiparis?: {
-      id: string;
-      siparisNo: string;
-    };
+    kaynakSiparis?: { id: string; siparisNo: string };
   };
   siparisNo?: string;
-  createdByUser?: {
-    fullName?: string;
-    username?: string;
-  };
+  createdByUser?: { fullName?: string; username?: string };
   createdAt?: string;
-  updatedByUser?: {
-    fullName?: string;
-    username?: string;
-  };
+  updatedByUser?: { fullName?: string; username?: string };
   updatedAt?: string;
-  logs?: Array<{
-    createdAt: string;
-    message: string;
-  }>;
+  logs?: Array<{ createdAt: string; message: string }>;
+}
+
+interface SalesStats {
+  aylikSatis: { tutar: number; adet: number };
+  tahsilatBekleyen: { tutar: number; adet: number };
+  vadesiGecmis: { tutar: number; adet: number };
+}
+
+interface PriceHistoryItem {
+  faturaNo: string;
+  tarih: string;
+  birimFiyat: number;
+  miktar: number;
+  tutar: number;
 }
 
 export default function SatisFaturalariPage() {
+  const { addTab, setActiveTab } = useTabStore();
   const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
+
   const [faturalar, setFaturalar] = useState<Fatura[]>([]);
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
   const [loading, setLoading] = useState(false);
   const [faturaDurumlari, setFaturaDurumlari] = useState<Record<string, string>>({});
 
-  // Sorting states
-  const [sortBy, setSortBy] = useState('tarih');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 10,
+  });
+  const [sortModel, setSortModel] = useState<GridSortModel>([
+    { field: 'tarih', sort: 'desc' },
+  ]);
+  const [filterModel, setFilterModel] = useState<GridFilterModel>({
+    items: [],
+  });
+  const [rowCount, setRowCount] = useState(0);
 
   // Dialog states
   const [openAdd, setOpenAdd] = useState(false);
@@ -128,17 +186,22 @@ export default function SatisFaturalariPage() {
   const [pendingDurum, setPendingDurum] = useState<{ faturaId: string; eskiDurum: string; yeniDurum: string } | null>(null);
   const [irsaliyeIptal, setIrsaliyeIptal] = useState(false);
 
+
+
   // Form data
   const [formData, setFormData] = useState({
     faturaNo: '',
     faturaTipi: 'SATIS' as 'SATIS' | 'ALIS',
     cariId: '',
+    satisElemaniId: '',
     tarih: new Date().toISOString().split('T')[0],
     vade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
     iskonto: 0,
     aciklama: '',
     kalemler: [] as FaturaKalemi[],
   });
+
+  const [satisElemanlari, setSatisElemanlari] = useState<any[]>([]);
 
   // Snackbar
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
@@ -155,28 +218,59 @@ export default function SatisFaturalariPage() {
   const [profitData, setProfitData] = useState<any>(null);
   const [loadingProfit, setLoadingProfit] = useState(false);
 
+  // Summary Cards stats
+  const [stats, setStats] = useState<SalesStats | null>(null);
+
+  // Advanced Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterDurum, setFilterDurum] = useState<string[]>([]);
+  const [filterSatisElemaniId, setFilterSatisElemaniId] = useState('');
+
+
+  // Price History
+  const [priceHistoryAnchor, setPriceHistoryAnchor] = useState<null | HTMLElement>(null);
+  const [priceHistory, setPriceHistory] = useState<PriceHistoryItem[]>([]);
+  const [loadingPriceHistory, setLoadingPriceHistory] = useState(false);
+
+
+
 
 
   useEffect(() => {
     fetchFaturalar();
     fetchCariler();
     fetchStoklar();
-  }, []);
+    fetchSatisElemanlari();
+    fetchStats();
+  }, [paginationModel, sortModel, filterModel]); // Trigger fetch on model changes
 
   const fetchFaturalar = async () => {
     try {
       setLoading(true);
-      const response = await axios.get('/fatura', {
-        params: {
-          faturaTipi: 'SATIS',
-          search: searchTerm,
-          sortBy,
-          sortOrder,
-        },
-      });
-      const faturaData = response.data.data || [];
+      const params: Record<string, any> = {
+        faturaTipi: 'SATIS',
+        search: searchTerm,
+        page: paginationModel.page + 1, // API uses 1-based indexing
+        limit: paginationModel.pageSize,
+        sortBy: sortModel[0]?.field || 'tarih',
+        sortOrder: sortModel[0]?.sort || 'desc',
+      };
+
+      if (filterStartDate) params.startDate = filterStartDate;
+      if (filterEndDate) params.endDate = filterEndDate;
+      if (filterDurum.length > 0) params.durum = filterDurum.join(',');
+      if (filterSatisElemaniId) params.satisElemaniId = filterSatisElemaniId;
+
+      const response = await axios.get('/fatura', { params });
+
+      const faturaData = response.data?.data || [];
+      const totalCount = response.data?.meta?.total || response.data?.total || faturaData.length; // Fallback
+
       setFaturalar(faturaData);
-      // Her fatura için mevcut durumu state'e kaydet
+      setRowCount(totalCount);
+
       const durumMap: Record<string, string> = {};
       faturaData.forEach((fatura: Fatura) => {
         durumMap[fatura.id] = fatura.durum;
@@ -226,11 +320,68 @@ export default function SatisFaturalariPage() {
   };
 
 
+
+  // Price History
+  const fetchPriceHistory = async (event: React.MouseEvent<HTMLElement>, cariId: string, stokId: string) => {
+    setPriceHistoryAnchor(event.currentTarget);
+    setLoadingPriceHistory(true);
+    try {
+      const response = await axios.get('/fatura/price-history', {
+        params: { cariId, stokId },
+      });
+      setPriceHistory(response.data);
+    } catch (error) {
+      setPriceHistory([]);
+    } finally {
+      setLoadingPriceHistory(false);
+    }
+  };
+
+  // Excel Export
+  const handleExportExcel = async () => {
+    try {
+      const params: Record<string, string> = { faturaTipi: 'SATIS' };
+      if (searchTerm) params.search = searchTerm;
+      if (filterStartDate) params.startDate = filterStartDate;
+      if (filterEndDate) params.endDate = filterEndDate;
+      if (filterDurum.length > 0) params.durum = filterDurum.join(',');
+      if (filterSatisElemaniId) params.satisElemaniId = filterSatisElemaniId;
+
+      const response = await axios.get('/fatura/export/excel', {
+        params,
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `faturalar_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showSnackbar('Excel dosyası indirildi', 'success');
+    } catch (error: any) {
+      showSnackbar('Excel aktarımı başarısız', 'error');
+    }
+  };
+
+  // Clear filters
+  const handleClearFilters = () => {
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setFilterDurum([]);
+    setFilterSatisElemaniId('');
+    setSearchTerm('');
+  };
+
+
   const resetForm = () => {
     setFormData({
       faturaNo: '',
       faturaTipi: 'SATIS',
       cariId: '',
+      satisElemaniId: '',
       tarih: new Date().toISOString().split('T')[0],
       vade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
       iskonto: 0,
@@ -242,7 +393,14 @@ export default function SatisFaturalariPage() {
   const handleAddKalem = () => {
     setFormData(prev => ({
       ...prev,
-      kalemler: [...prev.kalemler, { stokId: '', miktar: 1, birimFiyat: 0, kdvOrani: 20 }],
+      kalemler: [...prev.kalemler, {
+        stokId: '',
+        miktar: 1,
+        birimFiyat: 0,
+        kdvOrani: 20,
+        iskontoOrani: 0,
+        iskontoTutari: 0
+      }],
     }));
   };
 
@@ -271,23 +429,22 @@ export default function SatisFaturalariPage() {
     });
   };
 
-  const handleSort = (column: string) => {
-    // Eğer aynı sütuna tıklanırsa sıralamayı ters çevir
-    if (sortBy === column) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
-    } else {
-      setSortBy(column);
-      setSortOrder('desc'); // Yeni sütun varsayılan olarak azalan (desc)
-    }
-  };
 
   const calculateTotal = () => {
     let toplamTutar = 0;
     let kdvTutar = 0;
 
     formData.kalemler.forEach(kalem => {
-      const tutar = kalem.miktar * kalem.birimFiyat;
-      const kalemKdv = (tutar * kalem.kdvOrani) / 100;
+      const miktar = kalem.miktar || 0;
+      const birimFiyat = kalem.birimFiyat || 0;
+      const rawTutar = miktar * birimFiyat;
+
+      const iskontoOrani = kalem.iskontoOrani || 0;
+      const iskontoTutari = kalem.iskontoTutari || (rawTutar * iskontoOrani) / 100;
+      const tutar = rawTutar - iskontoTutari;
+
+      const kalemKdv = (tutar * (kalem.kdvOrani || 0)) / 100;
+
       toplamTutar += tutar;
       kdvTutar += kalemKdv;
     });
@@ -382,6 +539,7 @@ export default function SatisFaturalariPage() {
         faturaNo: fullFatura.faturaNo,
         faturaTipi: fullFatura.faturaTipi,
         cariId: fullFatura.cariId,
+        satisElemaniId: fullFatura.satisElemaniId || '',
         tarih: new Date(fullFatura.tarih).toISOString().split('T')[0],
         vade: fullFatura.vade ? new Date(fullFatura.vade).toISOString().split('T')[0] : '',
         iskonto: fullFatura.iskonto || 0,
@@ -391,6 +549,8 @@ export default function SatisFaturalariPage() {
           miktar: k.miktar,
           birimFiyat: k.birimFiyat,
           kdvOrani: k.kdvOrani,
+          iskontoOrani: k.iskontoOrani || 0,
+          iskontoTutari: k.iskontoTutari || 0,
         })),
       });
 
@@ -533,8 +693,28 @@ export default function SatisFaturalariPage() {
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
-      currency: 'TRY'
+      currency: 'TRY',
     }).format(amount);
+  };
+
+  const fetchStats = async () => {
+    try {
+      const response = await axios.get('/fatura/stats', {
+        params: { faturaTipi: 'SATIS' }
+      });
+      setStats(response.data);
+    } catch (error) {
+      console.error('İstatistikler yüklenirken hata:', error);
+    }
+  };
+
+  const fetchSatisElemanlari = async () => {
+    try {
+      const response = await axios.get('/satis-elemani'); // Correct endpoint based on SatisElemaniController
+      setSatisElemanlari(response.data || []);
+    } catch (error) {
+      console.error('Satış elemanları yüklenirken hata:', error);
+    }
   };
 
   const getStatusColor = (status: string): 'default' | 'primary' | 'secondary' | 'error' | 'info' | 'success' | 'warning' => {
@@ -612,17 +792,45 @@ export default function SatisFaturalariPage() {
                 InputLabelProps={{ shrink: true }}
               />
             </Box>
-            <Box>
-              <FormControl fullWidth required>
+            <Box sx={{ display: 'flex', gap: 2 }}>
+              <FormControl sx={{ flex: 1 }} required>
                 <InputLabel>Cari</InputLabel>
                 <Select
                   value={formData.cariId}
-                  onChange={(e) => setFormData(prev => ({ ...prev, cariId: e.target.value }))}
+                  onChange={async (e) => {
+                    const cariId = e.target.value;
+                    setFormData(prev => ({ ...prev, cariId }));
+                    // Cari seçildiğinde varsayılan satış elemanını getir
+                    try {
+                      const response = await axios.get(`/cari/${cariId}`);
+                      if (response.data?.satisElemaniId) {
+                        setFormData(prev => ({ ...prev, satisElemaniId: response.data.satisElemaniId }));
+                      }
+                    } catch (error) {
+                      console.error('Cari detayları yüklenirken hata:', error);
+                    }
+                  }}
                   label="Cari"
                 >
                   {cariler.map((cari) => (
                     <MenuItem key={cari.id} value={cari.id}>
                       {cari.cariKodu} - {cari.unvan}
+                    </MenuItem>
+                  ))}
+                </Select>
+              </FormControl>
+
+              <FormControl sx={{ flex: 1 }}>
+                <InputLabel>Satış Elemanı</InputLabel>
+                <Select
+                  value={formData.satisElemaniId || ''}
+                  onChange={(e) => setFormData(prev => ({ ...prev, satisElemaniId: e.target.value }))}
+                  label="Satış Elemanı"
+                >
+                  <MenuItem value=""><em>Seçiniz</em></MenuItem>
+                  {satisElemanlari.map((se) => (
+                    <MenuItem key={se.id} value={se.id}>
+                      {se.adSoyad}
                     </MenuItem>
                   ))}
                 </Select>
@@ -655,11 +863,14 @@ export default function SatisFaturalariPage() {
                 <Table size="small">
                   <TableHead>
                     <TableRow>
-                      <TableCell width="35%">Stok</TableCell>
-                      <TableCell width="15%">Miktar</TableCell>
-                      <TableCell width="20%">Birim Fiyat</TableCell>
-                      <TableCell width="15%">KDV %</TableCell>
-                      <TableCell width="10%">İşlem</TableCell>
+                      <TableCell width="25%">Stok</TableCell>
+                      <TableCell width="10%">Miktar</TableCell>
+                      <TableCell width="15%">Birim Fiyat</TableCell>
+                      <TableCell width="10%">İsk (%)</TableCell>
+                      <TableCell width="15%">İsk (₺)</TableCell>
+                      <TableCell width="10%">KDV %</TableCell>
+                      <TableCell width="15%" align="right">Satır Toplamı</TableCell>
+                      <TableCell width="5%">İşlem</TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -670,63 +881,111 @@ export default function SatisFaturalariPage() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      formData.kalemler.map((kalem, index) => (
-                        <TableRow key={index}>
-                          <TableCell>
-                            <FormControl fullWidth size="small">
-                              <Select
-                                value={kalem.stokId}
-                                onChange={(e) => handleKalemChange(index, 'stokId', e.target.value)}
+                      formData.kalemler.map((kalem, index) => {
+                        const rawTutar = (kalem.miktar || 0) * (kalem.birimFiyat || 0);
+                        const lineIskonto = kalem.iskontoTutari || (rawTutar * (kalem.iskontoOrani || 0)) / 100;
+                        const lineNet = rawTutar - lineIskonto;
+                        const lineKdv = (lineNet * (kalem.kdvOrani || 0)) / 100;
+                        const lineTotal = lineNet + lineKdv;
+
+                        return (
+                          <TableRow key={index}>
+                            <TableCell>
+                              <FormControl fullWidth size="small">
+                                <Select
+                                  value={kalem.stokId}
+                                  onChange={(e) => handleKalemChange(index, 'stokId', e.target.value)}
+                                >
+                                  {stoklar.map((stok) => (
+                                    <MenuItem key={stok.id} value={stok.id}>
+                                      {stok.stokKodu} - {stok.stokAdi}
+                                    </MenuItem>
+                                  ))}
+                                </Select>
+                              </FormControl>
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                fullWidth
+                                type="number"
+                                size="small"
+                                value={kalem.miktar}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  handleKalemChange(index, 'miktar', isNaN(value) ? 1 : value);
+                                }}
+                                inputProps={{ min: 1 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                fullWidth
+                                type="number"
+                                size="small"
+                                value={kalem.birimFiyat}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  handleKalemChange(index, 'birimFiyat', isNaN(value) ? 0 : value);
+                                }}
+                                inputProps={{ min: 0, step: 0.01 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                fullWidth
+                                type="number"
+                                size="small"
+                                value={kalem.iskontoOrani}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  handleKalemChange(index, 'iskontoOrani', isNaN(value) ? 0 : value);
+                                }}
+                                inputProps={{ min: 0, max: 100, step: 0.1 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                fullWidth
+                                type="number"
+                                size="small"
+                                value={kalem.iskontoTutari}
+                                onChange={(e) => {
+                                  const value = parseFloat(e.target.value);
+                                  handleKalemChange(index, 'iskontoTutari', isNaN(value) ? 0 : value);
+                                }}
+                                inputProps={{ min: 0, step: 0.01 }}
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <TextField
+                                fullWidth
+                                type="number"
+                                size="small"
+                                value={kalem.kdvOrani}
+                                onChange={(e) => {
+                                  const value = parseInt(e.target.value);
+                                  handleKalemChange(index, 'kdvOrani', isNaN(value) ? 0 : value);
+                                }}
+                                inputProps={{ min: 0, max: 100 }}
+                              />
+                            </TableCell>
+                            <TableCell align="right">
+                              <Typography variant="body2" fontWeight="bold">
+                                {formatCurrency(lineTotal)}
+                              </Typography>
+                            </TableCell>
+                            <TableCell>
+                              <IconButton
+                                size="small"
+                                color="error"
+                                onClick={() => handleRemoveKalem(index)}
                               >
-                                {stoklar.map((stok) => (
-                                  <MenuItem key={stok.id} value={stok.id}>
-                                    {stok.stokKodu} - {stok.stokAdi}
-                                  </MenuItem>
-                                ))}
-                              </Select>
-                            </FormControl>
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              value={kalem.miktar}
-                              onChange={(e) => handleKalemChange(index, 'miktar', parseFloat(e.target.value))}
-                              inputProps={{ min: 1 }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              value={kalem.birimFiyat}
-                              onChange={(e) => handleKalemChange(index, 'birimFiyat', parseFloat(e.target.value))}
-                              inputProps={{ min: 0, step: 0.01 }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              value={kalem.kdvOrani}
-                              onChange={(e) => handleKalemChange(index, 'kdvOrani', parseInt(e.target.value))}
-                              inputProps={{ min: 0, max: 100 }}
-                            />
-                          </TableCell>
-                          <TableCell>
-                            <IconButton
-                              size="small"
-                              color="error"
-                              onClick={() => handleRemoveKalem(index)}
-                            >
-                              <Delete />
-                            </IconButton>
-                          </TableCell>
-                        </TableRow>
-                      ))
+                                <Delete />
+                              </IconButton>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })
                     )}
                   </TableBody>
                 </Table>
@@ -753,10 +1012,10 @@ export default function SatisFaturalariPage() {
             </Box>
 
             {/* Toplam */}
-            <Paper 
-              variant="outlined" 
-              sx={{ 
-                p: 2, 
+            <Paper
+              variant="outlined"
+              sx={{
+                p: 2,
                 bgcolor: 'var(--muted)',
                 border: '1px solid var(--border)',
                 borderRadius: 'var(--radius-md)',
@@ -764,36 +1023,36 @@ export default function SatisFaturalariPage() {
             >
               <Box sx={{ display: 'flex', gap: 2, justifyContent: 'space-between' }}>
                 <Box>
-                  <Typography 
-                    variant="body2" 
+                  <Typography
+                    variant="body2"
                     sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
                   >
                     Ara Toplam:
                   </Typography>
-                  <Typography 
-                    variant="h6" 
+                  <Typography
+                    variant="h6"
                     sx={{ fontWeight: 700, color: 'var(--foreground)' }}
                   >
                     {formatCurrency(toplamTutar)}
                   </Typography>
                 </Box>
                 <Box>
-                  <Typography 
-                    variant="body2" 
+                  <Typography
+                    variant="body2"
                     sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
                   >
                     KDV Toplamı:
                   </Typography>
-                  <Typography 
-                    variant="h6" 
+                  <Typography
+                    variant="h6"
                     sx={{ fontWeight: 700, color: 'var(--foreground)' }}
                   >
                     {formatCurrency(kdvTutar)}
                   </Typography>
                 </Box>
                 <Box>
-                  <Typography 
-                    variant="body2" 
+                  <Typography
+                    variant="body2"
                     sx={{ color: 'var(--muted-foreground)', fontSize: '0.875rem' }}
                   >
                     Genel Toplam:
@@ -813,7 +1072,7 @@ export default function SatisFaturalariPage() {
           </Box>
         </DialogContent>
         <DialogActions>
-          <Button 
+          <Button
             onClick={() => { setOpenAdd(false); setOpenEdit(false); }}
             sx={{
               textTransform: 'none',
@@ -846,417 +1105,197 @@ export default function SatisFaturalariPage() {
     );
   };
 
+  const handleEdit = (row: Fatura) => {
+    openEditDialog(row);
+  };
+
+  const handleView = (row: Fatura) => {
+    openViewDialog(row);
+  };
+
+  /* Profit Handler */
+  const handleShowProfit = async (fatura: Fatura) => {
+    setLoadingProfit(true);
+    setOpenProfitDialog(true);
+    try {
+      const data = await getProfitByInvoice(fatura.id);
+      setProfitData(data);
+    } catch (error) {
+      showSnackbar('Kar bilgisi alınamadı', 'error');
+      setOpenProfitDialog(false);
+    } finally {
+      setLoadingProfit(false);
+    }
+  };
+
+  const columns: GridColDef[] = useMemo(() => [
+    {
+      field: 'faturaNo',
+      headerName: 'Fatura No',
+      flex: 1,
+      minWidth: 150,
+      renderCell: (params) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">{params.value}</Typography>
+          {params.row.earsiv && <Chip label="E-Arşiv" size="small" color="info" sx={{ height: 20, fontSize: '0.65rem' }} />}
+          {params.row.efatura && <Chip label="E-Fatura" size="small" color="primary" sx={{ height: 20, fontSize: '0.65rem' }} />}
+        </Box>
+      )
+    },
+    {
+      field: 'tarih',
+      headerName: 'Tarih',
+      width: 120,
+      valueFormatter: (value) => new Date(value).toLocaleDateString('tr-TR'),
+    },
+    {
+      field: 'cari',
+      headerName: 'Cari',
+      flex: 1.5,
+      minWidth: 200,
+      valueGetter: (params: any) => params?.unvan || '',
+      renderCell: (params) => (
+        <Box>
+          <Typography variant="body2" fontWeight="medium">{params.value}</Typography>
+          <Typography variant="caption" color="text.secondary">{params.row.cari?.vergiNo || params.row.cari?.tcKimlikNo}</Typography>
+        </Box>
+      )
+    },
+    {
+      field: 'vade',
+      headerName: 'Vade',
+      width: 120,
+      valueFormatter: (value) => new Date(value).toLocaleDateString('tr-TR'),
+    },
+    {
+      field: 'genelToplam',
+      headerName: 'Tutar',
+      width: 150,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
+      valueFormatter: (value) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value),
+      renderCell: (params) => (
+        <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: 'monospace' }}>
+          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(params.value)}
+        </Typography>
+      )
+    },
+    {
+      field: 'kalanTutar',
+      headerName: 'Kalan',
+      width: 150,
+      type: 'number',
+      align: 'right',
+      headerAlign: 'right',
+      renderCell: (params) => (
+        <Typography variant="body2" color={params.value > 0 ? 'error.main' : 'success.main'} fontWeight="bold" sx={{ fontFamily: 'monospace' }}>
+          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(params.value)}
+        </Typography>
+      )
+    },
+    {
+      field: 'durum',
+      headerName: 'Durum',
+      width: 140,
+      renderCell: (params) => <StatusBadge status={params.value} />
+    },
+    {
+      field: 'actions',
+      type: 'actions',
+      headerName: 'İşlemler',
+      width: 160,
+      getActions: (params) => [
+        <Tooltip title="Düzenle">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEdit(params.row); }}>
+            <Edit fontSize="small" />
+          </IconButton>
+        </Tooltip>,
+        <Tooltip title="Yazdır">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); window.open(`/fatura/satis/print/${params.row.id}`, '_blank'); }}>
+            <Print fontSize="small" />
+          </IconButton>
+        </Tooltip>,
+        <Tooltip title="Detay">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleView(params.row); }}>
+            <Visibility fontSize="small" />
+          </IconButton>
+        </Tooltip>,
+        <Tooltip title="Diğer İşlemler">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleMenuOpen(e, params.row.id); }}>
+            <MoreVert fontSize="small" />
+          </IconButton>
+        </Tooltip>,
+      ],
+    },
+  ], []);
+
+  const handleUseTemplate = () => {
+    showSnackbar('Bu özellik yakında eklenecektir.', 'info');
+  };
+
   return (
     <MainLayout>
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Box>
-          <Typography 
-            variant="h4" 
-            sx={{
-              fontWeight: 700,
-              fontSize: '1.875rem',
-              color: 'var(--foreground)',
-              letterSpacing: '-0.02em',
-              mb: 0.5,
-            }}
-          >
-            Satış Faturaları
-          </Typography>
-          <Typography 
-            variant="body2" 
-            sx={{
-              color: 'var(--muted-foreground)',
-              fontSize: '0.875rem',
-            }}
-          >
-            Satış faturalarını yönetin
-          </Typography>
+      <Box sx={{ p: 3 }}>
+        {/* Header */}
+        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Box>
+            <Typography variant="h4" fontWeight="700" sx={{ letterSpacing: '-0.5px' }}>
+              Satış Faturaları
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              Müşterilerinize kestiğiniz tüm faturaları buradan yönetebilirsiniz.
+            </Typography>
+          </Box>
+          <Box sx={{ display: 'flex', gap: 1 }}>
+            <Button
+              variant="outlined"
+              startIcon={<Assessment />}
+              onClick={() => router.push('/raporlama/satis-elemani')}
+            >
+              Raporlar
+            </Button>
+            <Button
+              variant="contained"
+              startIcon={<Add />}
+              onClick={() => {
+                addTab({
+                  id: 'fatura-satis-yeni',
+                  label: 'Yeni Satış Faturası',
+                  path: '/fatura/satis/yeni'
+                });
+                setActiveTab('fatura-satis-yeni');
+                router.push('/fatura/satis/yeni');
+              }}
+              sx={{
+                bgcolor: 'var(--primary)',
+                '&:hover': { bgcolor: 'var(--primary-hover)' },
+              }}
+            >
+              Yeni Fatura
+            </Button>
+          </Box>
         </Box>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={() => router.push('/fatura/satis/yeni')}
-          sx={{
-            bgcolor: 'var(--secondary)',
-            color: 'var(--secondary-foreground)',
-            boxShadow: 'var(--shadow-sm)',
-            textTransform: 'none',
-            fontWeight: 600,
-            '&:hover': {
-              bgcolor: 'var(--secondary-hover)',
-              boxShadow: 'var(--shadow-md)',
-              transform: 'translateY(-1px)',
-            }
-          }}
-        >
-          Yeni Satış Faturası
-        </Button>
+
+        <KPIHeader loading={loading} data={stats} type="SATIS" />
+
+
+        {/* DataGrid */}
+        <InvoiceDataGrid
+          rows={faturalar}
+          columns={columns}
+          loading={loading}
+          rowCount={rowCount}
+          paginationModel={paginationModel}
+          onPaginationModelChange={setPaginationModel}
+          sortModel={sortModel}
+          onSortModelChange={setSortModel}
+          onFilterModelChange={setFilterModel}
+          checkboxSelection={false}
+        />
       </Box>
 
-      <Paper sx={{ p: 2, mb: 3, borderRadius: 2 }}>
-        <Box sx={{ display: 'flex', gap: 2 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Fatura No veya Cari Ara..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyPress={(e) => e.key === 'Enter' && fetchFaturalar()}
-            InputProps={{
-              startAdornment: <Search sx={{ mr: 1, color: 'text.secondary' }} />,
-            }}
-          />
-          <Button
-            variant="contained"
-            onClick={fetchFaturalar}
-            sx={{ minWidth: 100 }}
-          >
-            Ara
-          </Button>
-        </Box>
-      </Paper>
-
-      <TableContainer 
-        component={Paper} 
-        sx={{ 
-          borderRadius: 'var(--radius)',
-          border: '1px solid var(--border)',
-          boxShadow: 'var(--shadow-sm)',
-        }}
-      >
-        <Table>
-          <TableHead sx={{ bgcolor: 'var(--muted)' }}>
-            <TableRow>
-              <TableCell 
-                sx={{ 
-                  fontWeight: 600, 
-                  cursor: 'pointer',
-                  color: 'var(--foreground)',
-                  fontSize: '0.875rem',
-                }} 
-                onClick={() => handleSort('faturaNo')}
-              >
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>Fatura No</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                    {sortBy === 'faturaNo' && (
-                      sortOrder === 'asc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />
-                    )}
-                  </Box>
-                </Box>
-              </TableCell>
-              <TableCell sx={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => handleSort('tarih')}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" fontWeight="600">Tarih</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                    {sortBy === 'tarih' && (
-                      sortOrder === 'asc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />
-                    )}
-                  </Box>
-                </Box>
-              </TableCell>
-              <TableCell sx={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => handleSort('cari')}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" fontWeight="600">Cari</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                    {sortBy === 'cari' && (
-                      sortOrder === 'asc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />
-                    )}
-                  </Box>
-                </Box>
-              </TableCell>
-              <TableCell sx={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => handleSort('vade')}>
-                <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                  <Typography variant="body2" fontWeight="600">Vade</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center', ml: 1 }}>
-                    {sortBy === 'vade' && (
-                      sortOrder === 'asc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />
-                    )}
-                  </Box>
-                </Box>
-              </TableCell>
-              <TableCell align="right" sx={{ fontWeight: 600, cursor: 'pointer' }} onClick={() => handleSort('genelToplam')}>
-                <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Typography variant="body2" fontWeight="600">Tutar</Typography>
-                  <Box sx={{ display: 'flex', alignItems: 'center' }}>
-                    {sortBy === 'genelToplam' && (
-                      sortOrder === 'asc' ? <ArrowDownward sx={{ fontSize: 14 }} /> : <ArrowUpward sx={{ fontSize: 14 }} />
-                    )}
-                  </Box>
-                </Box>
-              </TableCell>
-              <TableCell sx={{ fontWeight: 600 }}>Onay Durumu</TableCell>
-              <TableCell align="center" sx={{ fontWeight: 600 }}>İşlemler</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {loading ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
-                  <CircularProgress />
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 2 }}>
-                    Yükleniyor...
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : faturalar.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
-                  <Typography variant="body1" color="text.secondary">
-                    Fatura bulunamadı
-                  </Typography>
-                  <Typography variant="body2" color="text.secondary" sx={{ mt: 1 }}>
-                    Yeni fatura eklemek için yukarıdaki butonu kullanın
-                  </Typography>
-                </TableCell>
-              </TableRow>
-            ) : (
-              faturalar.map((fatura) => (
-                <TableRow
-                  key={fatura.id}
-                  hover
-                  sx={{ 
-                    '&:hover': { bgcolor: 'var(--muted)' },
-                    transition: 'background-color 0.2s ease',
-                  }}
-                >
-                  <TableCell>
-                    <Typography 
-                      variant="body2" 
-                      sx={{
-                        fontWeight: 600,
-                        color: 'var(--secondary)',
-                      }}
-                    >
-                      {fatura.faturaNo}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>{formatDate(fatura.tarih)}</TableCell>
-                  <TableCell>{fatura.cari.unvan}</TableCell>
-                  <TableCell>{fatura.vade ? formatDate(fatura.vade) : '-'}</TableCell>
-                  <TableCell align="right">
-                    <Typography variant="body2" fontWeight="600">
-                      {formatCurrency(fatura.genelToplam)}
-                    </Typography>
-                  </TableCell>
-                  <TableCell>
-                    <Chip
-                      label={getStatusLabel(fatura.durum)}
-                      color={getStatusColor(fatura.durum)}
-                      size="small"
-                    />
-                  </TableCell>
-                  <TableCell align="center">
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuOpen(e, fatura.id)}
-                      sx={{
-                        color: 'var(--muted-foreground)',
-                        '&:hover': {
-                          bgcolor: 'var(--muted)',
-                          color: 'var(--secondary)'
-                        }
-                      }}
-                    >
-                      <MoreVert fontSize="small" />
-                    </IconButton>
-
-                    <Menu
-                      anchorEl={anchorEl}
-                      open={Boolean(anchorEl) && menuFaturaId === fatura.id}
-                      onClose={handleMenuClose}
-                      PaperProps={{
-                        sx: {
-                          mt: 1,
-                          boxShadow: '0 4px 20px rgba(0,0,0,0.1)',
-                          borderRadius: 2,
-                          minWidth: 200,
-                        }
-                      }}
-                    >
-                      <MenuItem
-                        onClick={() => {
-                          openViewDialog(fatura);
-                          handleMenuClose();
-                        }}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)' }
-                        }}
-                      >
-                        <Visibility fontSize="small" sx={{ color: 'var(--chart-1)' }} />
-                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Görüntüle</Typography>
-                      </MenuItem>
-
-                      <MenuItem
-                        onClick={() => {
-                          router.push(`/fatura/satis/duzenle/${fatura.id}`);
-                          handleMenuClose();
-                        }}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)' }
-                        }}
-                      >
-                        <Edit fontSize="small" sx={{ color: 'var(--primary)' }} />
-                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Düzenle</Typography>
-                      </MenuItem>
-
-                      <MenuItem
-                        onClick={() => {
-                          router.push(`/fatura/satis/print/${fatura.id}`);
-                          handleMenuClose();
-                        }}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-2) 10%, transparent)' }
-                        }}
-                      >
-                        <Print fontSize="small" sx={{ color: 'var(--chart-2)' }} />
-                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Yazdır</Typography>
-                      </MenuItem>
-
-                      <MenuItem
-                        onClick={() => {
-                          router.push(`/fatura/satis/malzeme-hazirlama/${fatura.id}`);
-                          handleMenuClose();
-                        }}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)' }
-                        }}
-                      >
-                        <Assignment fontSize="small" sx={{ color: 'var(--secondary)' }} />
-                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Malzeme Hazırlama Fişi</Typography>
-                      </MenuItem>
-
-                      <MenuItem
-                        onClick={() => {
-                          router.push(`/fatura/iade/satis/yeni?originalId=${fatura.id}`);
-                          handleMenuClose();
-                        }}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: '#fef2f2' }
-                        }}
-                      >
-                        <Undo fontSize="small" sx={{ color: '#ef4444' }} />
-                        <Typography variant="body2">İade Oluştur</Typography>
-                      </MenuItem>
-
-                      {fatura.faturaTipi === 'SATIS' && (
-                        <MenuItem
-                          onClick={async () => {
-                            try {
-                              setLoadingProfit(true);
-                              const profit = await getProfitByInvoice(fatura.id);
-                              setProfitData(profit);
-                              setOpenProfitDialog(true);
-                            } catch (error: any) {
-                              showSnackbar(
-                                error.response?.data?.message || 'Kar bilgileri yüklenirken hata oluştu',
-                                'error'
-                              );
-                            } finally {
-                              setLoadingProfit(false);
-                              handleMenuClose();
-                            }
-                          }}
-                          disabled={loadingProfit}
-                          sx={{
-                            gap: 1.5,
-                            py: 1,
-                            '&:hover': { bgcolor: 'color-mix(in srgb, #10b981 10%, transparent)' }
-                          }}
-                        >
-                          {loadingProfit ? (
-                            <CircularProgress size={16} sx={{ color: '#10b981' }} />
-                          ) : (
-                            <TrendingUp fontSize="small" sx={{ color: '#10b981' }} />
-                          )}
-                          <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>Karlılık Görüntüle</Typography>
-                        </MenuItem>
-                      )}
-
-                      {fatura.durum === 'ONAYLANDI' && fatura.faturaTipi === 'SATIS' && (
-                        <MenuItem
-                          onClick={() => {
-                            handleSendEInvoice(fatura);
-                            handleMenuClose();
-                          }}
-                          disabled={sendingEInvoice === fatura.id || fatura.efaturaStatus === 'SENT'}
-                          sx={{
-                            gap: 1.5,
-                            py: 1,
-                            '&:hover': { bgcolor: '#ecfdf5' },
-                            '&.Mui-disabled': { opacity: 0.5 }
-                          }}
-                        >
-                          {sendingEInvoice === fatura.id ? (
-                            <CircularProgress size={16} sx={{ color: '#10b981' }} />
-                          ) : (
-                            <CloudUpload fontSize="small" sx={{ color: fatura.efaturaStatus === 'SENT' ? '#6b7280' : '#10b981' }} />
-                          )}
-                          <Typography variant="body2">
-                            {fatura.efaturaStatus === 'SENT' ? 'E-Fatura Gönderildi' : 'E-Fatura Gönder'}
-                          </Typography>
-                        </MenuItem>
-                      )}
-
-                      <MenuItem
-                        onClick={() => {
-                          openIptalDialog(fatura);
-                          handleMenuClose();
-                        }}
-                        disabled={fatura.durum === 'IPTAL'}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: '#fef2f2' },
-                          '&.Mui-disabled': { opacity: 0.5 }
-                        }}
-                      >
-                        <Cancel fontSize="small" sx={{ color: fatura.durum === 'IPTAL' ? '#9ca3af' : '#ef4444' }} />
-                        <Typography variant="body2">İptal Et</Typography>
-                      </MenuItem>
-
-                      <MenuItem
-                        onClick={() => {
-                          openDeleteDialog(fatura);
-                          handleMenuClose();
-                        }}
-                        disabled={fatura.durum === 'ONAYLANDI' || fatura.durum === 'IPTAL'}
-                        sx={{
-                          gap: 1.5,
-                          py: 1,
-                          '&:hover': { bgcolor: '#fef2f2' },
-                          '&.Mui-disabled': { opacity: 0.5 }
-                        }}
-                      >
-                        <Delete fontSize="small" sx={{ color: '#ef4444' }} />
-                        <Typography variant="body2">Sil</Typography>
-                      </MenuItem>
-                    </Menu>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
-
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mt: 2 }}>
-        <Typography variant="body2" color="text.secondary">
-          Toplam {faturalar.length} kayıt gösteriliyor
-        </Typography>
-      </Box>
-
-      {/* Form Dialog */}
+      {/* Dialogs */}
       {renderFormDialog()}
 
       {/* View Dialog */}
@@ -1277,10 +1316,11 @@ export default function SatisFaturalariPage() {
                   <Typography variant="body2" color="text.secondary">Fatura No:</Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <Typography variant="body1" fontWeight="bold">{selectedFatura.faturaNo}</Typography>
-                    {selectedFatura.deliveryNoteId && selectedFatura.satisIrsaliyeleri && (
-                      <Link
+                    {selectedFatura.deliveryNoteId && selectedFatura.irsaliye && (
+                      <MuiLink
+                        component={Link}
                         href={`/satis-irsaliyesi/${selectedFatura.deliveryNoteId}`}
-                        onClick={(e) => {
+                        onClick={(e: any) => {
                           e.stopPropagation();
                         }}
                         sx={{
@@ -1296,9 +1336,9 @@ export default function SatisFaturalariPage() {
                       >
                         <LocalShipping fontSize="small" />
                         <Typography variant="body2" fontWeight={500}>
-                          {selectedFatura.satisIrsaliyeleri.irsaliyeNo}
+                          {selectedFatura.irsaliye.irsaliyeNo}
                         </Typography>
-                      </Link>
+                      </MuiLink>
                     )}
                   </Box>
                 </Box>
@@ -1322,23 +1362,27 @@ export default function SatisFaturalariPage() {
                   <TableContainer component={Paper} variant="outlined">
                     <Table size="small">
                       <TableHead>
-                        <TableRow>
-                          <TableCell>Stok</TableCell>
-                          <TableCell>Miktar</TableCell>
-                          <TableCell>Birim Fiyat</TableCell>
-                          <TableCell>KDV %</TableCell>
-                          <TableCell align="right">Tutar</TableCell>
+                        <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                          <TableCell sx={{ fontWeight: 600 }}>Stok</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Miktar</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Birim Fiyat</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>İndirim (%)</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>İndirim (₺)</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>KDV %</TableCell>
+                          <TableCell align="right" sx={{ fontWeight: 600 }}>Tutar</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {selectedFatura.kalemler.map((kalem, index) => (
-                          <TableRow key={index}>
+                        {selectedFatura.kalemler.map((kalem: any, index: any) => (
+                          <TableRow key={index} hover>
                             <TableCell>{kalem.stok?.stokAdi || '-'}</TableCell>
                             <TableCell>{kalem.miktar}</TableCell>
                             <TableCell>{formatCurrency(kalem.birimFiyat)}</TableCell>
+                            <TableCell>%{kalem.iskontoOrani || 0}</TableCell>
+                            <TableCell>{formatCurrency(kalem.iskontoTutari || 0)}</TableCell>
                             <TableCell>%{kalem.kdvOrani}</TableCell>
                             <TableCell align="right">
-                              {formatCurrency((kalem.tutar || 0) + (kalem.kdvTutar || 0))}
+                              {formatCurrency((Number(kalem.tutar) || 0) + (Number(kalem.kdvTutar) || 0))}
                             </TableCell>
                           </TableRow>
                         ))}
@@ -1348,10 +1392,34 @@ export default function SatisFaturalariPage() {
                 </Box>
               )}
 
-              <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f9fafb', mb: 2 }}>
-                <Typography variant="h6" fontWeight="bold" sx={{ color: '#8b5cf6' }}>
-                  Genel Toplam: {formatCurrency(selectedFatura.genelToplam)}
-                </Typography>
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 2, mb: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                    <Typography variant="body2" color="text.secondary">Ara Toplam:</Typography>
+                    <Typography variant="body2" fontWeight={500}>
+                      {formatCurrency(Number(selectedFatura.toplamTutar || 0) + Number(selectedFatura.iskonto || 0))}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                    <Typography variant="body2" color="text.secondary">İskonto:</Typography>
+                    <Typography variant="body2" fontWeight={500} color="error.main">
+                      -{formatCurrency(selectedFatura.iskonto || 0)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                    <Typography variant="body2" color="text.secondary">KDV Toplamı:</Typography>
+                    <Typography variant="body2" fontWeight={500}>
+                      {formatCurrency(selectedFatura.kdvTutar || 0)}
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ width: '250px', my: 1 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                    <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
+                    <Typography variant="h6" fontWeight="bold" color="primary.main">
+                      {formatCurrency(selectedFatura.genelToplam)}
+                    </Typography>
+                  </Box>
+                </Box>
               </Paper>
 
               {/* Audit Bilgileri */}
@@ -1422,7 +1490,7 @@ export default function SatisFaturalariPage() {
                             month: '2-digit',
                             hour: '2-digit',
                             minute: '2-digit'
-                          })} - {log.actionType}
+                          })} - {log.actionType || log.message}
                           {log.user && ` (${log.user.fullName})`}
                         </Typography>
                       ))}
@@ -1438,7 +1506,26 @@ export default function SatisFaturalariPage() {
         </DialogActions>
       </Dialog>
 
-      {/* İptal Dialog */}
+      {/* Delete Dialog */}
+      <Dialog open={openDelete} onClose={() => setOpenDelete(false)}>
+        <DialogTitle sx={{ fontWeight: 'bold' }}>Fatura Sil</DialogTitle>
+        <DialogContent>
+          <Typography>
+            <strong>{selectedFatura?.faturaNo}</strong> nolu faturayı silmek istediğinizden emin misiniz?
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+            Bu işlem geri alınamaz!
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenDelete(false)}>İptal</Button>
+          <Button onClick={handleDelete} variant="contained" color="error">
+            Sil
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Iptal Dialog */}
       <Dialog open={openIptal} onClose={() => { setOpenIptal(false); setIrsaliyeIptal(false); }} maxWidth="sm" fullWidth>
         <DialogTitle sx={{
           background: 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
@@ -1524,26 +1611,7 @@ export default function SatisFaturalariPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Delete Dialog */}
-      <Dialog open={openDelete} onClose={() => setOpenDelete(false)}>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Fatura Sil</DialogTitle>
-        <DialogContent>
-          <Typography>
-            <strong>{selectedFatura?.faturaNo}</strong> nolu faturayı silmek istediğinizden emin misiniz?
-          </Typography>
-          <Typography variant="body2" color="error" sx={{ mt: 2 }}>
-            Bu işlem geri alınamaz!
-          </Typography>
-        </DialogContent>
-        <DialogActions>
-          <Button onClick={() => setOpenDelete(false)}>İptal</Button>
-          <Button onClick={handleDelete} variant="contained" color="error">
-            Sil
-          </Button>
-        </DialogActions>
-      </Dialog>
-
-      {/* Durum Değişikliği Onay Dialog */}
+      {/* Durum Onay Dialog */}
       <Dialog open={openDurumOnay} onClose={handleDurumChangeCancel} maxWidth="sm" fullWidth>
         <DialogTitle sx={{
           background: 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)',
@@ -1598,30 +1666,6 @@ export default function SatisFaturalariPage() {
                   </Box>
                 </Box>
               </Box>
-              {pendingDurum.yeniDurum === 'ONAYLANDI' && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  <Typography variant="body2">
-                    • Stok hareketi oluşturulacak (çıkış)<br />
-                    • Cari bakiye artacak
-                  </Typography>
-                </Alert>
-              )}
-              {pendingDurum.yeniDurum === 'IPTAL' && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  <Typography variant="body2">
-                    • Stok hareketi oluşturulacak (giriş - iptal)<br />
-                    • Cari bakiye azalacak
-                  </Typography>
-                </Alert>
-              )}
-              {pendingDurum.yeniDurum === 'ACIK' && (
-                <Alert severity="info" sx={{ mb: 2 }}>
-                  <Typography variant="body2">
-                    • Önceki stok ve cari hareketleri geri alınacak<br />
-                    • Fatura tekrar beklemede durumuna dönecek
-                  </Typography>
-                </Alert>
-              )}
             </Box>
           )}
         </DialogContent>
@@ -1642,7 +1686,7 @@ export default function SatisFaturalariPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Kar Görüntüleme Dialog */}
+      {/* Profit Dialog */}
       <Dialog
         open={openProfitDialog}
         onClose={() => {
@@ -1672,23 +1716,10 @@ export default function SatisFaturalariPage() {
             </Box>
           ) : profitData ? (
             <Box>
-              {/* Fatura Özeti */}
               <Paper elevation={1} sx={{ p: 3, mb: 3, bgcolor: '#f9fafb' }}>
                 <Typography variant="subtitle2" color="text.secondary" gutterBottom>
                   Fatura Özeti
                 </Typography>
-                <Box display="flex" justifyContent="space-between" mb={2}>
-                  <Typography variant="body2">Cari:</Typography>
-                  <Typography variant="body2" fontWeight="bold">
-                    {profitData.fatura.cari.unvan}
-                  </Typography>
-                </Box>
-                <Box display="flex" justifyContent="space-between" mb={2}>
-                  <Typography variant="body2">Tarih:</Typography>
-                  <Typography variant="body2">
-                    {new Date(profitData.fatura.tarih).toLocaleDateString('tr-TR')}
-                  </Typography>
-                </Box>
                 <Box display="flex" justifyContent="space-between" mb={2}>
                   <Typography variant="body2">Toplam Satış:</Typography>
                   <Typography variant="body2" fontWeight="bold" color="primary">
@@ -1720,98 +1751,7 @@ export default function SatisFaturalariPage() {
                     }).format(profitData.fatura.toplamKar)}
                   </Typography>
                 </Box>
-                <Box display="flex" justifyContent="space-between">
-                  <Typography variant="body2">Kar Oranı:</Typography>
-                  <Typography
-                    variant="body2"
-                    fontWeight="bold"
-                    color={profitData.fatura.karOrani >= 0 ? 'success.main' : 'error.main'}
-                  >
-                    {profitData.fatura.karOrani.toFixed(2)}%
-                  </Typography>
-                </Box>
               </Paper>
-
-              {/* Kalem Detayları */}
-              <Typography variant="subtitle2" color="text.secondary" gutterBottom>
-                Kalem Detayları
-              </Typography>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Ürün</TableCell>
-                      <TableCell align="right">Miktar</TableCell>
-                      <TableCell align="right">Birim Fiyat</TableCell>
-                      <TableCell align="right">Birim Maliyet</TableCell>
-                      <TableCell align="right">Toplam Satış</TableCell>
-                      <TableCell align="right">Toplam Maliyet</TableCell>
-                      <TableCell align="right">Kar</TableCell>
-                      <TableCell align="right">Kar Oranı</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {profitData.kalemler.map((kalem: any) => (
-                      <TableRow key={kalem.id}>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight="medium">
-                            {kalem.stok?.stokKodu || '-'}
-                          </Typography>
-                          <Typography variant="caption" color="text.secondary">
-                            {kalem.stok?.stokAdi || '-'}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right">{kalem.miktar}</TableCell>
-                        <TableCell align="right">
-                          {new Intl.NumberFormat('tr-TR', {
-                            style: 'currency',
-                            currency: 'TRY',
-                          }).format(kalem.birimFiyat)}
-                        </TableCell>
-                        <TableCell align="right">
-                          {new Intl.NumberFormat('tr-TR', {
-                            style: 'currency',
-                            currency: 'TRY',
-                          }).format(kalem.birimMaliyet)}
-                        </TableCell>
-                        <TableCell align="right">
-                          {new Intl.NumberFormat('tr-TR', {
-                            style: 'currency',
-                            currency: 'TRY',
-                          }).format(kalem.toplamSatisTutari)}
-                        </TableCell>
-                        <TableCell align="right">
-                          {new Intl.NumberFormat('tr-TR', {
-                            style: 'currency',
-                            currency: 'TRY',
-                          }).format(kalem.toplamMaliyet)}
-                        </TableCell>
-                        <TableCell
-                          align="right"
-                          sx={{
-                            color: kalem.kar >= 0 ? 'success.main' : 'error.main',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {new Intl.NumberFormat('tr-TR', {
-                            style: 'currency',
-                            currency: 'TRY',
-                          }).format(kalem.kar)}
-                        </TableCell>
-                        <TableCell
-                          align="right"
-                          sx={{
-                            color: kalem.karOrani >= 0 ? 'success.main' : 'error.main',
-                            fontWeight: 'bold',
-                          }}
-                        >
-                          {kalem.karOrani.toFixed(2)}%
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </TableContainer>
             </Box>
           ) : (
             <Typography variant="body2" color="text.secondary">
@@ -1829,18 +1769,86 @@ export default function SatisFaturalariPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Snackbar */}
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        PaperProps={{
+          elevation: 3,
+          sx: { minWidth: 220, mt: 1 }
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        {(() => {
+          const fatura = faturalar.find(f => f.id === menuFaturaId);
+          if (!fatura) return null;
+
+          return [
+            <MenuItem key="detail" onClick={() => { handleMenuClose(); handleView(fatura); }}>
+              <ListItemIcon><Visibility fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Detayları Görüntüle</Typography>
+            </MenuItem>,
+            <MenuItem key="edit" onClick={() => { handleMenuClose(); handleEdit(fatura); }}>
+              <ListItemIcon><Edit fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Düzenle</Typography>
+            </MenuItem>,
+            <MenuItem key="print" onClick={() => { handleMenuClose(); window.open(`/fatura/satis/print/${fatura.id}`, '_blank'); }}>
+              <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Yazdır</Typography>
+            </MenuItem>,
+            <Divider key="d1" />,
+            <MenuItem key="profit" onClick={() => { handleMenuClose(); handleShowProfit(fatura); }}>
+              <ListItemIcon><TrendingUp fontSize="small" sx={{ color: 'success.main' }} /></ListItemIcon>
+              <Typography variant="body2">Kâr/Zarar Analizi</Typography>
+            </MenuItem>,
+            <MenuItem key="copy" onClick={() => { handleMenuClose(); router.push(`/fatura/satis/yeni?kopyala=${fatura.id}`); }}>
+              <ListItemIcon><ContentCopy fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Kopyasını Oluştur</Typography>
+            </MenuItem>,
+            <MenuItem key="template" onClick={() => { handleMenuClose(); handleUseTemplate(); }}>
+              <ListItemIcon><Description fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Şablon Olarak Kullan</Typography>
+            </MenuItem>,
+            <Divider key="d2" />,
+            <MenuItem
+              key="einvoice"
+              onClick={() => { handleMenuClose(); handleSendEInvoice(fatura); }}
+              disabled={fatura.efaturaStatus === 'SENT' || sendingEInvoice === fatura.id}
+            >
+              <ListItemIcon>
+                {sendingEInvoice === fatura.id ? <CircularProgress size={16} /> : <CloudUpload fontSize="small" sx={{ color: fatura.efaturaStatus === 'SENT' ? 'text.disabled' : 'primary.main' }} />}
+              </ListItemIcon>
+              <Typography variant="body2">{fatura.efaturaStatus === 'SENT' ? 'E-Fatura Gönderildi' : 'E-Fatura Gönder'}</Typography>
+            </MenuItem>,
+            <MenuItem
+              key="cancel"
+              onClick={() => { handleMenuClose(); openIptalDialog(fatura); }}
+              disabled={fatura.durum === 'IPTAL'}
+              sx={{ color: 'error.main' }}
+            >
+              <ListItemIcon><Cancel fontSize="small" color="error" /></ListItemIcon>
+              <Typography variant="body2">İptal Et</Typography>
+            </MenuItem>,
+            <MenuItem
+              key="delete"
+              onClick={() => { handleMenuClose(); openDeleteDialog(fatura); }}
+              disabled={fatura.durum === 'ONAYLANDI' || fatura.durum === 'IPTAL'}
+              sx={{ color: 'error.main' }}
+            >
+              <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
+              <Typography variant="body2">Sil</Typography>
+            </MenuItem>
+          ];
+        })()}
+      </Menu>
+
       <Snackbar
         open={snackbar.open}
         autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
       >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
           {snackbar.message}
         </Alert>
       </Snackbar>

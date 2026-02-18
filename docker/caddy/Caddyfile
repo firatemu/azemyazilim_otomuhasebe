@@ -41,6 +41,12 @@ panel.otomuhasebe.com {
   reverse_proxy user-panel:3000
 }
 
+# Local Preview (Jetski)
+http://localhost {
+  # Proxy to staging panel on port 3010
+  reverse_proxy host.docker.internal:3010
+}
+
 # ==========================
 # STAGING (DEV) ROUTING
 # ==========================
@@ -48,14 +54,14 @@ panel.otomuhasebe.com {
 staging.otomuhasebe.com {
   import common_security
   
-  # API routes to backend
+  # API routes to backend (Docker)
   handle /api/* {
-    reverse_proxy compose-backend-staging-1:3000
+    reverse_proxy backend-staging:3000
   }
-  
-  # All other routes to user panel
+
+  # All other routes to User Panel (Docker)
   handle {
-    reverse_proxy compose-user-panel-staging-1:3000
+    reverse_proxy user-panel-staging:3000
   }
 }
 
@@ -66,22 +72,22 @@ staging-api.otomuhasebe.com {
   @root path /
   redir @root /api/health temporary
   
-  # API routes - Backend runs on host via PM2 on port 3020
-  # Use host.docker.internal to reach host from Docker container
-  reverse_proxy host.docker.internal:3020
+  # API routes - Backend (Docker)
+  reverse_proxy backend-staging:3000
 }
 
-admin-staging.otomuhasebe.com {
-  import common_security
-  reverse_proxy admin-panel-staging:3001 {
-    header_up Host localhost:3001
-  }
-}
+# admin-staging.otomuhasebe.com {
+#   import common_security
+#   reverse_proxy admin-panel-staging:80 {
+#     header_up Host localhost:80
+#   }
+# }
 
-landing-staging.otomuhasebe.com {
-  import common_security
-  reverse_proxy landing-page-staging:3000
-}
+# landing-staging is currently unused or lacks DNS
+# landing-staging.otomuhasebe.com {
+#   import common_security
+#   reverse_proxy landing-page-staging:3000
+# }
 
 # Admin Panel
 admin.otomuhasebe.com {

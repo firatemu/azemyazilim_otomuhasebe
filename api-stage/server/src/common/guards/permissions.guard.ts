@@ -1,44 +1,48 @@
-import { Injectable, CanActivate, ExecutionContext } from '@nestjs/common';
+import { CanActivate, ExecutionContext, Injectable, ForbiddenException } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
-
-export const PERMISSIONS_KEY = 'permissions';
-
-export const RequirePermissions = (...permissions: string[]) => {
-  return Reflect.metadata(PERMISSIONS_KEY, permissions);
-};
+import { PermissionsService } from '../../modules/permissions/permissions.service';
+import { PERMISSIONS_KEY, RequiredPermission } from '../decorators/require-permissions.decorator';
 
 @Injectable()
 export class PermissionsGuard implements CanActivate {
-  constructor(private reflector: Reflector) {}
+  constructor(
+    private reflector: Reflector,
+    private permissionsService: PermissionsService,
+  ) { }
 
-  canActivate(context: ExecutionContext): boolean {
-    const requiredPermissions = this.reflector.getAllAndOverride<string[]>(
+  async canActivate(context: ExecutionContext): Promise<boolean> {
+    const requiredPermissions = this.reflector.getAllAndOverride<RequiredPermission[]>(
       PERMISSIONS_KEY,
       [context.getHandler(), context.getClass()],
     );
 
     if (!requiredPermissions || requiredPermissions.length === 0) {
-      return true; // İzin gereksinimi yoksa erişime izin ver
-    }
-
-    const request = context.switchToHttp().getRequest();
-    const user = request.user;
-
-    if (!user) {
-      return false;
-    }
-
-    // SUPER_ADMIN her zaman erişebilir
-    if (user.role === 'SUPER_ADMIN') {
       return true;
     }
 
-    const userPermissions = user.permissions || [];
+    const request = context.switchToHttp().getRequest();
+    const user = request.user; // Assuming JwtAuthGuard adds user to request
 
-    // Tüm gerekli izinlerin kullanıcıda olması gerekir
-    return requiredPermissions.every((permission) =>
-      userPermissions.includes(permission),
-    );
+    if (!user || !user.id) {
+      // Should have been caught by AuthGuard, but safety first
+      return false;
+    }
+
+    // Check all required permissions
+    for (const permission of requiredPermissions) {
+      const hasPermission = await this.permissionsService.hasPermission(
+        user.id,
+        permission.module,
+        permission.action,
+      );
+
+      if (!hasPermission) {
+        throw new ForbiddenException(
+          `Missing permission: ${permission.module}.${permission.action}`,
+        );
+      }
+    }
+
+    return true;
   }
 }
-

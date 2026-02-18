@@ -99,11 +99,28 @@ const durumMetinleri: Record<string, string> = {
   IPTAL: 'İptal',
 };
 
+import { useTabStore } from '@/stores/tabStore';
+
+// ... imports
+
 export default function SatisSiparisleriPage() {
   const router = useRouter();
+  const { addTab } = useTabStore();
   const [searchTerm, setSearchTerm] = useState('');
   const [siparisler, setSiparisler] = useState<Siparis[]>([]);
+
+  const handleCreate = () => {
+    addTab({
+      id: 'yeni-satis-siparis',
+      label: 'Yeni Satış Siparişi',
+      path: '/siparis/satis/yeni',
+      icon: 'add_shopping_cart'
+    });
+    router.push('/siparis/satis/yeni');
+  };
+
   const [loading, setLoading] = useState(false);
+
   const [durumFilter, setDurumFilter] = useState<'ALL' | 'BEKLEMEDE' | 'HAZIRLANIYOR' | 'HAZIRLANDI' | 'SEVK_EDILDI' | 'KISMI_SEVK' | 'FATURALANDI'>('ALL');
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
@@ -308,7 +325,7 @@ export default function SatisSiparisleriPage() {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => router.push('/siparis/satis/yeni')}
+            onClick={handleCreate}
           >
             Yeni Sipariş
           </Button>
@@ -375,94 +392,94 @@ export default function SatisSiparisleriPage() {
                   siparisler
                     .filter(s => durumFilter === 'ALL' ? true : s.durum === durumFilter)
                     .map((siparis) => (
-                    <TableRow key={siparis.id} hover>
-                      <TableCell>{siparis.siparisNo}</TableCell>
-                      <TableCell>{formatDate(siparis.tarih)}</TableCell>
-                      <TableCell>
-                        <Typography variant="body2">{siparis.cari.unvan}</Typography>
-                        <Typography variant="caption" color="text.secondary">
-                          {siparis.cari.cariKodu}
-                        </Typography>
-                      </TableCell>
-                      <TableCell align="right">{formatCurrency(siparis.toplamTutar)}</TableCell>
-                      <TableCell align="right">{formatCurrency(siparis.kdvTutar)}</TableCell>
-                      <TableCell align="right">
-                        <Typography variant="body2" fontWeight="bold">
-                          {formatCurrency(siparis.genelToplam)}
-                        </Typography>
-                      </TableCell>
-                      <TableCell>
-                        <Chip
-                          label={durumMetinleri[siparis.durum]}
-                          color={durumRenkleri[siparis.durum]}
-                          size="small"
-                        />
-                      </TableCell>
-                      <TableCell>
-                        {siparis.kaynakIrsaliyeleri && siparis.kaynakIrsaliyeleri.length > 0 ? (
+                      <TableRow key={siparis.id} hover>
+                        <TableCell>{siparis.siparisNo}</TableCell>
+                        <TableCell>{formatDate(siparis.tarih)}</TableCell>
+                        <TableCell>
+                          <Typography variant="body2">{siparis.cari.unvan}</Typography>
+                          <Typography variant="caption" color="text.secondary">
+                            {siparis.cari.cariKodu}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="right">{formatCurrency(siparis.toplamTutar)}</TableCell>
+                        <TableCell align="right">{formatCurrency(siparis.kdvTutar)}</TableCell>
+                        <TableCell align="right">
+                          <Typography variant="body2" fontWeight="bold">
+                            {formatCurrency(siparis.genelToplam)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
                           <Chip
-                            label="İrsaliyendirilmiş"
-                            color="info"
+                            label={durumMetinleri[siparis.durum]}
+                            color={durumRenkleri[siparis.durum]}
                             size="small"
                           />
-                        ) : siparis.faturaNo ? (
-                          <Typography variant="caption">{siparis.faturaNo}</Typography>
-                        ) : (
-                          <Typography variant="caption" color="text.secondary">-</Typography>
-                        )}
-                      </TableCell>
-                      <TableCell align="center">
-                        <IconButton
-                          size="small"
-                          onClick={() => router.push(`/siparis/satis/duzenle/${siparis.id}`)}
-                          disabled={siparis.durum === 'FATURALANDI' || siparis.durum === 'IPTAL'}
-                        >
-                          <Edit />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handlePrint(siparis)}
-                          color="primary"
-                        >
-                          <PrintIcon />
-                        </IconButton>
-                        <IconButton
-                          size="small"
-                          onClick={() => handleHazirlama(siparis)}
-                          color="secondary"
-                          title="Hazırlama Formu"
-                        >
-                          <Inventory />
-                        </IconButton>
-                        {siparis.durum !== 'FATURALANDI' && siparis.durum !== 'IPTAL' && (
+                        </TableCell>
+                        <TableCell>
+                          {siparis.kaynakIrsaliyeleri && siparis.kaynakIrsaliyeleri.length > 0 ? (
+                            <Chip
+                              label="İrsaliyendirilmiş"
+                              color="info"
+                              size="small"
+                            />
+                          ) : siparis.faturaNo ? (
+                            <Typography variant="caption">{siparis.faturaNo}</Typography>
+                          ) : (
+                            <Typography variant="caption" color="text.secondary">-</Typography>
+                          )}
+                        </TableCell>
+                        <TableCell align="center">
                           <IconButton
                             size="small"
-                            onClick={() => handleSevkClick(siparis)}
-                            color="primary"
-                            title="Sevk Et"
+                            onClick={() => router.push(`/siparis/satis/duzenle/${siparis.id}`)}
+                            disabled={siparis.durum === 'FATURALANDI' || siparis.durum === 'IPTAL'}
                           >
-                            <Send />
+                            <Edit />
                           </IconButton>
-                        )}
-                        {(siparis.durum === 'SEVK_EDILDI' || siparis.durum === 'KISMI_SEVK') && (
                           <IconButton
                             size="small"
-                            onClick={() => handleCreateIrsaliye(siparis)}
+                            onClick={() => handlePrint(siparis)}
                             color="primary"
-                            title="İrsaliye Oluştur"
                           >
-                            <LocalShipping />
+                            <PrintIcon />
                           </IconButton>
-                        )}
-                        <IconButton
-                          size="small"
-                          onClick={(e) => handleMenuOpen(e, siparis)}
-                        >
-                          <MoreVert />
-                        </IconButton>
-                      </TableCell>
-                    </TableRow>
-                  ))
+                          <IconButton
+                            size="small"
+                            onClick={() => handleHazirlama(siparis)}
+                            color="secondary"
+                            title="Hazırlama Formu"
+                          >
+                            <Inventory />
+                          </IconButton>
+                          {siparis.durum !== 'FATURALANDI' && siparis.durum !== 'IPTAL' && (
+                            <IconButton
+                              size="small"
+                              onClick={() => handleSevkClick(siparis)}
+                              color="primary"
+                              title="Sevk Et"
+                            >
+                              <Send />
+                            </IconButton>
+                          )}
+                          {(siparis.durum === 'SEVK_EDILDI' || siparis.durum === 'KISMI_SEVK') && (
+                            <IconButton
+                              size="small"
+                              onClick={() => handleCreateIrsaliye(siparis)}
+                              color="primary"
+                              title="İrsaliye Oluştur"
+                            >
+                              <LocalShipping />
+                            </IconButton>
+                          )}
+                          <IconButton
+                            size="small"
+                            onClick={(e) => handleMenuOpen(e, siparis)}
+                          >
+                            <MoreVert />
+                          </IconButton>
+                        </TableCell>
+                      </TableRow>
+                    ))
                 )}
               </TableBody>
             </Table>

@@ -21,6 +21,14 @@
     "noImplicitAny": false,
     "strictBindCallApply": false,
     "noFallthroughCasesInSwitch": false,
-    "noEmitOnError": false
-  }
+    "noEmitOnError": false,
+    "types": []
+  },
+  "exclude": [
+    "node_modules",
+    "dist",
+    "coverage",
+    "test",
+    "**/*.spec.ts"
+  ]
 }

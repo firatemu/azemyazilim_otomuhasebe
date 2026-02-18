@@ -24,7 +24,7 @@ interface StokSummary {
 
 @Injectable()
 export class RaporlamaService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getOverview(query: OverviewQueryDto) {
     const range = this.resolveRange(query);
@@ -211,15 +211,15 @@ export class RaporlamaService {
     const [cariler, stoklar] = await Promise.all([
       cariIds.length
         ? this.prisma.cari.findMany({
-            where: { id: { in: cariIds } },
-            select: { id: true, cariKodu: true, unvan: true },
-          })
+          where: { id: { in: cariIds } },
+          select: { id: true, cariKodu: true, unvan: true },
+        })
         : Promise.resolve<CariSummary[]>([]),
       topProductsRaw.length
         ? this.prisma.stok.findMany({
-            where: { id: { in: topProductsRaw.map((item) => item.stokId) } },
-            select: { id: true, stokKodu: true, stokAdi: true, birim: true },
-          })
+          where: { id: { in: topProductsRaw.map((item) => item.stokId) } },
+          select: { id: true, stokKodu: true, stokAdi: true, birim: true },
+        })
         : Promise.resolve<StokSummary[]>([]),
     ]);
 
@@ -421,5 +421,75 @@ export class RaporlamaService {
     }
 
     return { startDate, endDate, preset };
+  }
+
+  async getSalespersonPerformance(query: OverviewQueryDto) {
+    const range = this.resolveRange(query);
+
+    const [salesRaw, collectionsRaw, salespersons] = await Promise.all([
+      this.prisma.fatura.groupBy({
+        by: ['satisElemaniId'],
+        where: {
+          faturaTipi: 'SATIS',
+          durum: 'ONAYLANDI',
+          tarih: {
+            gte: range.startDate,
+            lte: range.endDate,
+          },
+          deletedAt: null,
+          satisElemaniId: { not: null },
+        },
+        _sum: {
+          genelToplam: true,
+        },
+        _count: {
+          id: true,
+        },
+      }),
+      this.prisma.tahsilat.groupBy({
+        by: ['satisElemaniId'],
+        where: {
+          tip: 'TAHSILAT',
+          tarih: {
+            gte: range.startDate,
+            lte: range.endDate,
+          },
+          satisElemaniId: { not: null },
+        },
+        _sum: {
+          tutar: true,
+        },
+        _count: {
+          id: true,
+        },
+      }),
+      this.prisma.satisElemani.findMany({
+        where: { aktif: true },
+        select: { id: true, adSoyad: true },
+      }),
+    ]);
+
+    const performanceData = salespersons.map((se) => {
+      const sales = salesRaw.find((s) => s.satisElemaniId === se.id);
+      const collections = collectionsRaw.find((c) => c.satisElemaniId === se.id);
+
+      return {
+        satisElemaniId: se.id,
+        adSoyad: se.adSoyad,
+        toplamSatis: this.toNumber(sales?._sum?.genelToplam),
+        satisAdedi: sales?._count?.id ?? 0,
+        toplamTahsilat: this.toNumber(collections?._sum?.tutar),
+        tahsilatAdedi: collections?._count?.id ?? 0,
+      };
+    });
+
+    return {
+      range: {
+        startDate: range.startDate.toISOString(),
+        endDate: range.endDate.toISOString(),
+        preset: range.preset,
+      },
+      performance: performanceData.sort((a, b) => b.toplamSatis - a.toplamSatis),
+    };
   }
 }

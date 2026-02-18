@@ -134,9 +134,6 @@ export class FaturaService {
     sortBy?: string,
     sortOrder?: 'asc' | 'desc',
   ) {
-    // #region agent log
-    fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.service.ts:49',message:'findAll called',data:{page,limit,faturaTipi,search,cariId},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'A'})}).catch(()=>{});
-    // #endregion
     try {
       const skip = (page - 1) * limit;
       const tenantId = await this.tenantResolver.resolveForQuery();
@@ -162,16 +159,31 @@ export class FaturaService {
         ];
       }
 
-      // #region agent log
-      fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.service.ts:78',message:'Before Prisma query',data:{where:JSON.stringify(where)},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'B'})}).catch(()=>{});
-      // #endregion
 
+      // ✅ Performance optimized query - Using select instead of include
       const [data, total] = await Promise.all([
         this.prisma.fatura.findMany({
           where,
           skip,
           take: limit,
-          include: {
+          select: {
+            id: true,
+            faturaNo: true,
+            faturaTipi: true,
+            tarih: true,
+            vade: true,
+            toplamTutar: true,
+            kdvTutar: true,
+            genelToplam: true,
+            durum: true,
+            odenecekTutar: true,
+            odenenTutar: true,
+            aciklama: true,
+            siparisNo: true,
+            efaturaStatus: true,
+            createdAt: true,
+            updatedAt: true,
+            // Relations - optimized selection
             cari: {
               select: {
                 id: true,
@@ -180,31 +192,15 @@ export class FaturaService {
                 tip: true,
               },
             },
-            irsaliye: {
-              select: {
-                id: true,
-                irsaliyeNo: true,
-                kaynakSiparis: {
-                  select: {
-                    id: true,
-                    siparisNo: true,
-                  },
+            // Only include basic irsaliye info if needed (nested relation removed)
+            ...(deliveryNoteId ? {
+              irsaliye: {
+                select: {
+                  id: true,
+                  irsaliyeNo: true,
                 },
               },
-            },
-            faturaTahsilatlar: {
-              include: {
-                tahsilat: {
-                  select: {
-                    id: true,
-                    tarih: true,
-                    tip: true,
-                    odemeTipi: true,
-                  },
-                },
-              },
-              orderBy: { createdAt: 'desc' },
-            },
+            } : {}),
             createdByUser: {
               select: {
                 id: true,
@@ -212,16 +208,12 @@ export class FaturaService {
                 username: true,
               },
             },
-            updatedByUser: {
-              select: {
-                id: true,
-                fullName: true,
-                username: true,
-              },
-            },
+            // Count instead of full relations - solves N+1 problem
             _count: {
               select: {
                 kalemler: true,
+                faturaTahsilatlar: true,
+                logs: true,
               },
             },
           },
@@ -230,18 +222,12 @@ export class FaturaService {
         this.prisma.fatura.count({ where }),
       ]);
 
-      // #region agent log
-      fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.service.ts:131',message:'Prisma query succeeded',data:{dataCount:data.length,total},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'C'})}).catch(()=>{});
-      // #endregion
 
       return {
         data,
         meta: { total, page, limit, totalPages: Math.ceil(total / limit) },
       };
     } catch (error) {
-      // #region agent log
-      fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'fatura.service.ts:136',message:'findAll error caught',data:{errorMessage:error?.message,errorStack:error?.stack,errorName:error?.name},timestamp:Date.now(),sessionId:'debug-session',runId:'run1',hypothesisId:'D'})}).catch(()=>{});
-      // #endregion
       console.error('Fatura findAll error:', error);
       throw new BadRequestException(
         `Faturalar yüklenirken hata oluştu: ${error.message}`,
@@ -791,6 +777,47 @@ export class FaturaService {
         updateData.durum &&
         updateData.durum !== fatura.durum
       ) {
+        // Eğer durum ONAYLANDI'ya geçiyorsa
+        if (updateData.durum === 'ONAYLANDI') {
+          // Transaction içinde işlemleri yap
+          await this.prisma.$transaction(async (prisma) => {
+            // 1. Cari Hareket Oluştur
+            await prisma.cariHareket.create({
+              data: {
+                cariId: updated.cariId,
+                tip: 'ALACAK',
+                tutar: updated.genelToplam,
+                bakiye: updated.cari.bakiye.toNumber() - updated.genelToplam.toNumber(),
+                belgeTipi: 'FATURA',
+                belgeNo: updated.faturaNo,
+                tarih: new Date(updated.tarih),
+                aciklama: `Alış Faturası: ${updated.faturaNo}`,
+              },
+            });
+
+            // 2. Cari Bakiyeyi Güncelle
+            await prisma.cari.update({
+              where: { id: updated.cariId },
+              data: {
+                bakiye: { decrement: updated.genelToplam },
+              },
+            });
+
+            // 3. Stok Hareketlerini Oluştur
+            for (const kalem of updated.kalemler) {
+              await prisma.stokHareket.create({
+                data: {
+                  stokId: kalem.stokId,
+                  hareketTipi: 'GIRIS',
+                  miktar: kalem.miktar,
+                  birimFiyat: kalem.birimFiyat,
+                  aciklama: `Alış Faturası: ${updated.faturaNo}`,
+                },
+              });
+            }
+          });
+        }
+
         // Durum değiştiğinde parametre açıksa maliyetlendirme yap
         try {
           const autoCostingEnabled = await this.systemParameterService.getParameterAsBoolean(
@@ -915,6 +942,44 @@ export class FaturaService {
       // Maliyetlendirme (sadece ALIS faturaları için ve parametre açıksa)
       // Kalemler güncellendiğinde veya durum değiştiğinde maliyetlendirme yap
       if (fatura.faturaTipi === 'ALIS') {
+        // Eğer durum ONAYLANDI'ya geçiyorsa ve eski durum ONAYLANDI değilse
+        if (updateFaturaDto.durum === 'ONAYLANDI' && fatura.durum !== 'ONAYLANDI') {
+          // 1. Cari Hareket Oluştur
+          await prisma.cariHareket.create({
+            data: {
+              cariId: updated.cariId,
+              tip: 'ALACAK',
+              tutar: updated.genelToplam,
+              bakiye: updated.cari.bakiye.toNumber() - updated.genelToplam.toNumber(), // Alış faturası carinin alacağını (bizim borcumuzu) artırır, yani bakiyeyi azaltır (negatif bakiye borç demektir)
+              belgeTipi: 'FATURA',
+              belgeNo: updated.faturaNo,
+              tarih: new Date(updated.tarih),
+              aciklama: `Alış Faturası: ${updated.faturaNo}`,
+            },
+          });
+
+          // 2. Cari Bakiyeyi Güncelle (Azalt - Borçlanıyoruz)
+          await prisma.cari.update({
+            where: { id: updated.cariId },
+            data: {
+              bakiye: { decrement: updated.genelToplam },
+            },
+          });
+
+          // 3. Stok Hareketlerini Oluştur
+          for (const kalem of updated.kalemler) {
+            await prisma.stokHareket.create({
+              data: {
+                stokId: kalem.stokId,
+                hareketTipi: 'GIRIS',
+                miktar: kalem.miktar,
+                birimFiyat: kalem.birimFiyat,
+                aciklama: `Alış Faturası: ${updated.faturaNo}`,
+              },
+            });
+          }
+        }
+
         const shouldCalculateCosts =
           fatura.durum !== 'ONAYLANDI' || updateFaturaDto.kalemler || updateFaturaDto.durum;
 

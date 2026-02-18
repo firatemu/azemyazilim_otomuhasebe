@@ -41,6 +41,30 @@ const PARAMETER_DEFINITIONS: ParameterDefinition[] = [
     category: 'FATURA',
     defaultValue: true,
   },
+  {
+    key: 'NEGATIVE_STOCK_CONTROL',
+    label: 'Negatif Stok Kontrolü',
+    description:
+      'Satış faturası kaydedilirken stok miktarı kontrolü yapılır. Açık olduğunda, mevcut stoktan fazla satış yapılamaz ve stok negatife düşecek ürünler gösterilir. Kapalı olduğunda stok negatife düşebilir.',
+    category: 'STOK',
+    defaultValue: false,
+  },
+  {
+    key: 'NEGATIVE_BANK_BALANCE_CONTROL',
+    label: 'Negatif Banka Bakiyesi Kontrolü',
+    description:
+      'Banka havale işlemi yapılırken bakiye kontrolü yapılır. Açık olduğunda, mevcut bakiyeden fazla çıkış yapılamaz. Kapalı olduğunda bakiye eksiye düşebilir.',
+    category: 'BANKA',
+    defaultValue: true,
+  },
+  {
+    key: 'ALLOW_NEGATIVE_CASH_BALANCE',
+    label: 'Negatif Kasa Bakiyesi İzni',
+    description:
+      'Kasa işlemlerinde bakiye kontrolü yapılır. Açık olduğunda, kasa bakiyesi eksiye düşebilir. Kapalı olduğunda, mevcut bakiyeden fazla çıkış yapılamaz.',
+    category: 'KASA',
+    defaultValue: false,
+  },
 ];
 
 export default function ParametrelerPage() {

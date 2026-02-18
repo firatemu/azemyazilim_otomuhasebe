@@ -301,6 +301,59 @@ backup_code() {
     echo "$archive_file"
 }
 
+# Fonksiyon: S3'e Yükle
+upload_to_s3() {
+    local file_path=$1
+    local file_name=$(basename "$file_path")
+    
+    log INFO "=== Off-site Yedekleme (S3) Başlıyor ==="
+    
+    # S3 Bucket kontrolü (Env variable)
+    if [ -z "$S3_BUCKET" ]; then
+        log WARN "S3_BUCKET tanımlı değil. Off-site yedekleme atlanıyor."
+        return 0
+    fi
+
+    # AWS CLI kontrolü
+    if command -v aws &> /dev/null; then
+        log INFO "AWS CLI bulundu. S3'e yükleniyor..."
+        
+        # S3 Path: s3://bucket/year/month/file
+        local s3_path="s3://${S3_BUCKET}/backups/${BACKUP_DATE:0:4}/${BACKUP_DATE:5:2}/${file_name}"
+        
+        aws s3 cp "$file_path" "$s3_path" --no-progress 2>&1 | tee -a "$LOG_FILE"
+        
+        if [ $? -eq 0 ]; then
+            log INFO "Yedek başarıyla S3'e yüklendi: $s3_path"
+        else
+            log ERROR "S3 yükleme başarısız oldu!"
+            return 1
+        fi
+        
+    # Rclone kontrolü
+    elif command -v rclone &> /dev/null; then
+        log INFO "Rclone bulundu. Remote'a yükleniyor..."
+        
+        # Rclone Remote: remote:bucket/path
+        # S3_REMOTE_NAME var mı kontrol et, yoksa 's3' varsay
+        local remote_name="${S3_REMOTE_NAME:-s3}"
+        local s3_path="${remote_name}:${S3_BUCKET}/backups/${BACKUP_DATE:0:4}/${BACKUP_DATE:5:2}/"
+        
+        rclone copy "$file_path" "$s3_path" 2>&1 | tee -a "$LOG_FILE"
+        
+        if [ $? -eq 0 ]; then
+             log INFO "Yedek başarıyla remote'a yüklendi: ${s3_path}${file_name}"
+        else
+             log ERROR "Rclone yükleme başarısız oldu!"
+             return 1
+        fi
+    else
+        log WARN "AWS CLI veya Rclone bulunamadı! Off-site yedekleme yapılamıyor."
+        log WARN "Lütfen 'apt install awscli' veya rclone kurun."
+        return 1
+    fi
+}
+
 # Fonksiyon: Yedekleme özeti
 print_summary() {
     log INFO "=== Yedekleme Özeti ==="
@@ -351,13 +404,23 @@ main() {
 
     # Veritabanı yedeği
     if command -v pg_dump &> /dev/null; then
-        backup_database || log WARN "Veritabanı yedekleme atlandı"
+        db_backup_file=$(backup_database)
+        if [ -f "$db_backup_file" ]; then
+            upload_to_s3 "$db_backup_file"
+        else 
+             log WARN "Veritabanı yedek dosyası bulunamadı, upload atlanıyor."
+        fi
     else
         log WARN "pg_dump bulunamadı! Veritabanı yedekleme atlanıyor."
     fi
 
     # Kod yedeği
-    backup_code || log ERROR "Kod yedekleme başarısız oldu!"
+    code_backup_file=$(backup_code)
+    if [ -f "$code_backup_file" ]; then
+        upload_to_s3 "$code_backup_file"
+    else
+        log ERROR "Kod yedekleme başarısız oldu!"
+    fi
 
     # Özet
     print_summary

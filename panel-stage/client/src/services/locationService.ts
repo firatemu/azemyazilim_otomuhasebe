@@ -1,5 +1,6 @@
 // TurkiyeAPI Integration for Turkish Location Data
 // API Documentation: https://turkiyeapi.dev/docs
+import axios from '@/lib/axios';
 
 const TURKIYE_API_BASE = 'https://turkiyeapi.dev/api/v1';
 
@@ -20,10 +21,11 @@ export interface District {
 }
 
 export interface Neighborhood {
-  id: number;
+  id: number | string;
   name: string;
   population?: number;
   districtId?: number;
+  postalCode?: string;
 }
 
 /**
@@ -128,6 +130,23 @@ export const locationService = {
     } catch (error) {
       console.error('Error finding district:', error);
       return null;
+    }
+  },
+
+  /**
+   * Get neighborhoods from local API (otomuhasebe database)
+   * @param city - City name
+   * @param district - District name
+   */
+  getLocalNeighborhoods: async (city: string, district: string): Promise<Neighborhood[]> => {
+    try {
+      const response = await axios.get('/postal-codes/neighborhoods', {
+        params: { city, district }
+      });
+      return response.data || [];
+    } catch (error) {
+      console.error('Error fetching local neighborhoods:', error);
+      return [];
     }
   },
 };

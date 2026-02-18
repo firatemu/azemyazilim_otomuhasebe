@@ -53,9 +53,26 @@ interface SatinAlmaIrsaliyesi {
   createdAt?: string;
 }
 
+import { useTabStore } from '@/stores/tabStore';
+
+// ... imports
+
 export default function SatinAlmaIrsaliyeleriPage() {
   const router = useRouter();
+  const { addTab } = useTabStore();
   const [searchTerm, setSearchTerm] = useState('');
+  // ... state definitions
+
+  const handleCreate = () => {
+    addTab({
+      id: 'yeni-satin-alma-irsaliyesi',
+      label: 'Yeni Satın Alma İrsaliyesi',
+      path: '/satin-alma-irsaliyesi/yeni',
+      icon: 'local_shipping'
+    });
+    router.push('/satin-alma-irsaliyesi/yeni');
+  };
+
   const [irsaliyeler, setIrsaliyeler] = useState<SatinAlmaIrsaliyesi[]>([]);
   const [loading, setLoading] = useState(false);
   const [openDelete, setOpenDelete] = useState(false);
@@ -174,7 +191,7 @@ export default function SatinAlmaIrsaliyeleriPage() {
           <Button
             variant="contained"
             startIcon={<Add />}
-            onClick={() => router.push('/satin-alma-irsaliyesi/yeni')}
+            onClick={handleCreate}
             sx={{
               background: 'linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%)',
             }}

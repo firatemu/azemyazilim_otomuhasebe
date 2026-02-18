@@ -10,56 +10,91 @@ import {
   KasaHareketTipi,
   KasaTipi,
   Prisma,
+  BankaHareketTipi,
+  BankaHareketAltTipi,
+  Kasa,
+  BankaHesabi,
 } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { CreateBankaHavaleDto } from './dto/create-banka-havale.dto';
 import { FilterBankaHavaleDto } from './dto/filter-banka-havale.dto';
 import { UpdateBankaHavaleDto } from './dto/update-banka-havale.dto';
+import { SystemParameterService } from '../system-parameter/system-parameter.service';
 
 @Injectable()
 export class BankaHavaleService {
-  constructor(private prisma: PrismaService) { }
+  constructor(
+    private prisma: PrismaService,
+    private systemParameterService: SystemParameterService,
+  ) { }
 
   async create(createDto: CreateBankaHavaleDto, userId: string) {
-    // Banka hesabını kontrol et
-    const bankaHesabi = await this.prisma.kasa.findUnique({
-      where: { id: createDto.bankaHesabiId },
-    });
+    console.log('[BankaHavaleService] createDto received:', JSON.stringify(createDto, null, 2));
+    let bankaHesabiKasa: Kasa | null = null;
+    let bankaHesabiYeni: BankaHesabi | null = null;
 
-    if (!bankaHesabi) {
-      throw new NotFoundException('Banka hesabı bulunamadı');
+    // 1. Durum: Eski sistem (Kasa ID ile)
+    if (createDto.bankaHesabiId) {
+      bankaHesabiKasa = await this.prisma.kasa.findUnique({
+        where: { id: createDto.bankaHesabiId },
+      });
+
+      if (!bankaHesabiKasa) {
+        throw new NotFoundException('Kasa bulunamadı');
+      }
+
+      if (bankaHesabiKasa.kasaTipi !== KasaTipi.BANKA) {
+        throw new BadRequestException('Seçilen kasa bir banka hesabı değil');
+      }
+
+      if (!bankaHesabiKasa.aktif) {
+        throw new BadRequestException('Banka hesabı aktif değil');
+      }
     }
 
-    if (bankaHesabi.kasaTipi !== KasaTipi.BANKA) {
-      throw new BadRequestException('Seçilen kasa bir banka hesabı değil');
+    // 2. Durum: Yeni sistem (BankaHesabi ID ile)
+    if (createDto.bankaHesapId) {
+      bankaHesabiYeni = await this.prisma.bankaHesabi.findUnique({
+        where: { id: createDto.bankaHesapId },
+      });
+
+      if (!bankaHesabiYeni) {
+        throw new NotFoundException('Banka hesabı bulunamadı');
+      }
+
+      if (!bankaHesabiYeni.aktif) {
+        throw new BadRequestException('Banka hesabı aktif değil');
+      }
     }
 
-    if (!bankaHesabi.aktif) {
-      throw new BadRequestException('Banka hesabı aktif değil');
-    }
-
-    // Cari kontrolü
-    const cari = await this.prisma.cari.findUnique({
-      where: { id: createDto.cariId },
-    });
-
-    if (!cari) {
-      throw new NotFoundException('Cari bulunamadı');
-    }
-
-    if (!cari.aktif) {
-      throw new BadRequestException('Cari hesap aktif değil');
+    // En az biri seçili olmalı
+    if (!bankaHesabiKasa && !bankaHesabiYeni) {
+      throw new BadRequestException('Bir banka hesabı seçilmelidir');
     }
 
     // Transaction ile işlemleri gerçekleştir
     return this.prisma.$transaction(async (prisma) => {
+      // Cari kontrolü
+      const cari = await prisma.cari.findUnique({
+        where: { id: createDto.cariId },
+      });
+
+      if (!cari) {
+        throw new NotFoundException('Cari bulunamadı');
+      }
+
+      if (!cari.aktif) {
+        throw new BadRequestException('Cari hesap aktif değil');
+      }
+
       const tarih = createDto.tarih ? new Date(createDto.tarih) : new Date();
 
       // Banka havale kaydını oluştur
       const bankaHavale = await prisma.bankaHavale.create({
         data: {
           hareketTipi: createDto.hareketTipi,
-          bankaHesabiId: createDto.bankaHesabiId,
+          bankaHesabiId: createDto.bankaHesabiId, // Optional olabilir
+          bankaHesapId: createDto.bankaHesapId,   // Optional olabilir
           cariId: createDto.cariId,
           tutar: createDto.tutar,
           tarih: tarih,
@@ -94,77 +129,82 @@ export class BankaHavaleService {
         },
       });
 
-      // Banka hesabı bakiyesini güncelle
       const isGelen = createDto.hareketTipi === HavaleTipi.GELEN;
-      const yeniBankaBakiye = isGelen
-        ? Number(bankaHesabi.bakiye) + createDto.tutar
-        : Number(bankaHesabi.bakiye) - createDto.tutar;
 
-      if (!isGelen && yeniBankaBakiye < 0) {
-        throw new BadRequestException('Banka hesabında yeterli bakiye yok');
-      }
+      // 1. Kasa Bakiyesi Güncelleme (Eğer seçildiyse)
+      if (bankaHesabiKasa) {
+        const yeniBankaBakiye = isGelen
+          ? Number(bankaHesabiKasa.bakiye) + createDto.tutar
+          : Number(bankaHesabiKasa.bakiye) - createDto.tutar;
 
-      await prisma.kasa.update({
-        where: { id: createDto.bankaHesabiId },
-        data: { bakiye: yeniBankaBakiye },
-      });
+        if (!isGelen && yeniBankaBakiye < 0) {
+          const negativeBalanceControl = await this.systemParameterService.getParameterAsBoolean('NEGATIVE_BANK_BALANCE_CONTROL', false);
+          console.log(`[BankaHavaleService] Kasa check - Bakiye: ${yeniBankaBakiye}, Control: ${negativeBalanceControl}`);
+          if (negativeBalanceControl) {
+            throw new BadRequestException('Banka hesabında yeterli bakiye yok (Kasa)');
+          }
+        }
 
-      // Kasa hareket kaydı oluştur
-      await prisma.kasaHareket.create({
-        data: {
-          kasaId: createDto.bankaHesabiId,
-          hareketTipi: isGelen
-            ? KasaHareketTipi.HAVALE_GELEN
-            : KasaHareketTipi.HAVALE_GIDEN,
-          tutar: createDto.tutar,
-          bakiye: yeniBankaBakiye,
-          belgeTipi: 'HAVALE',
-          belgeNo: createDto.referansNo,
-          cariId: createDto.cariId,
-          aciklama:
-            createDto.aciklama ||
-            `${isGelen ? 'Gelen' : 'Giden'} Havale - ${cari.unvan}`,
-          tarih: tarih,
-          createdBy: userId,
-        },
-      });
-
-      // BankaHesapHareket kaydı oluştur (eğer spesifik banka hesabı belirtilmişse)
-      if (createDto.bankaHesapId) {
-        // BankaHesabi'yi kontrol et
-        const bankaHesap = await prisma.bankaHesabi.findUnique({
-          where: { id: createDto.bankaHesapId },
+        await prisma.kasa.update({
+          where: { id: bankaHesabiKasa.id },
+          data: { bakiye: yeniBankaBakiye },
         });
 
-        if (bankaHesap && bankaHesap.kasaId === createDto.bankaHesabiId) {
-          // BankaHesabi bakiyesini güncelle
-          const yeniHesapBakiye = isGelen
-            ? Number(bankaHesap.bakiye) + createDto.tutar
-            : Number(bankaHesap.bakiye) - createDto.tutar;
+        // Kasa hareket kaydı oluştur
+        await prisma.kasaHareket.create({
+          data: {
+            kasaId: bankaHesabiKasa.id,
+            hareketTipi: isGelen
+              ? KasaHareketTipi.HAVALE_GELEN
+              : KasaHareketTipi.HAVALE_GIDEN,
+            tutar: createDto.tutar,
+            bakiye: yeniBankaBakiye,
+            belgeTipi: 'HAVALE',
+            belgeNo: createDto.referansNo,
+            cariId: createDto.cariId,
+            aciklama:
+              createDto.aciklama ||
+              `${isGelen ? 'Gelen' : 'Giden'} Havale - ${cari.unvan}`,
+            tarih: tarih,
+            createdBy: userId,
+          },
+        });
+      }
 
-          if (!isGelen && yeniHesapBakiye < 0) {
-            throw new BadRequestException('Banka hesabında yeterli bakiye yok');
+      // 2. BankaHesabi Bakiyesi Güncelleme (Eğer seçildiyse)
+      if (bankaHesabiYeni) {
+        const yeniHesapBakiye = isGelen
+          ? Number(bankaHesabiYeni.bakiye) + createDto.tutar
+          : Number(bankaHesabiYeni.bakiye) - createDto.tutar;
+
+        if (!isGelen && yeniHesapBakiye < 0) {
+          const negativeBalanceControl = await this.systemParameterService.getParameterAsBoolean('NEGATIVE_BANK_BALANCE_CONTROL', false);
+          console.log(`[BankaHavaleService] BankaHesap check - Bakiye: ${yeniHesapBakiye}, Control: ${negativeBalanceControl}`);
+          if (negativeBalanceControl) {
+            throw new BadRequestException('Banka hesabında yeterli bakiye yok (Banka Hesabı)');
           }
-
-          await prisma.bankaHesabi.update({
-            where: { id: createDto.bankaHesapId },
-            data: { bakiye: yeniHesapBakiye },
-          });
-
-          // BankaHesapHareket kaydı oluştur
-          await prisma.bankaHesapHareket.create({
-            data: {
-              hesapId: createDto.bankaHesapId,
-              hareketTipi: isGelen ? 'HAVALE_GELEN' : 'HAVALE_GIDEN',
-              tutar: createDto.tutar,
-              bakiye: yeniHesapBakiye,
-              aciklama: createDto.aciklama || `${isGelen ? 'Gelen' : 'Giden'} Havale`,
-              referansNo: createDto.referansNo,
-              cariId: createDto.cariId,
-              tarih: tarih,
-            },
-          });
         }
+
+        await prisma.bankaHesabi.update({
+          where: { id: bankaHesabiYeni.id },
+          data: { bakiye: yeniHesapBakiye },
+        });
+
+        // BankaHesapHareket kaydı oluştur
+        await prisma.bankaHesapHareket.create({
+          data: {
+            hesapId: bankaHesabiYeni.id,
+            hareketTipi: isGelen ? BankaHareketTipi.GELEN : BankaHareketTipi.GIDEN,
+            hareketAltTipi: isGelen ? BankaHareketAltTipi.HAVALE_GELEN : BankaHareketAltTipi.HAVALE_GIDEN,
+            tutar: createDto.tutar,
+            netTutar: createDto.tutar,
+            bakiye: yeniHesapBakiye,
+            aciklama: createDto.aciklama || `${isGelen ? 'Gelen' : 'Giden'} Havale`,
+            referansNo: createDto.referansNo,
+            cariId: createDto.cariId,
+            tarih: tarih,
+          },
+        });
       }
 
       // Cari bakiyesini güncelle
@@ -189,7 +229,7 @@ export class BankaHavaleService {
           tarih: tarih,
           aciklama:
             createDto.aciklama ||
-            `${isGelen ? 'Gelen' : 'Giden'} Havale - ${bankaHesabi.kasaAdi}`,
+            `${isGelen ? 'Gelen' : 'Giden'} Havale - ${bankaHesabiKasa ? bankaHesabiKasa.kasaAdi : (bankaHesabiYeni ? bankaHesabiYeni.hesapAdi : '')}`,
         },
       });
 
@@ -254,6 +294,19 @@ export class BankaHavaleService {
             kasaAdi: true,
           },
         },
+        bankaHesap: {
+          select: {
+            id: true,
+            hesapKodu: true,
+            hesapAdi: true,
+            banka: {
+              select: {
+                ad: true,
+                logo: true,
+              },
+            },
+          },
+        },
         cari: {
           select: {
             id: true,
@@ -290,6 +343,19 @@ export class BankaHavaleService {
             id: true,
             kasaKodu: true,
             kasaAdi: true,
+          },
+        },
+        bankaHesap: {
+          select: {
+            id: true,
+            hesapKodu: true,
+            hesapAdi: true,
+            banka: {
+              select: {
+                ad: true,
+                logo: true,
+              },
+            },
           },
         },
         cari: {
@@ -344,142 +410,169 @@ export class BankaHavaleService {
     const existingHavale = await this.prisma.bankaHavale.findUnique({
       where: { id },
       include: {
-        bankaHesabi: true,
-        cari: true,
+        bankaHesabi: true, // Kasa
+        bankaHesap: true, // BankaHesabi
       },
     });
 
-    if (!existingHavale || existingHavale.deletedAt) {
+    if (!existingHavale) {
       throw new NotFoundException('Banka havale kaydı bulunamadı');
     }
 
-    // Yeni banka hesabı kontrolü (değiştirildiyse)
-    if (
-      updateDto.bankaHesabiId &&
-      updateDto.bankaHesabiId !== existingHavale.bankaHesabiId
-    ) {
-      const yeniBankaHesabi = await this.prisma.kasa.findUnique({
-        where: { id: updateDto.bankaHesabiId },
-      });
+    // 1. Yeni girilen (veya eski) Banka/Kasa kontrolü
+    let yeniKasa: Kasa | null = null;
+    let yeniBankaHesap: BankaHesabi | null = null;
 
-      if (!yeniBankaHesabi) {
-        throw new NotFoundException('Yeni banka hesabı bulunamadı');
-      }
+    // Eğer updateDto'da yeni bir ID varsa onu kullan, yoksa eskisine bak
+    // Not: DTO'da bankaHesabiId veya bankaHesapId gönderilmemişse, eski kayıttakini baz alacağız.
+    // Ancak mekanizma karışık olabilir: Kullanıcı bankaHesabiId gönderdiyse, bankaHesapId null mu kabul edilmeli?
+    // Basitlik adina: DTO'da hangisi varsa veya eskisi neyse onu bulalım.
 
-      if (yeniBankaHesabi.kasaTipi !== KasaTipi.BANKA) {
-        throw new BadRequestException('Seçilen kasa bir banka hesabı değil');
-      }
+    const targetKasaId = updateDto.bankaHesabiId !== undefined ? updateDto.bankaHesabiId : existingHavale.bankaHesabiId;
+    const targetBankaHesapId = updateDto.bankaHesapId !== undefined ? updateDto.bankaHesapId : existingHavale.bankaHesapId;
 
-      if (!yeniBankaHesabi.aktif) {
-        throw new BadRequestException('Yeni banka hesabı aktif değil');
+    if (targetKasaId) {
+      yeniKasa = await this.prisma.kasa.findUnique({ where: { id: targetKasaId } });
+      if (!yeniKasa || !yeniKasa.aktif || yeniKasa.kasaTipi !== KasaTipi.BANKA) {
+        // Eğer updateDto ile geldiyse hata fırlat, eskisi ise ve pasifse belki işlem yapmayabiliriz ama genelde hata fırlatılır.
+        if (updateDto.bankaHesabiId) throw new BadRequestException('Geçersiz veya pasif kasa');
       }
     }
 
-    // Yeni cari kontrolü (değiştirildiyse)
-    if (updateDto.cariId && updateDto.cariId !== existingHavale.cariId) {
-      const yeniCari = await this.prisma.cari.findUnique({
-        where: { id: updateDto.cariId },
-      });
-
-      if (!yeniCari) {
-        throw new NotFoundException('Yeni cari bulunamadı');
+    if (targetBankaHesapId) {
+      yeniBankaHesap = await this.prisma.bankaHesabi.findUnique({ where: { id: targetBankaHesapId } });
+      if (!yeniBankaHesap || !yeniBankaHesap.aktif) {
+        if (updateDto.bankaHesapId) throw new BadRequestException('Geçersiz veya pasif banka hesabı');
       }
+    }
 
-      if (!yeniCari.aktif) {
-        throw new BadRequestException('Yeni cari hesap aktif değil');
-      }
+    // 2. Yeni Cari Kontrolü
+    const targetCariId = updateDto.cariId || existingHavale.cariId;
+    const yeniCari = await this.prisma.cari.findUnique({ where: { id: targetCariId } });
+    if (!yeniCari || !yeniCari.aktif) {
+      throw new BadRequestException('Geçersiz veya pasif cari');
     }
 
     return this.prisma.$transaction(async (prisma) => {
-      // Eski işlemleri geri al
-      const eskiBankaId = existingHavale.bankaHesabiId;
-      const eskiCariId = existingHavale.cariId;
+      // A. ESKİ BAKİYELERİ GERİ AL
       const eskiTutar = Number(existingHavale.tutar);
       const eskiHareketTipi = existingHavale.hareketTipi;
 
-      const eskiBanka = await prisma.kasa.findUnique({
-        where: { id: eskiBankaId },
-      });
-      const eskiCari = await prisma.cari.findUnique({
-        where: { id: eskiCariId },
-      });
+      // A1. Eski Kasa Bakiyesi Geri Al
+      if (existingHavale.bankaHesabiId && existingHavale.bankaHesabi) {
+        const eskiKasa = existingHavale.bankaHesabi;
+        const revertKasaBakiye = eskiHareketTipi === HavaleTipi.GELEN
+          ? Number(eskiKasa.bakiye) - eskiTutar
+          : Number(eskiKasa.bakiye) + eskiTutar;
 
-      if (!eskiBanka || !eskiCari) {
-        throw new NotFoundException('Eski kayıtlar bulunamadı');
+        await prisma.kasa.update({
+          where: { id: existingHavale.bankaHesabiId },
+          data: { bakiye: revertKasaBakiye }
+        });
       }
 
-      // Eski işlemi geri al - Banka
-      const eskiBankaYeniBakiye =
-        eskiHareketTipi === HavaleTipi.GELEN
-          ? Number(eskiBanka.bakiye) - eskiTutar
-          : Number(eskiBanka.bakiye) + eskiTutar;
+      // A2. Eski BankaHesap Bakiyesi Geri Al
+      if (existingHavale.bankaHesapId && existingHavale.bankaHesap) {
+        const eskiHesap = existingHavale.bankaHesap;
+        const revertHesapBakiye = eskiHareketTipi === HavaleTipi.GELEN
+          ? Number(eskiHesap.bakiye) - eskiTutar
+          : Number(eskiHesap.bakiye) + eskiTutar;
 
-      await prisma.kasa.update({
-        where: { id: eskiBankaId },
-        data: { bakiye: eskiBankaYeniBakiye },
-      });
-
-      // Eski işlemi geri al - Cari
-      const eskiCariYeniBakiye =
-        eskiHareketTipi === HavaleTipi.GELEN
-          ? Number(eskiCari.bakiye) + eskiTutar
-          : Number(eskiCari.bakiye) - eskiTutar;
-
-      await prisma.cari.update({
-        where: { id: eskiCariId },
-        data: { bakiye: eskiCariYeniBakiye },
-      });
-
-      // Yeni değerleri hazırla
-      const yeniBankaId = updateDto.bankaHesabiId || eskiBankaId;
-      const yeniCariId = updateDto.cariId || eskiCariId;
-      const yeniTutar =
-        updateDto.tutar !== undefined ? updateDto.tutar : eskiTutar;
-      const yeniHareketTipi = updateDto.hareketTipi || eskiHareketTipi;
-
-      const yeniBanka = await prisma.kasa.findUnique({
-        where: { id: yeniBankaId },
-      });
-      const yeniCari = await prisma.cari.findUnique({
-        where: { id: yeniCariId },
-      });
-
-      if (!yeniBanka || !yeniCari) {
-        throw new NotFoundException('Yeni kayıtlar bulunamadı');
+        await prisma.bankaHesabi.update({
+          where: { id: existingHavale.bankaHesapId },
+          data: { bakiye: revertHesapBakiye }
+        });
       }
 
-      // Yeni işlemi uygula - Banka
-      const yeniBankaBakiye =
-        yeniHareketTipi === HavaleTipi.GELEN
-          ? Number(yeniBanka.bakiye) + yeniTutar
-          : Number(yeniBanka.bakiye) - yeniTutar;
+      // A3. Eski Cari Bakiyesi Geri Al
+      // Eski cari bilgisini findUnique ile taze çekmek daha güvenli olabilir ama
+      // existingHavale üzerinden gelen cari ID ile işlem yapacağız. 
+      // Ancak transaction içinde bakiye güncellemeleri için "anlık" veri okumalıyız.
+      const guncelEskiCari = await prisma.cari.findUnique({ where: { id: existingHavale.cariId } });
+      if (guncelEskiCari) {
+        const revertCariBakiye = eskiHareketTipi === HavaleTipi.GELEN
+          ? Number(guncelEskiCari.bakiye) + eskiTutar
+          : Number(guncelEskiCari.bakiye) - eskiTutar;
 
-      if (yeniHareketTipi === HavaleTipi.GIDEN && yeniBankaBakiye < 0) {
-        throw new BadRequestException('Banka hesabında yeterli bakiye yok');
+        await prisma.cari.update({
+          where: { id: existingHavale.cariId },
+          data: { bakiye: revertCariBakiye }
+        });
       }
 
-      await prisma.kasa.update({
-        where: { id: yeniBankaId },
-        data: { bakiye: yeniBankaBakiye },
-      });
+      // B. YENİ BAKİYELERİ UYGULA
+      // Burada "yeniKasa", "yeniBankaHesap", "yeniCari" nesnelerini tazeledik mi? 
+      // Transaction başında okumuştuk (if (targetKasaId)...), ancak bakiyeler değişmiş olabilir (özellikle aynı hesapsa).
+      // En doğrusu: Revert işleminden sonra "taze" hallerini tekrar okumak veya revert bakiyelerini baz almak.
+      // Revert işleminden sonra tekrar okumak en garantisi.
 
-      // Yeni işlemi uygula - Cari
-      const yeniCariBakiye =
-        yeniHareketTipi === HavaleTipi.GELEN
-          ? Number(yeniCari.bakiye) - yeniTutar
-          : Number(yeniCari.bakiye) + yeniTutar;
+      const tazeYeniTutar = updateDto.tutar !== undefined ? updateDto.tutar : eskiTutar;
+      const tazeHareketTipi = updateDto.hareketTipi || eskiHareketTipi;
 
-      await prisma.cari.update({
-        where: { id: yeniCariId },
-        data: { bakiye: yeniCariBakiye },
-      });
+      // B1. Kasa Güncelle (Varsa)
+      if (targetKasaId) {
+        const tazeKasa = await prisma.kasa.findUnique({ where: { id: targetKasaId } });
+        if (tazeKasa) {
+          const updateKasaBakiye = tazeHareketTipi === HavaleTipi.GELEN
+            ? Number(tazeKasa.bakiye) + tazeYeniTutar
+            : Number(tazeKasa.bakiye) - tazeYeniTutar;
 
-      // Havale kaydını güncelle
+          if (tazeHareketTipi === HavaleTipi.GIDEN && updateKasaBakiye < 0) {
+            const negativeBalanceControl = await this.systemParameterService.getParameterAsBoolean('NEGATIVE_BANK_BALANCE_CONTROL', false);
+            if (negativeBalanceControl) {
+              throw new BadRequestException('Kasa bakiyesi yetersiz');
+            }
+          }
+
+          await prisma.kasa.update({
+            where: { id: targetKasaId },
+            data: { bakiye: updateKasaBakiye }
+          });
+        }
+      }
+
+      // B2. BankaHesap Güncelle (Varsa)
+      if (targetBankaHesapId) {
+        const tazeHesap = await prisma.bankaHesabi.findUnique({ where: { id: targetBankaHesapId } });
+        if (tazeHesap) {
+          const updateHesapBakiye = tazeHareketTipi === HavaleTipi.GELEN
+            ? Number(tazeHesap.bakiye) + tazeYeniTutar
+            : Number(tazeHesap.bakiye) - tazeYeniTutar;
+
+          if (tazeHareketTipi === HavaleTipi.GIDEN && updateHesapBakiye < 0) {
+            const negativeBalanceControl = await this.systemParameterService.getParameterAsBoolean('NEGATIVE_BANK_BALANCE_CONTROL', false);
+            if (negativeBalanceControl) {
+              throw new BadRequestException('Banka hesap bakiyesi yetersiz');
+            }
+          }
+
+          await prisma.bankaHesabi.update({
+            where: { id: targetBankaHesapId },
+            data: { bakiye: updateHesapBakiye }
+          });
+        }
+      }
+
+      // B3. Cari Güncelle
+      const tazeCari = await prisma.cari.findUnique({ where: { id: targetCariId } });
+      if (tazeCari) {
+        const updateCariBakiye = tazeHareketTipi === HavaleTipi.GELEN
+          ? Number(tazeCari.bakiye) - tazeYeniTutar
+          : Number(tazeCari.bakiye) + tazeYeniTutar;
+
+        await prisma.cari.update({
+          where: { id: targetCariId },
+          data: { bakiye: updateCariBakiye }
+        });
+      }
+
+      // C. HAVALE KAYDINI GÜNCELLE
       const updateData: any = {
-        hareketTipi: updateDto.hareketTipi,
-        bankaHesabiId: updateDto.bankaHesabiId,
-        cariId: updateDto.cariId,
-        tutar: yeniTutar,
+        hareketTipi: tazeHareketTipi,
+        bankaHesabiId: targetKasaId || null,
+        bankaHesapId: targetBankaHesapId || null,
+        cariId: targetCariId,
+        tutar: tazeYeniTutar,
         aciklama: updateDto.aciklama,
         referansNo: updateDto.referansNo,
         gonderen: updateDto.gonderen,
@@ -487,12 +580,7 @@ export class BankaHavaleService {
         updatedBy: userId,
       };
 
-      // Tarih varsa ve geçerliyse ekle
-      if (
-        updateDto.tarih &&
-        typeof updateDto.tarih === 'string' &&
-        updateDto.tarih.trim() !== ''
-      ) {
+      if (updateDto.tarih) {
         updateData.tarih = new Date(updateDto.tarih);
       }
 
@@ -500,38 +588,15 @@ export class BankaHavaleService {
         where: { id },
         data: updateData,
         include: {
-          bankaHesabi: {
-            select: {
-              id: true,
-              kasaKodu: true,
-              kasaAdi: true,
-            },
-          },
-          cari: {
-            select: {
-              id: true,
-              cariKodu: true,
-              unvan: true,
-            },
-          },
-          createdByUser: {
-            select: {
-              id: true,
-              fullName: true,
-              username: true,
-            },
-          },
-          updatedByUser: {
-            select: {
-              id: true,
-              fullName: true,
-              username: true,
-            },
-          },
+          bankaHesabi: { select: { id: true, kasaKodu: true, kasaAdi: true } },
+          bankaHesap: { select: { id: true, hesapAdi: true, hesapNo: true, iban: true } },
+          cari: { select: { id: true, cariKodu: true, unvan: true } },
+          createdByUser: { select: { id: true, fullName: true, username: true } },
+          updatedByUser: { select: { id: true, fullName: true, username: true } },
         },
       });
 
-      // Log kaydı oluştur
+      // Log
       await prisma.bankaHavaleLog.create({
         data: {
           bankaHavaleId: id,
@@ -554,6 +619,7 @@ export class BankaHavaleService {
       where: { id },
       include: {
         bankaHesabi: true,
+        bankaHesap: true,
         cari: true,
       },
     });
@@ -568,8 +634,8 @@ export class BankaHavaleService {
         data: {
           originalId: havale.id,
           hareketTipi: havale.hareketTipi,
-          bankaHesabiId: havale.bankaHesabiId,
-          bankaHesabiAdi: havale.bankaHesabi.kasaAdi,
+          bankaHesabiId: havale.bankaHesabiId ?? havale.bankaHesapId ?? '',
+          bankaHesabiAdi: havale.bankaHesabi?.kasaAdi ?? havale.bankaHesap?.hesapAdi ?? 'Bilinmiyor',
           cariId: havale.cariId,
           cariUnvan: havale.cari.unvan,
           tutar: havale.tutar,
@@ -596,22 +662,42 @@ export class BankaHavaleService {
         },
       });
 
-      // Banka bakiyesini geri al
-      const yeniBankaBakiye =
-        havale.hareketTipi === HavaleTipi.GELEN
-          ? Number(havale.bankaHesabi.bakiye) - Number(havale.tutar)
-          : Number(havale.bankaHesabi.bakiye) + Number(havale.tutar);
+      // Banka bakiyesini geri al (Kasa)
+      if (havale.bankaHesabiId && havale.bankaHesabi) {
+        const yeniBankaBakiye =
+          havale.hareketTipi === HavaleTipi.GELEN
+            ? Number(havale.bankaHesabi.bakiye) - Number(havale.tutar)
+            : Number(havale.bankaHesabi.bakiye) + Number(havale.tutar);
 
-      await prisma.kasa.update({
-        where: { id: havale.bankaHesabiId },
-        data: { bakiye: yeniBankaBakiye },
-      });
+        await prisma.kasa.update({
+          where: { id: havale.bankaHesabiId },
+          data: { bakiye: yeniBankaBakiye },
+        });
+      }
+
+      // Banka bakiyesini geri al (BankaHesabi)
+      if (havale.bankaHesapId && havale.bankaHesap) {
+        const yeniBankaBakiye =
+          havale.hareketTipi === HavaleTipi.GELEN
+            ? Number(havale.bankaHesap.bakiye) - Number(havale.tutar)
+            : Number(havale.bankaHesap.bakiye) + Number(havale.tutar);
+
+        await prisma.bankaHesabi.update({
+          where: { id: havale.bankaHesapId },
+          data: { bakiye: yeniBankaBakiye },
+        });
+      }
 
       // Cari bakiyesini geri al
+      const guncelCari = await prisma.cari.findUnique({
+        where: { id: havale.cariId },
+      });
+      if (!guncelCari) throw new NotFoundException('Cari bulunamadı');
+
       const yeniCariBakiye =
         havale.hareketTipi === HavaleTipi.GELEN
-          ? Number(havale.cari.bakiye) + Number(havale.tutar)
-          : Number(havale.cari.bakiye) - Number(havale.tutar);
+          ? Number(guncelCari.bakiye) + Number(havale.tutar)
+          : Number(guncelCari.bakiye) - Number(havale.tutar);
 
       await prisma.cari.update({
         where: { id: havale.cariId },
@@ -664,7 +750,10 @@ export class BankaHavaleService {
     };
 
     if (bankaHesabiId) {
-      where.bankaHesabiId = bankaHesabiId;
+      where.OR = [
+        { bankaHesabiId: bankaHesabiId },
+        { bankaHesapId: bankaHesabiId },
+      ];
     }
 
     if (hareketTipi) {
