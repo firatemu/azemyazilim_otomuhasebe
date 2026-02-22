@@ -165,7 +165,7 @@ export default function SatisFaturalariPage() {
 
   const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
     page: 0,
-    pageSize: 10,
+    pageSize: 25,
   });
   const [sortModel, setSortModel] = useState<GridSortModel>([
     { field: 'tarih', sort: 'desc' },
@@ -1165,7 +1165,7 @@ export default function SatisFaturalariPage() {
       field: 'vade',
       headerName: 'Vade',
       width: 120,
-      valueFormatter: (value) => new Date(value).toLocaleDateString('tr-TR'),
+      valueFormatter: (value) => value ? new Date(value).toLocaleDateString('tr-TR') : '-',
     },
     {
       field: 'genelToplam',
@@ -1177,19 +1177,6 @@ export default function SatisFaturalariPage() {
       valueFormatter: (value) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value),
       renderCell: (params) => (
         <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: 'monospace' }}>
-          {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(params.value)}
-        </Typography>
-      )
-    },
-    {
-      field: 'kalanTutar',
-      headerName: 'Kalan',
-      width: 150,
-      type: 'number',
-      align: 'right',
-      headerAlign: 'right',
-      renderCell: (params) => (
-        <Typography variant="body2" color={params.value > 0 ? 'error.main' : 'success.main'} fontWeight="bold" sx={{ fontFamily: 'monospace' }}>
           {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(params.value)}
         </Typography>
       )

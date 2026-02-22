@@ -2746,13 +2746,13 @@ export class FaturaService {
       ];
     }
 
-    // Sıralama
-    let orderBy: any = { createdAt: 'desc' };
+    // Sıralama (varsayılan: tarih azalan = en yakın tarih önce)
+    let orderBy: any = { tarih: 'desc' };
     if (sortBy) {
       if (sortBy === 'cari') {
         orderBy = { cari: { unvan: sortOrder || 'asc' } };
       } else {
-        orderBy = { [sortBy]: sortOrder || 'asc' };
+        orderBy = { [sortBy]: sortOrder || 'desc' };
       }
     }
 

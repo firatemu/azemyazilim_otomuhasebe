@@ -82,12 +82,13 @@ export class CariService {
     });
   }
 
-  async findAll(page = 1, limit = 50, search?: string, tip?: string) {
+  async findAll(page = 1, limit = 50, search?: string, tip?: string, aktif?: boolean) {
     const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
 
     const where: any = {};
     if (tenantId) where.tenantId = tenantId;
+    if (aktif !== undefined) where.aktif = aktif;
 
     if (search) {
       where.OR = [
@@ -131,7 +132,7 @@ export class CariService {
     }));
 
     return {
-      data: cariler,
+      data,
       metadata: {
         total,
         page,

@@ -27,6 +27,7 @@ import {
   Snackbar,
   CircularProgress,
   Menu,
+  TablePagination,
 } from '@mui/material';
 import { Add, Edit, Delete, Search, Visibility, Close, Receipt, ToggleOn, ToggleOff, AccountBalance, MoreVert, Refresh } from '@mui/icons-material';
 import { useRouter } from 'next/navigation';
@@ -48,6 +49,9 @@ export default function CariPage() {
   const debouncedSearch = useDebounce(search, 500);
   const [loading, setLoading] = useState(false);
   const [showInactive, setShowInactive] = useState(false);
+  const [page, setPage] = useState(0);
+  const [pageSize, setPageSize] = useState(25);
+  const [totalCount, setTotalCount] = useState(0);
   const [openAdd, setOpenAdd] = useState(false);
   const [openEdit, setOpenEdit] = useState(false);
   const [openView, setOpenView] = useState(false);
@@ -78,7 +82,7 @@ export default function CariPage() {
 
   useEffect(() => {
     fetchCariler();
-  }, [debouncedSearch]); // Debounced search ile arama
+  }, [debouncedSearch, page, pageSize, showInactive]);
 
   useEffect(() => {
     const fetchSatisElemanlari = async () => {
@@ -96,9 +100,16 @@ export default function CariPage() {
     try {
       setLoading(true);
       const response = await axios.get('/cari', {
-        params: { search: debouncedSearch, limit: 100 },
+        params: {
+          search: debouncedSearch || undefined,
+          page: page + 1,
+          limit: pageSize,
+          aktif: showInactive ? false : true,
+        },
       });
-      setCariler(response.data.data || []);
+      const result = response.data;
+      setCariler(result.data || []);
+      setTotalCount(result.metadata?.total ?? 0);
     } catch (error) {
       console.error('Cari verisi alınamadı:', error);
       showSnackbar('Cari listesi yüklenemedi', 'error');
@@ -499,6 +510,7 @@ export default function CariPage() {
           border: '1px solid var(--border)',
           boxShadow: 'var(--shadow-sm)',
           bgcolor: 'var(--card)',
+          minHeight: 600,
         }}
       >
         <Table>
@@ -516,7 +528,7 @@ export default function CariPage() {
           <TableBody>
             {loading ? (
               <TableSkeleton rows={5} columns={7} />
-            ) : cariler.filter((cari: any) => showInactive ? cari.aktif === false : cari.aktif !== false).length === 0 ? (
+            ) : cariler.length === 0 ? (
               <TableRow>
                 <TableCell colSpan={7} align="center" sx={{ py: 8 }}>
                   <Typography variant="body1" sx={{ color: 'var(--muted-foreground)' }}>
@@ -528,7 +540,7 @@ export default function CariPage() {
                 </TableCell>
               </TableRow>
             ) : (
-              cariler.filter((cari: any) => showInactive ? cari.aktif === false : cari.aktif !== false).map((cari: any) => (
+              cariler.map((cari: any) => (
                 <TableRow
                   key={cari.id}
                   hover
@@ -583,6 +595,25 @@ export default function CariPage() {
             )}
           </TableBody>
         </Table>
+        <TablePagination
+          component="div"
+          count={totalCount}
+          page={page}
+          onPageChange={(_, newPage) => setPage(newPage)}
+          rowsPerPage={pageSize}
+          onRowsPerPageChange={(e) => {
+            setPageSize(Number(e.target.value));
+            setPage(0);
+          }}
+          rowsPerPageOptions={[10, 25, 50, 100]}
+          labelRowsPerPage="Sayfa başına:"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} / ${count !== -1 ? count : to}`}
+          sx={{
+            borderTop: '1px solid var(--border)',
+            color: 'var(--foreground)',
+            '& .MuiTablePagination-selectIcon': { color: 'var(--foreground)' },
+          }}
+        />
       </TableContainer>
 
       {/* Action Menu (Moved outside for performance and accessibility) */}

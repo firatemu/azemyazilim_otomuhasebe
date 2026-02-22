@@ -1544,7 +1544,7 @@ export default function MalzemeListesiPage() {
           onSearch={fetchStoklar}
           onRefresh={fetchStoklar}
         />
-        <Box sx={{ height: 600, width: '100%' }}>
+        <Box sx={{ height: 1420, width: '100%' }}>
           <DataGrid
             rows={filteredStoklar}
             columns={[

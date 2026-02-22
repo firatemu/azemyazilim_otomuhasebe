@@ -30,6 +30,8 @@ interface InvoiceDataGridProps {
     onRowClick?: (params: any) => void;
     checkboxSelection?: boolean;
     onRowSelectionModelChange?: (newSelectionModel: string[]) => void;
+    /** Tablo yüksekliği (px). Varsayılan: 650 */
+    height?: number;
 }
 
 function CustomToolbar() {
@@ -59,12 +61,13 @@ export default function InvoiceDataGrid({
     onRowClick,
     checkboxSelection = true,
     onRowSelectionModelChange,
+    height = 650,
 }: InvoiceDataGridProps) {
     return (
         <Paper
             elevation={0}
             sx={{
-                height: 650,
+                height,
                 width: '100%',
                 border: '1px solid var(--border)',
                 borderRadius: 2,
@@ -115,6 +118,8 @@ export default function InvoiceDataGrid({
                         borderBottom: '1px solid var(--border)',
                         color: 'var(--foreground)',
                         fontSize: '0.875rem',
+                        display: 'flex',
+                        alignItems: 'center',
                     },
                     '& .MuiDataGrid-footerContainer': {
                         borderTop: '1px solid var(--border)',

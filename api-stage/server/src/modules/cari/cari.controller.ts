@@ -106,12 +106,15 @@ export class CariController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('tip') tip?: string,
+    @Query('aktif') aktif?: string,
   ) {
+    const aktifBool = aktif === 'true' ? true : aktif === 'false' ? false : undefined;
     return this.cariService.findAll(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
       search,
       tip,
+      aktifBool,
     );
   }
 
