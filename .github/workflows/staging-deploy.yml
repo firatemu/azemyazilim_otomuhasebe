@@ -1,0 +1,108 @@
+# Staging ortamı: Build GitHub'da, deploy 31.210.210.185 (stnoto.com)
+# Sunucuda RAM yetersiz olduğu için build CI'da yapılır, sunucu sadece pull + up yapar.
+# Tetikleyici: workflow_dispatch (manuel) veya push to staging/main
+
+name: Staging Deploy (stnoto.com)
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - staging
+      - main
+
+env:
+  REGISTRY: ghcr.io
+  # GHCR package names (firatemu = github owner, adjust if different)
+  IMAGE_BACKEND: ghcr.io/firatemu/otomuhasebe-backend-staging:latest
+  IMAGE_PANEL: ghcr.io/firatemu/otomuhasebe-user-panel-staging:latest
+
+jobs:
+  build-backend:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push backend-staging
+        uses: docker/build-push-action@v5
+        with:
+          context: ./api-stage
+          file: ./api-stage/server/Dockerfile.staging.prod
+          push: true
+          tags: ${{ env.IMAGE_BACKEND }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  build-panel:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push user-panel-staging
+        uses: docker/build-push-action@v5
+        with:
+          context: ./panel-stage/client
+          file: ./panel-stage/client/Dockerfile.staging.prod
+          push: true
+          tags: ${{ env.IMAGE_PANEL }}
+          build-args: |
+            NEXT_PUBLIC_API_BASE_URL=https://api.stnoto.com
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          platforms: linux/amd64
+
+  deploy:
+    needs:
+      - build-backend
+      - build-panel
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy to staging server via SSH
+        uses: appleboy/ssh-action@v1.0.3
+        with:
+          host: 31.210.210.185
+          username: root
+          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          script_timeout: 5m
+          script: |
+            set -e
+            # GHCR login (private package için GHCR_PAT secret gerekir)
+            if [ -n "${{ secrets.GHCR_PAT }}" ]; then
+              echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
+            fi
+            cd /var/www/otomuhasebe
+            docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docker-compose.staging.ghcr.yml pull
+            docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docker-compose.staging.ghcr.yml up -d
+            echo "Staging deploy tamamlandı: stnoto.com"

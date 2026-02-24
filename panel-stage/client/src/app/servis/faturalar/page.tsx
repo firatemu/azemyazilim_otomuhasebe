@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   Box,
   Typography,
@@ -45,7 +45,7 @@ type WorkOrderOption = {
 
 type ItemPriceEdit = { id: string; unitPrice: number; taxRate: number };
 
-export default function ServisFaturalariPage() {
+function ServisFaturalariContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [invoices, setInvoices] = useState<ServiceInvoice[]>([]);
@@ -421,5 +421,19 @@ export default function ServisFaturalariPage() {
         </DialogActions>
       </Dialog>
     </>
+  );
+}
+
+export default function ServisFaturalariPage() {
+  return (
+    <Suspense
+      fallback={
+        <Box sx={{ display: 'flex', justifyContent: 'center', p: 4 }}>
+          <CircularProgress />
+        </Box>
+      }
+    >
+      <ServisFaturalariContent />
+    </Suspense>
   );
 }

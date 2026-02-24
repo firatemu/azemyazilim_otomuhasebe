@@ -12,8 +12,9 @@ WORKDIR /app/client
 COPY --from=deps /app/client/node_modules ./node_modules
 COPY . .
 
-# Set build time envs
-ENV NEXT_PUBLIC_API_BASE_URL=https://staging-api.otomuhasebe.com
+# Set build time envs (ARG allows override for stnoto.com: --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.stnoto.com)
+ARG NEXT_PUBLIC_API_BASE_URL=https://staging-api.otomuhasebe.com
+ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NODE_ENV=production
 
 RUN npx next build

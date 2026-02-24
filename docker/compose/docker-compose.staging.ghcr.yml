@@ -1,0 +1,48 @@
+# Staging - GHCR image'ları ile çalıştır (sunucuda build yok)
+# Image'lar GitHub Actions ile build edilip ghcr.io'ya push edilir.
+# Kullanım: docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docker-compose.staging.ghcr.yml up -d
+# Repo farklıysa: env'de GHCR_IMAGE_BACKEND ve GHCR_IMAGE_PANEL ile override edilebilir
+
+version: "3.9"
+
+services:
+  backend-staging:
+    image: ${GHCR_IMAGE_BACKEND:-ghcr.io/firatemu/otomuhasebe-backend-staging:latest}
+    env_file:
+      - .env.staging
+    networks: [ app_net ]
+    ports:
+      - "3020:3000"
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://0.0.0.0:3000/api/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  user-panel-staging:
+    image: ${GHCR_IMAGE_PANEL:-ghcr.io/firatemu/otomuhasebe-user-panel-staging:latest}
+    ports:
+      - "3010:3000"
+    env_file:
+      - .env.staging
+    environment:
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_API_BASE_URL: https://api.stnoto.com
+      NODE_ENV: production
+      API_PROXY_TARGET: "http://backend-staging:3000"
+    networks: [ app_net ]
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://0.0.0.0:3000/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+networks:
+  app_net:
+    name: compose_app_net
+    external: true

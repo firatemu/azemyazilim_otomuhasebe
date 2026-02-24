@@ -1,0 +1,47 @@
+# Staging - image ile çalıştır (sunucuda build yok)
+# Image'lar lokal build + deploy-staging-to-server.sh ile yüklenir.
+# Kullanım: docker compose -f docker-compose.base.yml -f docker-compose.staging.pull.yml up -d
+
+version: "3.9"
+
+services:
+  backend-staging:
+    image: otomuhasebe-backend-staging:latest
+    env_file:
+      - .env.staging
+    networks: [ app_net ]
+    ports:
+      - "3020:3000"
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://0.0.0.0:3000/api/health" ]
+      interval: 30s
+      timeout: 3s
+      retries: 12
+      start_period: 30s
+    restart: unless-stopped
+
+  user-panel-staging:
+    image: otomuhasebe-user-panel-staging:latest
+    ports:
+      - "3010:3000"
+    env_file:
+      - .env.staging
+    environment:
+      PORT: "3000"
+      HOSTNAME: "0.0.0.0"
+      NEXT_PUBLIC_API_BASE_URL: https://staging-api.otomuhasebe.com
+      NODE_ENV: production
+      API_PROXY_TARGET: "http://backend-staging:3000"
+    networks: [ app_net ]
+    healthcheck:
+      test: [ "CMD", "wget", "-qO-", "http://0.0.0.0:3000/" ]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    restart: unless-stopped
+
+networks:
+  app_net:
+    name: compose_app_net
+    external: true

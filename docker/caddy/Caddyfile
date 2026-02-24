@@ -76,6 +76,27 @@ staging-api.otomuhasebe.com {
   reverse_proxy backend-staging:3000
 }
 
+# ==========================
+# STNOTO.COM (Yeni sunucu staging)
+# ==========================
+
+stnoto.com, www.stnoto.com {
+  import common_security
+  handle /api/* {
+    reverse_proxy backend-staging:3000
+  }
+  handle {
+    reverse_proxy user-panel-staging:3000
+  }
+}
+
+api.stnoto.com {
+  import common_security
+  @root path /
+  redir @root /api/health temporary
+  reverse_proxy backend-staging:3000
+}
+
 # admin-staging.otomuhasebe.com {
 #   import common_security
 #   reverse_proxy admin-panel-staging:80 {

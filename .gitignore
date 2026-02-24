@@ -49,6 +49,7 @@ next-env.d.ts
 
 
 # Backups and temporary folders
+backups/
 *-backup/
 *_backup/
 panel-prod-backup/
