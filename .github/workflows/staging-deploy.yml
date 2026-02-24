@@ -1,4 +1,4 @@
-# Staging ortamı: Build GitHub'da, deploy 31.210.210.185 (stnoto.com)
+# Staging ortamı: Build GitHub'da, deploy 31.210.43.185 (stnoto.com)
 # Sunucuda RAM yetersiz olduğu için build CI'da yapılır, sunucu sadece pull + up yapar.
 # Tetikleyici: workflow_dispatch (manuel) veya push to staging/main
 
@@ -92,7 +92,7 @@ jobs:
       - name: Deploy to staging server via SSH
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 31.210.210.185
+          host: 31.210.43.185
           username: root
           key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
           script_timeout: 5m

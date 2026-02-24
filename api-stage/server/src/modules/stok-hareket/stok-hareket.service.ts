@@ -62,6 +62,18 @@ export class StokHareketService {
               iskontoOrani: true,
               iskontoTutari: true,
               tutar: true,
+              fatura: {
+                select: {
+                  faturaNo: true,
+                  faturaTipi: true,
+                  cari: {
+                    select: {
+                      unvan: true,
+                      cariKodu: true,
+                    },
+                  },
+                },
+              },
             },
           },
         },

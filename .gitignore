@@ -50,6 +50,7 @@ next-env.d.ts
 
 # Backups and temporary folders
 backups/
+dist-staging-images/
 *-backup/
 *_backup/
 panel-prod-backup/

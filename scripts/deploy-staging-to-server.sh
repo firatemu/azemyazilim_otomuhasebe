@@ -2,13 +2,13 @@
 # Build edilmiş staging image'larını (.tar) uzak sunucuya kopyalar ve docker load eder.
 # Önce: ./scripts/build-staging-local.sh   (Docker kurulu bir makinede)
 # Kullanım: ./scripts/deploy-staging-to-server.sh [KULLANICI@]SUNUCU_IP_veya_HOST
-# Varsayılan sunucu: root@31.210.210.185 (stnoto.com)
+# Varsayılan sunucu: root@31.210.43.185 (stnoto.com)
 
 set -e
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 OUT_DIR="${PROJECT_ROOT}/dist-staging-images"
-REMOTE="${1:-root@31.210.210.185}"
+REMOTE="${1:-root@31.210.43.185}"
 
 if [[ ! -f "${OUT_DIR}/otomuhasebe-backend-staging.tar" ]] || [[ ! -f "${OUT_DIR}/otomuhasebe-user-panel-staging.tar" ]]; then
   echo "Hata: Önce lokal build yapın (Docker kurulu makinede): ./scripts/build-staging-local.sh"

@@ -2,7 +2,7 @@
 
 Bu rehber, OtoMuhasebe staging ortamını **stnoto.com** domain'inde yeni bir Ubuntu 22 sunucuda yayına almak için gerekli tüm adımları içerir.
 
-**Hedef sunucu:** 31.210.210.185 (stnoto.com)
+**Hedef sunucu:** 31.210.43.185 (stnoto.com)
 
 **Not:** Sunucuda RAM yetersiz olduğu için build işlemi **GitHub Actions** üzerinde yapılır. Sunucu sadece hazır image'ları çeker (`docker pull`) ve çalıştırır; sunucuda `next build` veya `nest build` yapılmaz.
 
@@ -12,9 +12,9 @@ Bu rehber, OtoMuhasebe staging ortamını **stnoto.com** domain'inde yeni bir Ub
 
 Build GitHub'da yapılır, sunucu sadece pull + up yapar:
 
-1. **GitHub Secrets** ekleyin: `STAGING_SERVER_SSH_KEY` (root@31.210.210.185 için SSH private key), (opsiyonel) `GHCR_PAT` (private GHCR package için).
+1. **GitHub Secrets** ekleyin: `STAGING_SERVER_SSH_KEY` (root@31.210.43.185 için SSH private key), (opsiyonel) `GHCR_PAT` (private GHCR package için).
 2. **Sunucu hazırlığı** (aşağıdaki §1–§8): Docker, clone, network, .env.staging, base compose, DB restore.
-3. **DNS:** stnoto.com, api.stnoto.com, www.stnoto.com → 31.210.210.185
+3. **DNS:** stnoto.com, api.stnoto.com, www.stnoto.com → 31.210.43.185
 4. **İlk deploy:** GitHub Actions → "Staging Deploy (stnoto.com)" workflow'unu manuel çalıştırın (`workflow_dispatch`).
 5. **Sonraki deploylar:** `main` veya `staging` branch'e push veya workflow'u manuel tetikleyin.
 
@@ -70,9 +70,9 @@ Domain sağlayıcınızda aşağıdaki A kayıtlarını oluşturun (sunucu IP'ni
 
 | Kayıt | Tip | Değer | TTL |
 |-------|-----|-------|-----|
-| stnoto.com | A | 31.210.210.185 | 300 |
-| api.stnoto.com | A | 31.210.210.185 | 300 |
-| www.stnoto.com | A | 31.210.210.185 | 300 |
+| stnoto.com | A | 31.210.43.185 | 300 |
+| api.stnoto.com | A | 31.210.43.185 | 300 |
+| www.stnoto.com | A | 31.210.43.185 | 300 |
 
 DNS yayılımı 5–30 dakika sürebilir. Kontrol: `dig stnoto.com +short`
 
@@ -109,7 +109,7 @@ cd /home/azem/projects/otomuhasebe
 tar -czf staging_backup_$(date +%Y%m%d_%H%M%S).tar.gz -C backups staging_full_*
 
 # SCP ile yeni sunucuya gönder
-scp backups/staging_backup_*.tar.gz root@31.210.210.185:/var/www/otomuhasebe/backups/
+scp backups/staging_backup_*.tar.gz root@31.210.43.185:/var/www/otomuhasebe/backups/
 ```
 
 **Yeni sunucuda:**
@@ -265,7 +265,7 @@ docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docke
 
 **İlk deploy:** GitHub Actions'ta "Staging Deploy (stnoto.com)" workflow'unu manuel çalıştırın; workflow otomatik olarak pull + up yapar.
 
-**Lokal .tar ile (alternatif):** Lokal build + `./scripts/deploy-staging-to-server.sh root@31.210.210.185` kullanıyorsanız:
+**Lokal .tar ile (alternatif):** Lokal build + `./scripts/deploy-staging-to-server.sh root@31.210.43.185` kullanıyorsanız:
 ```bash
 docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docker-compose.staging.pull.yml up -d
 ```

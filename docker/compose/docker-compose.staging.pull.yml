@@ -29,7 +29,7 @@ services:
     environment:
       PORT: "3000"
       HOSTNAME: "0.0.0.0"
-      NEXT_PUBLIC_API_BASE_URL: https://staging-api.otomuhasebe.com
+      NEXT_PUBLIC_API_BASE_URL: https://api.stnoto.com
       NODE_ENV: production
       API_PROXY_TARGET: "http://backend-staging:3000"
     networks: [ app_net ]

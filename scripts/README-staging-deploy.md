@@ -5,13 +5,13 @@ Sunucuda RAM yetersiz olduğu için staging build sunucuda yapılmaz. İki seçe
 1. **GitHub Actions (önerilen):** Build CI'da yapılır, image'lar GHCR'a push edilir, sunucu `docker pull` ile çeker. Bkz. `.github/workflows/staging-deploy.yml`
 2. **Lokal build:** Lokal makinede build, .tar ile sunucuya SCP + `docker load`
 
-**Hedef sunucu:** `root@31.210.210.185` (stnoto.com)
+**Hedef sunucu:** `root@31.210.43.185` (stnoto.com)
 
 ## Gereksinimler
 
 - Lokal makinede Docker (4 GB+ RAM önerilir)
 - Uzak sunucuda Docker ve proje kurulu olmalı
-- SSH erişimi: `root@31.210.210.185` (şifre veya key)
+- SSH erişimi: `root@31.210.43.185` (şifre veya key)
 
 ## Adımlar
 
@@ -28,12 +28,12 @@ Proje kökünde:
 
 ### 2. Uzak sunucuya gönder ve yükle
 
-Varsayılan hedef `root@31.210.210.185`. Parametre vermeden veya farklı sunucu ile:
+Varsayılan hedef `root@31.210.43.185`. Parametre vermeden veya farklı sunucu ile:
 
 ```bash
 ./scripts/deploy-staging-to-server.sh
 # veya
-./scripts/deploy-staging-to-server.sh root@31.210.210.185
+./scripts/deploy-staging-to-server.sh root@31.210.43.185
 ```
 
 - .tar dosyaları sunucuya kopyalanır
@@ -45,7 +45,7 @@ Varsayılan hedef `root@31.210.210.185`. Parametre vermeden veya farklı sunucu 
 SSH ile sunucuya bağlanın:
 
 ```bash
-ssh root@31.210.210.185
+ssh root@31.210.43.185
 cd /var/www/otomuhasebe
 ```
 
@@ -73,7 +73,7 @@ Panel image içinde `NEXT_PUBLIC_API_BASE_URL` build zamanında sabitlenir. stno
 |------|--------|--------|
 | Build (GitHub Actions) | CI | Actions → "Staging Deploy (stnoto.com)" manuel veya push to main/staging |
 | Build (lokal) | Lokal (Docker kurulu) | `./scripts/build-staging-local.sh` |
-| Deploy (lokal .tar) | Lokal | `./scripts/deploy-staging-to-server.sh` (hedef: root@31.210.210.185) |
+| Deploy (lokal .tar) | Lokal | `./scripts/deploy-staging-to-server.sh` (hedef: root@31.210.43.185) |
 | Çalıştır (GHCR) | Sunucu | `docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docker-compose.staging.ghcr.yml up -d` |
 | Çalıştır (lokal .tar) | Sunucu | `docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docker-compose.staging.pull.yml up -d` |
 

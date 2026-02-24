@@ -884,12 +884,12 @@ export default function MalzemeListesiPage() {
     fetchAracModeller(marka);
   }, [fetchAracModeller]);
 
-  // Fetch stoklar - useCallback ile optimize edilmiş
+  // Fetch stoklar - useCallback ile optimize edilmiş (tüm sayfalar için veri çek)
   const fetchStoklar = useCallback(async () => {
     try {
       setLoading(true);
       const response = await axios.get('/stok', {
-        params: { search: debouncedSearch, limit: 20 },
+        params: { search: debouncedSearch, limit: 5000, page: 1 },
       });
       const stokData = response.data.data || [];
       setStoklar(stokData);
@@ -1073,7 +1073,7 @@ export default function MalzemeListesiPage() {
       try {
         setLoading(true);
         const response = await axios.get('/stok', {
-          params: { search: debouncedSearch, limit: 20 },
+          params: { search: debouncedSearch, limit: 5000, page: 1 },
         });
         const stokData = response.data.data || [];
         setStoklar(stokData);
@@ -1118,7 +1118,7 @@ export default function MalzemeListesiPage() {
         try {
           setLoading(true);
           const response = await axios.get('/stok', {
-            params: { search: debouncedSearch, limit: 20 },
+            params: { search: debouncedSearch, limit: 5000, page: 1 },
           });
           const stokData = response.data.data || [];
           setStoklar(stokData);
@@ -1181,7 +1181,7 @@ export default function MalzemeListesiPage() {
         try {
           setLoading(true);
           const response = await axios.get('/stok', {
-            params: { search: debouncedSearch, limit: 20 },
+            params: { search: debouncedSearch, limit: 5000, page: 1 },
           });
           const stokData = response.data.data || [];
           setStoklar(stokData);
@@ -1218,7 +1218,7 @@ export default function MalzemeListesiPage() {
       try {
         setLoading(true);
         const response = await axios.get('/stok', {
-          params: { search: debouncedSearch, limit: 20 },
+          params: { search: debouncedSearch, limit: 5000, page: 1 },
         });
         const stokData = response.data.data || [];
         setStoklar(stokData);
@@ -1250,7 +1250,7 @@ export default function MalzemeListesiPage() {
       try {
         setLoading(true);
         const response = await axios.get('/stok', {
-          params: { search: debouncedSearch, limit: 20 },
+          params: { search: debouncedSearch, limit: 5000, page: 1 },
         });
         const stokData = response.data.data || [];
         setStoklar(stokData);
@@ -1305,13 +1305,17 @@ export default function MalzemeListesiPage() {
   const formatMoney = (value: number) =>
     new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value || 0);
 
-  const getHareketLabel = (tip: string) => {
+  const getHareketLabel = (hareket: any) => {
+    const tip = hareket?.hareketTipi || '';
+    const faturaTipi = hareket?.faturaKalemi?.fatura?.faturaTipi;
     const labels: Record<string, string> = {
-      GIRIS: 'Giriş',
+      GIRIS: faturaTipi === 'ALIS' ? 'Satınalma faturası' : 'Giriş',
       CIKIS: 'Çıkış',
-      SATIS: 'Çıkış',
-      IADE: 'Giriş',
+      SATIS: 'Satış faturası',
+      IADE: faturaTipi === 'ALIS_IADE' ? 'Alış iadesi' : faturaTipi === 'SATIS_IADE' ? 'Satış iadesi' : 'İade',
       SAYIM: 'Sayım',
+      SAYIM_FAZLA: 'Sayım fazlası',
+      SAYIM_EKSIK: 'Sayım eksiği',
     };
     return labels[tip] || tip;
   };
@@ -1354,6 +1358,8 @@ export default function MalzemeListesiPage() {
       SATIS: 'primary',
       IADE: 'warning',
       SAYIM: 'default',
+      SAYIM_FAZLA: 'success',
+      SAYIM_EKSIK: 'error',
     };
     return colors[tip] || 'default';
   };
@@ -1843,26 +1849,28 @@ export default function MalzemeListesiPage() {
                   onChange={(e) => setHareketTipiFilter(e.target.value)}
                 >
                   <MenuItem value="">Tümü</MenuItem>
-                  <MenuItem value="GIRIS">Giriş</MenuItem>
+                  <MenuItem value="GIRIS">Giriş / Satınalma</MenuItem>
                   <MenuItem value="CIKIS">Çıkış</MenuItem>
-                  <MenuItem value="SATIS">Satış</MenuItem>
+                  <MenuItem value="SATIS">Satış faturası</MenuItem>
                   <MenuItem value="IADE">İade</MenuItem>
                   <MenuItem value="SAYIM">Sayım</MenuItem>
+                  <MenuItem value="SAYIM_FAZLA">Sayım fazlası</MenuItem>
+                  <MenuItem value="SAYIM_EKSIK">Sayım eksiği</MenuItem>
                 </Select>
               </FormControl>
 
-              <TableContainer component={Paper} sx={{ maxHeight: 420 }}>
+              <TableContainer component={Paper} sx={{ maxHeight: 420, '& .MuiTableCell-root': { color: 'var(--foreground)' } }}>
                 <Table stickyHeader size="small">
                   <TableHead sx={{ bgcolor: 'var(--muted)' }}>
                     <TableRow>
-                      <TableCell><strong>Tarih</strong></TableCell>
-                      <TableCell><strong>Hareket Tipi</strong></TableCell>
-                      <TableCell><strong>Ambar</strong></TableCell>
-                      <TableCell><strong>Ambar</strong></TableCell>
-                      <TableCell align="right"><strong>Miktar</strong></TableCell>
-                      <TableCell align="right"><strong>Birim Fiyat</strong></TableCell>
-                      <TableCell align="right"><strong>Toplam</strong></TableCell>
-                      <TableCell><strong>Açıklama</strong></TableCell>
+                      <TableCell sx={{ color: 'var(--foreground)' }}><strong>Tarih</strong></TableCell>
+                      <TableCell sx={{ color: 'var(--foreground)' }}><strong>İşlem Türü</strong></TableCell>
+                      <TableCell sx={{ color: 'var(--foreground)' }}><strong>Ambar</strong></TableCell>
+                      <TableCell sx={{ color: 'var(--foreground)' }}><strong>Cari</strong></TableCell>
+                      <TableCell align="right" sx={{ color: 'var(--foreground)' }}><strong>Miktar</strong></TableCell>
+                      <TableCell align="right" sx={{ color: 'var(--foreground)' }}><strong>Birim Fiyat</strong></TableCell>
+                      <TableCell align="right" sx={{ color: 'var(--foreground)' }}><strong>Toplam</strong></TableCell>
+                      <TableCell sx={{ color: 'var(--foreground)' }}><strong>Açıklama</strong></TableCell>
                     </TableRow>
                   </TableHead>
                   <TableBody>
@@ -1870,51 +1878,59 @@ export default function MalzemeListesiPage() {
                       <TableSkeleton rows={5} columns={6} />
                     ) : hareketler.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
-                          <Typography variant="body2" color="text.secondary">
+                        <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                          <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
                             Bu ürün için hareket kaydı bulunamadı.
                           </Typography>
                         </TableCell>
                       </TableRow>
                     ) : (
                       hareketler.map((hareket: any) => {
-                        const toplamTutar = (hareket.miktar || 0) * Number(hareket.birimFiyat ?? 0);
+                        const birimFiyat = Number(hareket.birimFiyat ?? hareket.faturaKalemi?.birimFiyat ?? 0);
+                        const toplamTutar = (hareket.miktar || 0) * birimFiyat;
+                        const cariBilgi = hareket.faturaKalemi?.fatura?.cari;
+                        const cariLabel = cariBilgi ? `${cariBilgi.cariKodu || ''} - ${cariBilgi.unvan || ''}`.trim() : '-';
                         return (
                           <TableRow key={hareket.id} hover>
                             <TableCell>
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography variant="caption" sx={{ color: 'var(--foreground)' }}>
                                 {formatHareketDate(hareket.createdAt)}
                               </Typography>
                             </TableCell>
                             <TableCell>
                               <Chip
-                                label={getHareketLabel(hareket.hareketTipi)}
+                                label={getHareketLabel(hareket)}
                                 color={getHareketColor(hareket.hareketTipi)}
                                 size="small"
                               />
                             </TableCell>
                             <TableCell>
-                              <Typography variant="body2">
+                              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
                                 {hareket.warehouse?.name || '-'}
                               </Typography>
                             </TableCell>
+                            <TableCell>
+                              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
+                                {cariLabel}
+                              </Typography>
+                            </TableCell>
                             <TableCell align="right">
-                              <Typography variant="body2" fontWeight="600">
+                              <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--foreground)' }}>
                                 {(hareket.miktar || 0).toLocaleString('tr-TR')}
                               </Typography>
                             </TableCell>
                             <TableCell align="right">
-                              <Typography variant="body2">
-                                {formatMoney(Number(hareket.birimFiyat ?? 0))}
+                              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
+                                {formatMoney(birimFiyat)}
                               </Typography>
                             </TableCell>
                             <TableCell align="right">
-                              <Typography variant="body2" fontWeight="600">
+                              <Typography variant="body2" fontWeight="600" sx={{ color: 'var(--foreground)' }}>
                                 {formatMoney(toplamTutar)}
                               </Typography>
                             </TableCell>
                             <TableCell>
-                              <Typography variant="caption" color="text.secondary">
+                              <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
                                 {hareket.aciklama || '-'}
                               </Typography>
                             </TableCell>
