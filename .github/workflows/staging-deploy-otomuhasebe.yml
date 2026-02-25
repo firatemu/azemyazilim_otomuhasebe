@@ -1,21 +1,21 @@
-# Staging ortamı: Build GitHub'da, image'lar GHCR'a push edilir.
-# Sunucuda RAM yetersiz olduğu için build CI'da yapılır; tüm sunucular sadece pull + up yapar.
-# Tetikleyici: sadece workflow_dispatch (manuel); push ile tetiklenmez
+# Staging ortamı: https://staging.otomuhasebe.com/ (sunucu IP: 76.13.14.43)
+# Build GitHub'da, image'lar GHCR'a push edilir; sunucuda pull + up.
+# Tetikleyici: sadece workflow_dispatch (manuel)
+# Gerekli secret: STAGING_OTOMUHASEBE_SSH_KEY (76.13.14.43 için SSH private key)
 
-name: Staging Deploy (stnoto.com)
+name: Staging Deploy (staging.otomuhasebe.com)
 
 on:
   workflow_dispatch:
     inputs:
       skip_deploy:
-        description: "Sadece build & GHCR push (deploy atla, başka sunuculardan pull edecekseniz)"
+        description: "Sadece build & GHCR push (deploy atla)"
         required: false
         default: false
         type: boolean
 
 env:
   REGISTRY: ghcr.io
-  # GHCR package names (firatemu = github owner, adjust if different)
   IMAGE_BACKEND: ghcr.io/firatemu/otomuhasebe-backend-staging:latest
   IMAGE_PANEL: ghcr.io/firatemu/otomuhasebe-user-panel-staging:latest
 
@@ -79,7 +79,7 @@ jobs:
           push: true
           tags: ${{ env.IMAGE_PANEL }}
           build-args: |
-            NEXT_PUBLIC_API_BASE_URL=https://api.stnoto.com
+            NEXT_PUBLIC_API_BASE_URL=https://staging.otomuhasebe.com
             API_PROXY_TARGET=http://backend-staging:3000
           cache-from: type=gha
           cache-to: type=gha,mode=max
@@ -91,24 +91,22 @@ jobs:
       - build-panel
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'workflow_dispatch' && !inputs.skip_deploy }}
-    # SSH/ sunucu hatası olsa bile workflow başarılı kalsın; image'lar GHCR'da, sunucuda manuel pull yapılabilir
     continue-on-error: true
 
     steps:
-      - name: Deploy to staging server via SSH
+      - name: Deploy to staging.otomuhasebe.com (76.13.14.43)
         uses: appleboy/ssh-action@v1.0.3
         with:
-          host: 31.210.43.185
+          host: 76.13.14.43
           username: root
-          key: ${{ secrets.STAGING_SERVER_SSH_KEY }}
+          key: ${{ secrets.STAGING_OTOMUHASEBE_SSH_KEY }}
           script_timeout: 5m
           script: |
             set -e
-            # GHCR login (private package için GHCR_PAT secret gerekir)
             if [ -n "${{ secrets.GHCR_PAT }}" ]; then
               echo "${{ secrets.GHCR_PAT }}" | docker login ghcr.io -u ${{ github.repository_owner }} --password-stdin
             fi
             cd /var/www/otomuhasebe
             docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docker-compose.staging.ghcr.yml pull
             docker compose -f docker/compose/docker-compose.base.yml -f docker/compose/docker-compose.staging.ghcr.yml up -d
-            echo "Staging deploy tamamlandı: stnoto.com"
+            echo "Staging deploy tamamlandı: https://staging.otomuhasebe.com"
