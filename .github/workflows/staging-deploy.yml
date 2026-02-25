@@ -95,6 +95,8 @@ jobs:
       - build-panel
     runs-on: ubuntu-latest
     if: ${{ github.event_name == 'push' || (github.event_name == 'workflow_dispatch' && !inputs.skip_deploy) }}
+    # SSH/ sunucu hatası olsa bile workflow başarılı kalsın; image'lar GHCR'da, sunucuda manuel pull yapılabilir
+    continue-on-error: true
 
     steps:
       - name: Deploy to staging server via SSH
