@@ -25,14 +25,14 @@ import {
     Avatar,
     Stack,
     Chip,
+    Tooltip,
+    LinearProgress,
+    Checkbox,
+    CircularProgress,
     useMediaQuery,
-    useTheme
+    useTheme,
+    InputAdornment,
 } from '@mui/material';
-import {
-    DataGrid,
-    GridColDef,
-    GridRowSelectionModel
-} from '@mui/x-data-grid';
 import {
     Delete,
     Save,
@@ -43,7 +43,9 @@ import {
     Description,
     ConfirmationNumber,
     Layers,
-    PostAdd
+    PostAdd,
+    Search,
+    Visibility,
 } from '@mui/icons-material';
 import axios from '@/lib/axios';
 import { useRouter, useSearchParams } from 'next/navigation';
@@ -65,7 +67,7 @@ const initialCekForm: CekFormData = {
     evrakNo: '',
     vadeTarihi: '',
     tutar: 0,
-    tip: 'CEK',
+    tip: 'MUSTERI_CEK', // Corrected from 'CEK'
     banka: '',
     sube: '',
     hesapNo: '',
@@ -107,11 +109,32 @@ function YeniBordroContent() {
     const [cekForm, setCekForm] = useState<CekFormData>(initialCekForm);
 
     const [portfoyCekler, setPortfoyCekler] = useState<any[]>([]);
-    const [secilenCekler, setSecilenCekler] = useState<GridRowSelectionModel>([] as any);
+    const [secilenCekler, setSecilenCekler] = useState<any[]>([]);
+    const [searchTerm, setSearchTerm] = useState('');
+
+    const menuTip = searchParams.get('tip');
+
+    const filteredBordroTips = useMemo(() => {
+        const girisTips = {
+            MUSTERI_EVRAK_GIRISI: BORDRO_TIP_LABELS.MUSTERI_EVRAK_GIRISI,
+            IADE_BORDROSU: BORDRO_TIP_LABELS.IADE_BORDROSU,
+        };
+
+        const cikisTips = {
+            BORC_EVRAK_CIKISI: BORDRO_TIP_LABELS.BORC_EVRAK_CIKISI,
+            CARIYE_EVRAK_CIROSU: BORDRO_TIP_LABELS.CARIYE_EVRAK_CIROSU,
+            BANKA_TAHSIL_CIROSU: BORDRO_TIP_LABELS.BANKA_TAHSIL_CIROSU,
+            BANKA_TEMINAT_CIROSU: BORDRO_TIP_LABELS.BANKA_TEMINAT_CIROSU,
+        };
+
+        if (menuTip === 'GIRIS') return Object.entries(girisTips);
+        if (menuTip === 'CIKIS') return Object.entries(cikisTips);
+        return Object.entries(BORDRO_TIP_LABELS);
+    }, [menuTip]);
 
     useEffect(() => {
-        axios.get('/cari').then(res => setCariler(res.data.data || []));
-        axios.get('/banka/hesap').then(res => setBankaHesaplari(res.data || []));
+        axios.get('/cari').then(res => setCariler(res.data?.data || res.data || []));
+        axios.get('/banka/hesap').then(res => setBankaHesaplari(res.data?.data || res.data || []));
         setBordroNo(`BR-${Date.now().toString().slice(-6)}`);
     }, []);
 
@@ -121,19 +144,39 @@ function YeniBordroContent() {
             setLoading(true);
             const status = bordroTipi === 'IADE_BORDROSU' ? '' : 'PORTFOYDE';
             axios.get(`/cek-senet?durum=${status}`).then(res => {
-                setPortfoyCekler(res.data);
+                const data = res.data?.data || res.data;
+                // Unique IDs check to prevent DataGrid internal crashes
+                const uniqueData = Array.isArray(data)
+                    ? Array.from(new Map(data.filter(i => i?.id).map(item => [item.id, item])).values())
+                    : [];
+                setPortfoyCekler(uniqueData);
             }).finally(() => setLoading(false));
         }
     }, [activeStep, bordroTipi]);
 
+    const filteredPortfoy = useMemo(() => {
+        if (!searchTerm) return portfoyCekler;
+        const lowSearch = searchTerm.toLowerCase();
+        return portfoyCekler.filter(p =>
+            (p.cekNo || '').toLowerCase().includes(lowSearch) ||
+            (p.banka || '').toLowerCase().includes(lowSearch) ||
+            (p.cari?.unvan || '').toLowerCase().includes(lowSearch)
+        );
+    }, [portfoyCekler, searchTerm]);
+
     const totalAmount = useMemo(() => {
-        if (bordroTipi === 'MUSTERI_EVRAK_GIRISI' || bordroTipi === 'BORC_EVRAK_CIKISI') {
-            return yeniCekler.reduce((acc, curr) => acc + (curr.tutar || 0), 0);
-        } else {
-            return (secilenCekler as string[]).reduce((acc, id) => {
-                const item = portfoyCekler.find(p => p.id === id);
-                return acc + (item?.tutar || 0);
-            }, 0);
+        try {
+            if (bordroTipi === 'MUSTERI_EVRAK_GIRISI' || bordroTipi === 'BORC_EVRAK_CIKISI') {
+                return (yeniCekler || []).reduce((acc, curr) => acc + (Number(curr?.tutar) || 0), 0);
+            } else {
+                const selection = Array.isArray(secilenCekler) ? secilenCekler : [];
+                return selection.reduce((acc, id) => {
+                    const item = (portfoyCekler || []).find(p => p.id === id);
+                    return acc + (Number(item?.tutar) || 0);
+                }, 0);
+            }
+        } catch (e) {
+            return 0;
         }
     }, [yeniCekler, secilenCekler, portfoyCekler, bordroTipi]);
 
@@ -199,26 +242,13 @@ function YeniBordroContent() {
         }
     };
 
-    const portfoyColumns: GridColDef[] = [
-        { field: 'cekNo', headerName: 'Evrak No', flex: 1 },
-        {
-            field: 'vade',
-            headerName: 'Vade',
-            flex: 1,
-            type: 'date',
-            valueGetter: (value: any) => value ? new Date(value) : null
-        },
-        {
-            field: 'tutar',
-            headerName: 'Tutar',
-            flex: 1,
-            valueFormatter: (params: any) => {
-                if (typeof params.value !== 'number' && typeof params.value !== 'string') return '-';
-                return new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(Number(params.value));
-            }
-        },
-        { field: 'borclu', headerName: 'Borçlu', flex: 1.5, valueGetter: (_: any, row: any) => row?.banka || row?.cari?.unvan || '-' },
-        { field: 'durum', headerName: 'Durum', flex: 1 },
+    // Column definitions for the portfolio table (rendered manually now)
+    const PORTFOY_COLUMNS = [
+        { id: 'cekNo', label: 'Evrak No' },
+        { id: 'vade', label: 'Vade' },
+        { id: 'tutar', label: 'Tutar' },
+        { id: 'borclu', label: 'Borçlu' },
+        { id: 'durum', label: 'Durum' },
     ];
 
     const WIZARD_STEPS = ['İşlem Tipi', 'Genel Bilgiler', 'Evrak Seçimi / Girişi'];
@@ -233,7 +263,7 @@ function YeniBordroContent() {
                     </IconButton>
                     <Box>
                         <Typography variant="h5" fontWeight={800} letterSpacing="-0.02em">
-                            Bordro Yönetimi
+                            {menuTip === 'GIRIS' ? 'Giriş Bordrosu' : menuTip === 'CIKIS' ? 'Çıkış Bordrosu' : 'Bordro Yönetimi'}
                         </Typography>
                         <Typography variant="body2" color="var(--muted-foreground)">
                             Kurumsal evrak hareketleri sihirbazı
@@ -262,13 +292,15 @@ function YeniBordroContent() {
                 }}>
                     {activeStep === 0 && (
                         <Box sx={{ py: 2 }}>
-                            <Typography variant="h6" fontWeight={700} mb={4} textAlign="center">Lütfen Yapılacak İşlemi Seçiniz</Typography>
+                            <Typography variant="h6" fontWeight={700} mb={4} textAlign="center">
+                                {menuTip === 'GIRIS' ? 'Giriş İşlemini Seçiniz' : menuTip === 'CIKIS' ? 'Çıkış İşlemini Seçiniz' : 'Lütfen Yapılacak İşlemi Seçiniz'}
+                            </Typography>
                             <Box sx={{
                                 display: 'grid',
                                 gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' },
                                 gap: 3
                             }}>
-                                {Object.entries(BORDRO_TIP_LABELS).map(([key, label]) => (
+                                {filteredBordroTips.map(([key, label]) => (
                                     <Box
                                         key={key}
                                         onClick={() => {
@@ -298,7 +330,7 @@ function YeniBordroContent() {
                                             bgcolor: bordroTipi === key ? 'var(--primary)' : 'var(--muted)',
                                             color: bordroTipi === key ? 'var(--primary-foreground)' : 'var(--foreground)'
                                         }}>
-                                            {key.includes('GIRIS') ? <PostAdd /> : <ArrowForward />}
+                                            {key.includes('GIRIS') || key.includes('IADE') ? <PostAdd /> : <ArrowForward />}
                                         </Avatar>
                                         <Typography variant="subtitle2" fontWeight={700}>{label}</Typography>
                                     </Box>
@@ -506,20 +538,101 @@ function YeniBordroContent() {
                                     </TableContainer>
                                 </Box>
                             ) : (
-                                <Box sx={{ height: 450, width: '100%', border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }}>
-                                    <DataGrid
-                                        rows={portfoyCekler}
-                                        columns={portfoyColumns}
-                                        checkboxSelection
-                                        loading={loading}
-                                        onRowSelectionModelChange={(newSelection) => setSecilenCekler(newSelection)}
-                                        rowSelectionModel={secilenCekler}
-                                        sx={{
-                                            border: 'none',
-                                            '& .MuiDataGrid-columnHeaders': { bgcolor: 'var(--muted)', fontWeight: 700 },
-                                            '& .MuiDataGrid-cell:focus': { outline: 'none' }
-                                        }}
-                                    />
+                                <Box sx={{ border: '1px solid var(--border)', borderRadius: '16px', overflow: 'hidden' }}>
+                                    <Box sx={{ p: 2, borderBottom: '1px solid var(--border)', bgcolor: 'var(--card)' }}>
+                                        <TextField
+                                            placeholder="Evrak no, banka veya cari unvanı ile ara..."
+                                            size="small"
+                                            fullWidth
+                                            value={searchTerm}
+                                            onChange={(e) => setSearchTerm(e.target.value)}
+                                            InputProps={{
+                                                startAdornment: (
+                                                    <InputAdornment position="start">
+                                                        <Search size={20} sx={{ color: 'var(--muted-foreground)' }} />
+                                                    </InputAdornment>
+                                                ),
+                                                sx: { borderRadius: '10px' }
+                                            }}
+                                        />
+                                    </Box>
+                                    <TableContainer sx={{ maxHeight: 400 }}>
+                                        <Table size="small" stickyHeader>
+                                            <TableHead>
+                                                <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                                                    <TableCell padding="checkbox" sx={{ bgcolor: 'var(--muted)' }}>
+                                                        <Checkbox
+                                                            indeterminate={secilenCekler.length > 0 && secilenCekler.length < filteredPortfoy.length}
+                                                            checked={filteredPortfoy.length > 0 && secilenCekler.length === filteredPortfoy.length}
+                                                            onChange={(e) => {
+                                                                if (e.target.checked) {
+                                                                    setSecilenCekler(filteredPortfoy.map(p => p.id));
+                                                                } else {
+                                                                    setSecilenCekler([]);
+                                                                }
+                                                            }}
+                                                        />
+                                                    </TableCell>
+                                                    {PORTFOY_COLUMNS.map(col => (
+                                                        <TableCell key={col.id} sx={{ fontWeight: 700, bgcolor: 'var(--muted)' }}>{col.label}</TableCell>
+                                                    ))}
+                                                </TableRow>
+                                            </TableHead>
+                                            <TableBody>
+                                                {loading ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                                                            <CircularProgress size={24} sx={{ mb: 1 }} />
+                                                            <Typography variant="body2" color="var(--muted-foreground)">Veriler yükleniyor...</Typography>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ) : filteredPortfoy.length === 0 ? (
+                                                    <TableRow>
+                                                        <TableCell colSpan={6} align="center" sx={{ py: 6 }}>
+                                                            <Typography variant="body2" color="var(--muted-foreground)">
+                                                                {searchTerm ? 'Arama sonucu bulunamadı.' : 'Portföyde uygun evrak bulunamadı.'}
+                                                            </Typography>
+                                                        </TableCell>
+                                                    </TableRow>
+                                                ) : (
+                                                    filteredPortfoy.map((row) => (
+                                                        <TableRow
+                                                            key={row.id}
+                                                            hover
+                                                            selected={secilenCekler.includes(row.id)}
+                                                            onClick={() => {
+                                                                const isSelected = secilenCekler.includes(row.id);
+                                                                if (isSelected) {
+                                                                    setSecilenCekler(secilenCekler.filter(id => id !== row.id));
+                                                                } else {
+                                                                    setSecilenCekler([...secilenCekler, row.id]);
+                                                                }
+                                                            }}
+                                                            sx={{ cursor: 'pointer' }}
+                                                        >
+                                                            <TableCell padding="checkbox">
+                                                                <Checkbox checked={secilenCekler.includes(row.id)} />
+                                                            </TableCell>
+                                                            <TableCell sx={{ fontWeight: 600 }}>{row.cekNo || row.seriNo || '-'}</TableCell>
+                                                            <TableCell>{row.vade ? new Date(row.vade).toLocaleDateString('tr-TR') : '-'}</TableCell>
+                                                            <TableCell sx={{ fontWeight: 700, color: 'var(--primary)' }}>
+                                                                {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(row.tutar || 0)}
+                                                            </TableCell>
+                                                            <TableCell>{row.banka || row.cari?.unvan || '-'}</TableCell>
+                                                            <TableCell>
+                                                                <Chip
+                                                                    label={row.durum || '-'}
+                                                                    size="small"
+                                                                    variant="outlined"
+                                                                    color={row.durum === 'PORTFOYDE' ? 'success' : 'default'}
+                                                                />
+                                                            </TableCell>
+                                                        </TableRow>
+                                                    ))
+                                                )}
+                                            </TableBody>
+                                        </Table>
+                                    </TableContainer>
                                 </Box>
                             )}
                         </Box>
@@ -557,7 +670,7 @@ function YeniBordroContent() {
                                     color="success"
                                     startIcon={<CheckCircle />}
                                     onClick={handleSave}
-                                    disabled={loading || ((bordroTipi === 'MUSTERI_EVRAK_GIRISI' || bordroTipi === 'BORC_EVRAK_CIKISI') ? yeniCekler.length === 0 : (secilenCekler as string[]).length === 0)}
+                                    disabled={loading || ((bordroTipi === 'MUSTERI_EVRAK_GIRISI' || bordroTipi === 'BORC_EVRAK_CIKISI') ? (yeniCekler || []).length === 0 : (Array.isArray(secilenCekler) ? secilenCekler.length : 0) === 0)}
                                     sx={{
                                         borderRadius: '10px',
                                         px: 4,

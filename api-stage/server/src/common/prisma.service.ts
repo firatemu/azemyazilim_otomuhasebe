@@ -16,7 +16,7 @@ const TENANT_MODELS = [
   'SatisIrsaliyesi', 'SatisIrsaliyesiKalemi', 'SatınAlmaIrsaliyesi', 'SatınAlmaIrsaliyesiKalemi',
   'Arac', 'CustomerVehicle', 'WorkOrder', 'WorkOrderItem', 'PartRequest', 'InventoryTransaction', 'ServiceInvoice', 'JournalEntry', 'JournalEntryLine',
   'PurchaseOrder', 'PurchaseOrderItem', 'BasitSiparis', 'SatınAlmaSiparisi', 'SatınAlmaSiparisKalemi',
-  'Masraf', 'MasrafKategori', 'SatisElemani', 'Randevu', 'SystemParameter'
+  'Masraf', 'MasrafKategori', 'SatisElemani', 'Randevu', 'SystemParameter', 'CompanyVehicle', 'VehicleExpense'
 ] as const;
 
 // Helper to define the extension (for type inference)
@@ -95,7 +95,7 @@ const createExtendedClient = (client: PrismaClient) => {
             'User', 'Tenant', 'Stok', 'StokHareket', 'Cari', 'CariHareket', 'Fatura',
             'Tahsilat', 'Siparis', 'Teklif', 'Personel', 'Warehouse', 'Banka', 'CekSenet',
             'SatisIrsaliyesi', 'SatınAlmaIrsaliyesi', 'Arac', 'WorkOrder', 'ServiceInvoice',
-            'PurchaseOrder', 'BasitSiparis', 'SatınAlmaSiparisi', 'Masraf'
+            'PurchaseOrder', 'BasitSiparis', 'SatınAlmaSiparisi', 'Masraf', 'CompanyVehicle', 'VehicleExpense'
           ];
 
           if (SOFT_DELETE_MODELS.includes(model as any)) {

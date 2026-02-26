@@ -480,7 +480,7 @@ export default function AlisFaturalariPage() {
       if (pendingDurum.yeniDurum === 'ONAYLANDI') {
         mesaj = 'Fatura onaylandı. Stoklar eklendi ve cari bakiye güncellendi.';
       } else if (pendingDurum.yeniDurum === 'IPTAL') {
-        mesaj = 'Fatura iptal edildi. Stoklar geri çıkarıldı ve cari bakiye düzeltildi.';
+        mesaj = 'Fatura iptal edildi. Cari bakiye düzeltildi. (İptal faturalar stok hesaplamasında dikkate alınmaz)';
       } else if (pendingDurum.yeniDurum === 'ACIK') {
         mesaj = 'Fatura beklemeye alındı. Stok ve cari işlemleri geri alındı.';
       }
@@ -1028,34 +1028,10 @@ export default function AlisFaturalariPage() {
               <ListItemIcon><Undo fontSize="small" /></ListItemIcon>
               <Typography variant="body2">İade Oluştur</Typography>
             </MenuItem>,
-            fatura.durum === 'ACIK' && (
-              <MenuItem
-                key="approve"
-                onClick={() => {
-                  handleDurumChangeRequest(fatura.id, fatura.durum, 'ONAYLANDI');
-                  handleMenuClose();
-                }}
-              >
-                <ListItemIcon />
-                <Typography variant="body2" sx={{ color: 'success.main', fontWeight: 600 }}>Onayla</Typography>
-              </MenuItem>
-            ),
-            fatura.durum !== 'ACIK' && fatura.durum !== 'IPTAL' && (
-              <MenuItem
-                key="pending"
-                onClick={() => {
-                  handleDurumChangeRequest(fatura.id, fatura.durum, 'ACIK');
-                  handleMenuClose();
-                }}
-              >
-                <ListItemIcon />
-                <Typography variant="body2">Beklemeye Al</Typography>
-              </MenuItem>
-            ),
             <MenuItem
               key="cancel"
               onClick={() => { handleMenuClose(); openIptalDialog(fatura); }}
-              disabled={fatura.durum === 'IPTAL'}
+              disabled={fatura.durum !== 'ONAYLANDI'}
               sx={{ color: 'error.main' }}
             >
               <ListItemIcon><Cancel fontSize="small" color="error" /></ListItemIcon>
@@ -1116,6 +1092,7 @@ export default function AlisFaturalariPage() {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
+                          <TableCell>Malzeme Kodu</TableCell>
                           <TableCell>Stok</TableCell>
                           <TableCell>Miktar</TableCell>
                           <TableCell>Birim Fiyat</TableCell>
@@ -1135,6 +1112,7 @@ export default function AlisFaturalariPage() {
 
                           return (
                             <TableRow key={index} hover>
+                              <TableCell>{kalem.stok?.stokKodu || '-'}</TableCell>
                               <TableCell>{kalem.stok?.stokAdi || '-'}</TableCell>
                               <TableCell>{kalem.miktar}</TableCell>
                               <TableCell>{formatCurrency(kalem.birimFiyat)}</TableCell>
@@ -1352,8 +1330,8 @@ export default function AlisFaturalariPage() {
               {pendingDurum.yeniDurum === 'IPTAL' && (
                 <Alert severity="info" sx={{ mb: 2 }}>
                   <Typography variant="body2">
-                    • Stok hareketi oluşturulacak (çıkış - iptal)<br />
-                    • Cari bakiye azalacak
+                    • Cari bakiye azalacak<br />
+                    • İptal faturalar stok hesaplamasında dikkate alınmaz
                   </Typography>
                 </Alert>
               )}
@@ -1414,10 +1392,10 @@ export default function AlisFaturalariPage() {
               {selectedFatura.satinAlmaIrsaliyesi && (
                 <Box sx={{
                   p: 2,
-                  bgcolor: 'var(--muted)',
+                  bgcolor: '#f9fafb',
                   borderRadius: 1,
                   mb: 2,
-                  border: '1px solid var(--border)'
+                  border: '1px solid #e5e7eb'
                 }}>
                   <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
                     Bu faturaya bağlı bir irsaliye bulunmaktadır:
@@ -1445,7 +1423,7 @@ export default function AlisFaturalariPage() {
                   {irsaliyeIptal && (
                     <Alert severity="info" sx={{ mt: 2 }}>
                       <Typography variant="body2">
-                        İrsaliye iptal edildiğinde, irsaliye kalemleri stoğa geri çıkarılacaktır.
+                        İrsaliye iptal edildiğinde, irsaliye durumu güncellenir. (Stok sadece onaylı faturalardan hesaplanır)
                       </Typography>
                     </Alert>
                   )}

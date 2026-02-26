@@ -64,4 +64,8 @@ export class UpdateCekSenetDto {
     @IsString()
     @IsOptional()
     hesapNo?: string;
+
+    @IsString()
+    @IsOptional()
+    aciklama?: string;
 }

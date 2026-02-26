@@ -167,15 +167,18 @@ export class InvoiceProfitService {
           continue;
         }
 
-        const birimFiyat = Number(kalem.birimFiyat);
         const miktar = kalem.miktar;
+        const tutarNet = Number(kalem.tutar || 0);
+        const kdvTutar = Number(kalem.kdvTutar || 0);
+        const toplamSatisKdvDahil = tutarNet + kdvTutar; // KDV dahil satış tutarı
+        const birimFiyatKdvDahil = miktar > 0 ? toplamSatisKdvDahil / miktar : 0;
         const birimMaliyet = await this.getCurrentCost(
           kalem.stokId,
           tenantId,
           db,
         );
 
-        const toplamSatis = new Decimal(birimFiyat * miktar);
+        const toplamSatis = new Decimal(toplamSatisKdvDahil);
         const toplamMaliyetKalem = new Decimal(birimMaliyet * miktar);
         const kar = toplamSatis.minus(toplamMaliyetKalem);
         const karOrani =
@@ -186,14 +189,14 @@ export class InvoiceProfitService {
         toplamSatisTutari = toplamSatisTutari.plus(toplamSatis);
         toplamMaliyet = toplamMaliyet.plus(toplamMaliyetKalem);
 
-        // Kalem bazlı kar kaydı
+        // Kalem bazlı kar kaydı (KDV dahil fiyat üzerinden)
         profitRecords.push({
           faturaId,
           faturaKalemiId: kalem.id,
           stokId: kalem.stokId,
           tenantId: tenantId || null,
           miktar,
-          birimFiyat: new Decimal(birimFiyat),
+          birimFiyat: new Decimal(birimFiyatKdvDahil),
           birimMaliyet: new Decimal(birimMaliyet),
           toplamSatisTutari: toplamSatis,
           toplamMaliyet: toplamMaliyetKalem,
@@ -626,9 +629,10 @@ export class InvoiceProfitService {
           },
         },
       },
-      orderBy: {
-        tarih: 'desc',
-      },
+      orderBy: [
+        { tarih: 'desc' },
+        { createdAt: 'desc' },
+      ],
     });
 
     // Her fatura için toplam kar kaydını ayrı sorgu ile al
@@ -702,7 +706,7 @@ export class InvoiceProfitService {
         },
         toplamSatisTutari: toplamKar
           ? Number(toplamKar.toplamSatisTutari)
-          : Number(fatura.toplamTutar || 0),
+          : Number(fatura.genelToplam || 0), // KDV dahil (fallback)
         toplamMaliyet: toplamKar ? Number(toplamKar.toplamMaliyet) : 0,
         toplamKar: toplamKar ? Number(toplamKar.kar) : 0,
         karOrani: toplamKar ? Number(toplamKar.karOrani) : 0,

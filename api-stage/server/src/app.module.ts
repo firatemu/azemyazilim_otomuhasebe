@@ -80,7 +80,8 @@ import { RolesModule } from './modules/roles/roles.module';
 import { StorageModule } from './modules/storage/storage.module';
 import { AdminModule } from './modules/admin/admin.module';
 import { QueueModule } from './common/modules/queue.module';
-
+import { CompanyVehiclesModule } from './modules/company-vehicles/company-vehicles.module';
+import { VehicleExpensesModule } from './modules/vehicle-expenses/vehicle-expenses.module';
 @Module({
   imports: [
     RolesModule,
@@ -167,6 +168,8 @@ import { QueueModule } from './common/modules/queue.module';
     StorageModule,
     AdminModule,
     QueueModule,
+    CompanyVehiclesModule,
+    VehicleExpensesModule,
   ],
   controllers: [AppController],
   providers: [

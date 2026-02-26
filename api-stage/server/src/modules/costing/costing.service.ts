@@ -166,6 +166,7 @@ export class CostingService {
         miktar: true,
         birimFiyat: true,
         tutar: true,
+        kdvTutar: true, // KDV dahil hesaplama için
         fatura: {
           select: { 
             tarih: true,
@@ -218,6 +219,7 @@ export class CostingService {
         miktar: true,
         birimFiyat: true,
         tutar: true,
+        kdvTutar: true, // KDV dahil hesaplama için
         fatura: {
           select: { 
             tarih: true,
@@ -256,10 +258,10 @@ export class CostingService {
     for (const line of purchaseLines) {
       const qty = Number(line.miktar);
       if (!qty || qty <= 0) continue;
-      const total = line.tutar
-        ? Number(line.tutar)
-        : Number(line.birimFiyat) * qty;
-      const unitCost = qty ? total / qty : 0;
+      const tutarNet = Number(line.tutar || 0);
+      const kdvTutar = Number(line.kdvTutar || 0);
+      const totalKdvDahil = tutarNet + kdvTutar; // KDV dahil tutar
+      const unitCost = qty ? totalKdvDahil / qty : 0;
       timeline.push({
         type: 'increase',
         date: line.fatura.tarih,
@@ -281,10 +283,10 @@ export class CostingService {
     for (const line of salesReturnLines) {
       const qty = Number(line.miktar);
       if (!qty || qty <= 0) continue;
-      const total = line.tutar
-        ? Number(line.tutar)
-        : Number(line.birimFiyat) * qty;
-      const unitCost = qty ? total / qty : 0;
+      const tutarNet = Number(line.tutar || 0);
+      const kdvTutar = Number(line.kdvTutar || 0);
+      const totalKdvDahil = tutarNet + kdvTutar; // KDV dahil tutar
+      const unitCost = qty ? totalKdvDahil / qty : 0;
       timeline.push({
         type: 'increase',
         date: line.fatura.tarih,
@@ -442,5 +444,47 @@ export class CostingService {
       cost: roundedCost,
       method: 'WEIGHTED_AVERAGE',
     };
+  }
+
+  /**
+   * Toplu maliyet hesaplama (rate limit aşımını önlemek için tek istekte tüm stoklar)
+   */
+  async calculateWeightedAverageCostBulk(stokIds: string[]) {
+    const results: Array<{
+      stokId: string;
+      stokKodu: string;
+      stokAdi: string;
+      cost: number;
+      status: 'success' | 'failed';
+      message?: string;
+    }> = [];
+
+    for (const stokId of stokIds) {
+      try {
+        const result = await this.calculateWeightedAverageCost(stokId);
+        results.push({
+          stokId: result.stokId,
+          stokKodu: result.stokKodu,
+          stokAdi: result.stokAdi,
+          cost: result.cost,
+          status: 'success',
+        });
+      } catch (error: any) {
+        const stok = await this.prisma.stok.findUnique({
+          where: { id: stokId },
+          select: { stokKodu: true, stokAdi: true },
+        });
+        results.push({
+          stokId,
+          stokKodu: stok?.stokKodu ?? '-',
+          stokAdi: stok?.stokAdi ?? '-',
+          cost: 0,
+          status: 'failed',
+          message: error?.message ?? 'Beklenmeyen hata',
+        });
+      }
+    }
+
+    return { results };
   }
 }

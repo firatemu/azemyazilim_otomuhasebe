@@ -37,6 +37,15 @@ export class FaturaService {
     private tcmbService: TcmbService,
   ) { }
 
+  /** Prisma Decimal veya number'ı güvenle number'a çevirir (null/undefined → 0). */
+  private toDecimalNumber(val: unknown): number {
+    if (val == null) return 0;
+    if (typeof val === 'number' && !Number.isNaN(val)) return val;
+    if (typeof val === 'object' && val !== null && 'toNumber' in val && typeof (val as any).toNumber === 'function')
+      return (val as any).toNumber();
+    return Number(val) || 0;
+  }
+
   private async createLog(
     faturaId: string,
     actionType: string,
@@ -514,6 +523,11 @@ export class FaturaService {
     userAgent?: string,
   ) {
     const { kalemler, siparisId, irsaliyeId, warehouseId, satisElemaniId, ...faturaData } = createFaturaDto;
+
+    // Satış faturaları kaydedildiğinde varsayılan olarak onaylanmış (ONAYLANDI) olur
+    if (faturaData.faturaTipi === 'SATIS' && !faturaData.durum) {
+      faturaData.durum = 'ONAYLANDI';
+    }
 
     const tenantId = await this.tenantResolver.resolveForCreate({ userId });
 
@@ -1231,6 +1245,11 @@ export class FaturaService {
 
     const updatedFatura = await this.prisma.$transaction(
       async (prisma) => {
+      // Onaylı faturada kalem/ambar güncellemesi: önce eski hareketleri geri al, sonra yeni kalemlerle yeniden uygula
+      if (fatura.durum === 'ONAYLANDI') {
+        await this.reverseInvoiceMovements(fatura, prisma, fatura.tenantId ?? undefined);
+      }
+
       // Eski kalemleri sil
       await prisma.faturaKalemi.deleteMany({
         where: { faturaId: id },
@@ -1286,9 +1305,19 @@ export class FaturaService {
         }
       }
 
-      // Durum değişikliği ve hareketlerin işlenmesi (kalemler güncellendiğinde)
-      if (updateFaturaDto.durum === 'ONAYLANDI' && fatura.durum !== 'ONAYLANDI') {
-        await this.processInvoiceMovements(updated, prisma, userId, warehouseId ?? (updated as { warehouseId?: string | null }).warehouseId ?? undefined, [], updated.tenantId ?? fatura.tenantId);
+      // Hareketlerin işlenmesi: durum ONAYLANDI'ya geçiyorsa veya fatura zaten ONAYLANDI ise (düzenleme sonrası yeniden uygula)
+      const shouldProcessMovements =
+        (updateFaturaDto.durum === 'ONAYLANDI' && fatura.durum !== 'ONAYLANDI') ||
+        fatura.durum === 'ONAYLANDI';
+      if (shouldProcessMovements) {
+        await this.processInvoiceMovements(
+          updated,
+          prisma,
+          userId,
+          warehouseId ?? (updated as { warehouseId?: string | null }).warehouseId ?? undefined,
+          [],
+          updated.tenantId ?? fatura.tenantId,
+        );
       }
 
       return updated;
@@ -1343,7 +1372,7 @@ export class FaturaService {
 
     // Soft delete: Fiziksel silme yerine işaretle
     const deletedFatura = await this.prisma.$transaction(async (prisma) => {
-      // Cari hareket kaydını sil (eğer onaylanmışsa)
+      // Cari hareket kaydını sil ve stok hareketlerini sil (eğer onaylanmışsa)
       if (fatura.durum === 'ONAYLANDI') {
         await prisma.cariHareket.deleteMany({
           where: {
@@ -1364,30 +1393,69 @@ export class FaturaService {
           },
         });
 
-        // Stok hareketlerini geri al
-        if (fatura.faturaTipi === 'SATIS') {
-          for (const kalem of fatura.kalemler) {
-            await prisma.stokHareket.create({
-              data: {
-                stokId: kalem.stokId,
-                hareketTipi: 'IADE',
-                miktar: kalem.miktar,
-                birimFiyat: kalem.birimFiyat,
-                aciklama: `Fatura Silme: ${fatura.faturaNo}`,
-              },
-            });
+        // Faturaya ait malzeme (stok) hareketlerini sil (ters hareket oluşturmak yerine kayıtları kaldır)
+        const kalemIds = fatura.kalemler?.map((k) => k.id) ?? [];
+        if (kalemIds.length > 0) {
+          await prisma.stokHareket.deleteMany({
+            where: { faturaKalemiId: { in: kalemIds } },
+          });
+        }
+
+        // Ambar stoklarını geri al (WMS açıksa)
+        const rawWh = (fatura as any).warehouseId;
+        const transactionWarehouseId = rawWh && String(rawWh).trim() ? String(rawWh).trim() : undefined;
+        for (const kalem of fatura.kalemler ?? []) {
+          if (!kalem.stokId) continue;
+          const miktar = Number(kalem.miktar) || 0;
+          if (miktar <= 0) continue;
+          if (transactionWarehouseId) {
+            await this.reverseWarehouseStockForInvoice(
+              transactionWarehouseId,
+              kalem.stokId,
+              miktar,
+              fatura.faturaTipi,
+              prisma,
+            );
           }
-        } else if (fatura.faturaTipi === 'ALIS') {
-          for (const kalem of fatura.kalemler) {
-            await prisma.stokHareket.create({
-              data: {
-                stokId: kalem.stokId,
-                hareketTipi: 'CIKIS',
-                miktar: kalem.miktar,
-                birimFiyat: kalem.birimFiyat,
-                aciklama: `Fatura Silme: ${fatura.faturaNo}`,
-              },
-            });
+        }
+        if (fatura.faturaTipi === 'SATIS' && fatura.deliveryNoteId && !transactionWarehouseId) {
+          const satisIrsaliyesi = await prisma.satisIrsaliyesi.findUnique({
+            where: { id: fatura.deliveryNoteId },
+            select: { depoId: true },
+          });
+          if (satisIrsaliyesi?.depoId) {
+            for (const kalem of fatura.kalemler ?? []) {
+              if (!kalem.stokId) continue;
+              const miktar = Number(kalem.miktar) || 0;
+              if (miktar <= 0) continue;
+              await this.reverseWarehouseStockForInvoice(
+                satisIrsaliyesi.depoId,
+                kalem.stokId,
+                miktar,
+                fatura.faturaTipi,
+                prisma,
+              );
+            }
+          }
+        }
+        if (fatura.faturaTipi === 'ALIS' && !transactionWarehouseId && fatura.satinAlmaIrsaliyeId) {
+          const irsaliye = await prisma.satınAlmaIrsaliyesi.findUnique({
+            where: { id: fatura.satinAlmaIrsaliyeId },
+            select: { depoId: true },
+          });
+          if (irsaliye?.depoId) {
+            for (const kalem of fatura.kalemler ?? []) {
+              if (!kalem.stokId) continue;
+              const miktar = Number(kalem.miktar) || 0;
+              if (miktar <= 0) continue;
+              await this.reverseWarehouseStockForInvoice(
+                irsaliye.depoId,
+                kalem.stokId,
+                miktar,
+                fatura.faturaTipi,
+                prisma,
+              );
+            }
           }
         }
       }
@@ -1545,15 +1613,14 @@ export class FaturaService {
       // Eğer durum ONAYLANDI ise, stok ve cari işlemlerini tekrar yap
       if (fatura.durum === 'ONAYLANDI') {
         // Cari hareket kaydı oluştur
+        const cariBakiye = this.toDecimalNumber(fatura.cari?.bakiye);
+        const gt = this.toDecimalNumber(fatura.genelToplam);
         await prisma.cariHareket.create({
           data: {
             cariId: fatura.cariId,
             tip: fatura.faturaTipi === 'SATIS' ? 'BORC' : 'ALACAK',
-            tutar: fatura.genelToplam,
-            bakiye:
-              fatura.faturaTipi === 'SATIS'
-                ? fatura.cari.bakiye.toNumber() + fatura.genelToplam.toNumber()
-                : fatura.cari.bakiye.toNumber() - fatura.genelToplam.toNumber(),
+            tutar: gt,
+            bakiye: fatura.faturaTipi === 'SATIS' ? cariBakiye + gt : cariBakiye - gt,
             belgeTipi: 'FATURA',
             belgeNo: fatura.faturaNo,
             tarih: fatura.tarih,
@@ -1633,11 +1700,11 @@ export class FaturaService {
       throw new BadRequestException('Bu fatura zaten iptal edilmiş.');
     }
 
-    // 2. Sadece ONAYLANDI faturalar iptal edilebilir!
-    if (fatura.durum !== 'ONAYLANDI') {
+    // 2. ONAYLANDI veya ACIK (beklemede) faturalar iptal edilebilir.
+    // ACIK ise hareketler zaten uygulanmamış (veya ONAYLANDI→ACIK ile geri alınmış), stok/cari tekrar işlenmez.
+    if (fatura.durum !== 'ONAYLANDI' && fatura.durum !== 'ACIK') {
       throw new BadRequestException(
-        'Sadece ONAYLANDI durumundaki faturalar iptal edilebilir. ' +
-        'ACIK (Beklemede) faturalar henüz işleme alınmadığı için iptal edilemez.',
+        'Sadece ONAYLANDI veya ACIK (beklemede) durumundaki faturalar iptal edilebilir.',
       );
     }
 
@@ -1651,7 +1718,18 @@ export class FaturaService {
     }
 
     return this.prisma.$transaction(async (prisma) => {
-      // 1. Fatura durumunu IPTAL yap
+      // Sadece ONAYLANDI faturalarda cari/stok hareketleri uygulanmıştır.
+      // SATIS/ALIS iptal: Sadece cari geri alınır, stok hareketi oluşturulmaz (fatura durumu iptal olduğu için stok hesaplamasında dikkate alınmaz).
+      // SATIS_IADE/ALIS_IADE: Hem cari hem stok geri alınır.
+      if (fatura.durum === 'ONAYLANDI') {
+        if (fatura.faturaTipi === 'SATIS' || fatura.faturaTipi === 'ALIS') {
+          await this.reverseCariOnlyForInvoice(fatura, prisma);
+        } else {
+          await this.reverseInvoiceMovements(fatura, prisma, fatura.tenantId ?? undefined, true);
+        }
+      }
+
+      // Fatura durumunu IPTAL yap
       const iptaldiFatura = await prisma.fatura.update({
         where: { id },
         data: { durum: 'IPTAL' },
@@ -1665,115 +1743,50 @@ export class FaturaService {
         },
       });
 
-      // 2. Stokları geri al (ters işlem)
-      if (fatura.faturaTipi === 'SATIS') {
-        // Satış faturası iptal: Stoğa geri ekle
-        for (const kalem of fatura.kalemler) {
-          await prisma.stokHareket.create({
+      // İptal hareket kaydı (sadece ONAYLANDI'dan iptal edildiyse - cari bakiyeyi göstermek için)
+      if (fatura.durum === 'ONAYLANDI') {
+        const cariGuncel = await prisma.cari.findUnique({
+          where: { id: fatura.cariId },
+          select: { bakiye: true },
+        });
+        if (cariGuncel) {
+          await prisma.cariHareket.create({
             data: {
-              stokId: kalem.stokId,
-              hareketTipi: 'IADE',
-              miktar: kalem.miktar,
-              birimFiyat: kalem.birimFiyat,
-              aciklama: `Fatura İptali: ${fatura.faturaNo} - ${kalem.stok?.stokAdi || 'Stok'}`,
-            },
-          });
-        }
-      } else if (fatura.faturaTipi === 'ALIS') {
-        // Alış faturası iptal: Stoktan düş
-        for (const kalem of fatura.kalemler) {
-          await prisma.stokHareket.create({
-            data: {
-              stokId: kalem.stokId,
-              hareketTipi: 'CIKIS',
-              miktar: kalem.miktar,
-              birimFiyat: kalem.birimFiyat,
-              aciklama: `Fatura İptali: ${fatura.faturaNo} - ${kalem.stok?.stokAdi || 'Stok'}`,
+              cariId: fatura.cariId,
+              tip: fatura.faturaTipi === 'SATIS' ? 'ALACAK' : 'BORC',
+              tutar: this.toDecimalNumber(fatura.genelToplam),
+              bakiye: this.toDecimalNumber(cariGuncel.bakiye),
+              belgeTipi: 'DUZELTME',
+              belgeNo: `${fatura.faturaNo}-IPTAL`,
+              tarih: new Date(),
+              aciklama: `Fatura İptali: ${fatura.faturaNo}`,
             },
           });
         }
       }
 
-      // 3. Cari hareket kaydını sil veya ters işlem yap
-      await prisma.cariHareket.deleteMany({
-        where: {
-          cariId: fatura.cariId,
-          belgeTipi: 'FATURA',
-          belgeNo: fatura.faturaNo,
-        },
-      });
-
-      // 4. Cari bakiyeyi düzelt (ters işlem)
-      await prisma.cari.update({
-        where: { id: fatura.cariId },
-        data: {
-          bakiye:
-            fatura.faturaTipi === 'SATIS'
-              ? { decrement: fatura.genelToplam } // Satış faturasında borcu azalt
-              : { increment: fatura.genelToplam }, // Alış faturasında alacağı arttır
-        },
-      });
-
-      // 5. İptal hareket kaydı oluştur
-      const yeniBakiye =
-        fatura.faturaTipi === 'SATIS'
-          ? fatura.cari.bakiye.toNumber() - fatura.genelToplam.toNumber()
-          : fatura.cari.bakiye.toNumber() + fatura.genelToplam.toNumber();
-
-      await prisma.cariHareket.create({
-        data: {
-          cariId: fatura.cariId,
-          tip: fatura.faturaTipi === 'SATIS' ? 'ALACAK' : 'BORC', // Ters işlem
-          tutar: fatura.genelToplam,
-          bakiye: yeniBakiye,
-          belgeTipi: 'DUZELTME',
-          belgeNo: `${fatura.faturaNo}-IPTAL`,
-          tarih: new Date(),
-          aciklama: `Fatura İptali: ${fatura.faturaNo}`,
-        },
-      });
-
       // Eğer irsaliyeIptal true ise ve faturaya bağlı irsaliye varsa
+      // SATIS/ALIS iptal: Stok hareketi oluşturulmaz (fatura iptal = stok hesaplamasında dikkate alınmaz)
       if (irsaliyeIptal && fatura.deliveryNoteId) {
         const irsaliye = await prisma.satisIrsaliyesi.findUnique({
           where: { id: fatura.deliveryNoteId },
-          include: {
-            kalemler: {
-              include: {
-                stok: true,
-              },
-            },
-          },
         });
-
         if (irsaliye && irsaliye.durum === 'FATURALANDI') {
-          // İrsaliye durumunu FATURALANMADI'ya çevir
           await prisma.satisIrsaliyesi.update({
             where: { id: irsaliye.id },
             data: { durum: IrsaliyeDurum.FATURALANMADI },
           });
-
-          // İrsaliye kalemlerini stoğa geri ekle (IADE tipi stok hareketi)
-          const tenantId = await this.tenantResolver.resolveForCreate({ userId });
-          for (const kalem of irsaliye.kalemler) {
-            const miktar = typeof kalem.miktar === 'object' && 'toNumber' in kalem.miktar
-              ? (kalem.miktar as Decimal).toNumber()
-              : Number(kalem.miktar);
-            const birimFiyat = typeof kalem.birimFiyat === 'object' && 'toNumber' in kalem.birimFiyat
-              ? (kalem.birimFiyat as Decimal).toNumber()
-              : Number(kalem.birimFiyat);
-
-            await prisma.stokHareket.create({
-              data: {
-                stokId: kalem.stokId,
-                hareketTipi: 'IADE',
-                miktar,
-                birimFiyat,
-                aciklama: `Fatura İptali - İrsaliye İptali: ${irsaliye.irsaliyeNo} - ${kalem.stok?.stokAdi || 'Stok'}`,
-                ...(tenantId && { tenantId }),
-              },
-            });
-          }
+        }
+      }
+      if (irsaliyeIptal && fatura.satinAlmaIrsaliyeId) {
+        const irsaliye = await prisma.satınAlmaIrsaliyesi.findUnique({
+          where: { id: fatura.satinAlmaIrsaliyeId },
+        });
+        if (irsaliye && irsaliye.durum === 'FATURALANDI') {
+          await prisma.satınAlmaIrsaliyesi.update({
+            where: { id: irsaliye.id },
+            data: { durum: IrsaliyeDurum.FATURALANMADI },
+          });
         }
       }
 
@@ -1807,137 +1820,33 @@ export class FaturaService {
     }
 
     return this.prisma.$transaction(async (prisma) => {
-      // Durum değişikliğine göre işlemler
-
-      // Eski durum ONAYLANDI ise, işlemleri geri al
+      // Eski durum ONAYLANDI ise: SATIS/ALIS için sadece cari geri alınır; SATIS_IADE/ALIS_IADE için cari+stok geri alınır
       if (eskiDurum === 'ONAYLANDI') {
-        // Cari hareket kaydını sil
-        await prisma.cariHareket.deleteMany({
-          where: {
-            cariId: fatura.cariId,
-            belgeTipi: 'FATURA',
-            belgeNo: fatura.faturaNo,
-          },
-        });
-
-        // Cari bakiyeyi geri al
-        await prisma.cari.update({
-          where: { id: fatura.cariId },
-          data: {
-            bakiye:
-              fatura.faturaTipi === 'SATIS'
-                ? { decrement: fatura.genelToplam }
-                : { increment: fatura.genelToplam },
-          },
-        });
-
-        // Stokları geri al (ters işlem)
-        if (fatura.faturaTipi === 'SATIS') {
-          // Satış faturası iptal: Stoğa geri ekle
-          for (const kalem of fatura.kalemler) {
-            await prisma.stokHareket.create({
-              data: {
-                stokId: kalem.stokId,
-                hareketTipi: 'IADE',
-                miktar: kalem.miktar,
-                birimFiyat: kalem.birimFiyat,
-                aciklama: `Fatura Durum Değişikliği: ${fatura.faturaNo} (ONAYLANDI → ${yeniDurum})`,
-              },
-            });
-          }
-        } else if (fatura.faturaTipi === 'ALIS') {
-          // Alış faturası iptal: Stoktan düş
-          for (const kalem of fatura.kalemler) {
-            await prisma.stokHareket.create({
-              data: {
-                stokId: kalem.stokId,
-                hareketTipi: 'CIKIS',
-                miktar: kalem.miktar,
-                birimFiyat: kalem.birimFiyat,
-                aciklama: `Fatura Durum Değişikliği: ${fatura.faturaNo} (ONAYLANDI → ${yeniDurum})`,
-              },
-            });
-          }
+        if (fatura.faturaTipi === 'SATIS' || fatura.faturaTipi === 'ALIS') {
+          await this.reverseCariOnlyForInvoice(fatura, prisma);
+        } else {
+          await this.reverseInvoiceMovements(fatura, prisma, fatura.tenantId ?? undefined);
         }
       }
 
-      // Yeni durum ONAYLANDI ise, işlemleri uygula
+      // Yeni durum ONAYLANDI ise: cari hareket oluşturulur, stok eksilir (SATIS) veya stoğa eklenir (ALIS)
       if (yeniDurum === 'ONAYLANDI') {
-        // Kar hesaplamasını güncelle (maliyet değişmiş olabilir)
         if (fatura.faturaTipi === 'SATIS') {
           try {
-            await this.invoiceProfitService.recalculateProfit(
-              id,
-              userId,
-            );
+            await this.invoiceProfitService.recalculateProfit(id, userId);
           } catch (error) {
             console.error('Kar hesaplama hatası:', error);
           }
         }
-        // Cari hareket kaydı oluştur
-        const cari = await prisma.cari.findUnique({
-          where: { id: fatura.cariId },
-        });
-
-        if (cari) {
-          await prisma.cariHareket.create({
-            data: {
-              cariId: fatura.cariId,
-              tip: fatura.faturaTipi === 'SATIS' ? 'BORC' : 'ALACAK',
-              tutar: fatura.genelToplam,
-              bakiye:
-                fatura.faturaTipi === 'SATIS'
-                  ? cari.bakiye.toNumber() + fatura.genelToplam.toNumber()
-                  : cari.bakiye.toNumber() - fatura.genelToplam.toNumber(),
-              belgeTipi: 'FATURA',
-              belgeNo: fatura.faturaNo,
-              tarih: fatura.tarih,
-              aciklama: `${fatura.faturaTipi === 'SATIS' ? 'Satış' : 'Alış'} Faturası: ${fatura.faturaNo}`,
-            },
-          });
-
-          // Cari bakiyeyi güncelle
-          await prisma.cari.update({
-            where: { id: fatura.cariId },
-            data: {
-              bakiye:
-                fatura.faturaTipi === 'SATIS'
-                  ? { increment: fatura.genelToplam }
-                  : { decrement: fatura.genelToplam },
-            },
-          });
-
-          // Stok hareketi oluştur - fatura kalemi ile ilişkilendir
-          if (fatura.faturaTipi === 'SATIS') {
-            // Satış faturası: Stoktan düş
-            for (const kalem of fatura.kalemler) {
-              await prisma.stokHareket.create({
-                data: {
-                  stokId: kalem.stokId,
-                  hareketTipi: 'SATIS',
-                  miktar: kalem.miktar,
-                  birimFiyat: kalem.birimFiyat,
-                  aciklama: `Satış Faturası: ${fatura.faturaNo}`,
-                  faturaKalemiId: kalem.id,
-                },
-              });
-            }
-          } else if (fatura.faturaTipi === 'ALIS') {
-            // Alış faturası: Stoğa ekle
-            for (const kalem of fatura.kalemler) {
-              await prisma.stokHareket.create({
-                data: {
-                  stokId: kalem.stokId,
-                  hareketTipi: 'GIRIS',
-                  miktar: kalem.miktar,
-                  birimFiyat: kalem.birimFiyat,
-                  aciklama: `Alış Faturası: ${fatura.faturaNo}`,
-                  faturaKalemiId: kalem.id,
-                },
-              });
-            }
-          }
-        }
+        const whId = (fatura as any).warehouseId ?? undefined;
+        await this.processInvoiceMovements(
+          fatura,
+          prisma,
+          userId,
+          whId,
+          [],
+          fatura.tenantId ?? undefined,
+        );
       }
 
       // Yeni durum IPTAL ise, iptal işlemlerini yap
@@ -1956,8 +1865,8 @@ export class FaturaService {
               data: {
                 cariId: fatura.cariId,
                 tip: fatura.faturaTipi === 'SATIS' ? 'ALACAK' : 'BORC',
-                tutar: fatura.genelToplam,
-                bakiye: cari.bakiye.toNumber(),
+                tutar: this.toDecimalNumber(fatura.genelToplam),
+                bakiye: this.toDecimalNumber(cari.bakiye),
                 belgeTipi: 'DUZELTME',
                 belgeNo: `${fatura.faturaNo}-IPTAL`,
                 tarih: new Date(),
@@ -2637,33 +2546,36 @@ export class FaturaService {
       ...(faturaTipi && { faturaTipi }),
     };
 
-    // Bu ayki toplam satış
+    // Sadece onaylanmış faturalar (ACIK/IPTAL hariç)
+    const onayliDurumlar: FaturaDurum[] = ['ONAYLANDI', 'KISMEN_ODENDI', 'KAPALI'];
+
+    // Bu ayki toplam satış (sadece onaylanmış)
     const monthlyStats = await this.prisma.fatura.aggregate({
       where: {
         ...baseWhere,
         tarih: { gte: startOfMonth },
-        durum: { notIn: ['IPTAL' as FaturaDurum] },
+        durum: { in: onayliDurumlar },
       },
       _sum: { genelToplam: true },
       _count: true,
     });
 
-    // Tahsilat bekleyen (ONAYLANDI veya ACIK durumunda olanlar)
+    // Tahsilat bekleyen (sadece onaylanmış: ONAYLANDI, KISMEN_ODENDI - KAPALI ödenmiş sayılır)
     const pendingStats = await this.prisma.fatura.aggregate({
       where: {
         ...baseWhere,
-        durum: { in: ['ONAYLANDI' as FaturaDurum, 'ACIK' as FaturaDurum, 'KISMEN_ODENDI' as FaturaDurum] },
+        durum: { in: ['ONAYLANDI' as FaturaDurum, 'KISMEN_ODENDI' as FaturaDurum] },
       },
       _sum: { genelToplam: true },
       _count: true,
     });
 
-    // Vadesi geçmiş (vade < now && durum != KAPALI && durum != IPTAL)
+    // Vadesi geçmiş (sadece onaylanmış, vade < now, KAPALI hariç)
     const overdueStats = await this.prisma.fatura.aggregate({
       where: {
         ...baseWhere,
         vade: { lt: now },
-        durum: { notIn: ['KAPALI' as FaturaDurum, 'IPTAL' as FaturaDurum] },
+        durum: { in: ['ONAYLANDI' as FaturaDurum, 'KISMEN_ODENDI' as FaturaDurum] },
       },
       _sum: { genelToplam: true },
       _count: true,
@@ -2912,6 +2824,216 @@ export class FaturaService {
         },
       },
     });
+  }
+
+  /**
+   * Reverse warehouse stock for a single product (used when reversing an approved invoice)
+   */
+  private async reverseWarehouseStockForInvoice(
+    warehouseId: string,
+    productId: string,
+    quantity: number,
+    faturaTipi: string,
+    prisma: any,
+  ) {
+    const wmsParam = await prisma.systemParameter.findFirst({
+      where: { key: 'ENABLE_WMS_MODULE', OR: [{ tenantId: null }] },
+      orderBy: { tenantId: 'desc' },
+    });
+    if (wmsParam?.value !== 'true' && wmsParam?.value !== true) return;
+
+    const defaultLocation = await this.warehouseService.getOrCreateDefaultLocation(warehouseId);
+    const stock = await prisma.productLocationStock.findUnique({
+      where: {
+        warehouseId_locationId_productId: {
+          warehouseId,
+          locationId: defaultLocation.id,
+          productId,
+        },
+      },
+    });
+    if (!stock) return;
+
+    // SATIS had SALE (decrement) -> reverse = increment. ALIS had PUT_AWAY (increment) -> reverse = decrement.
+    const qtyChange =
+      faturaTipi === 'SATIS' || faturaTipi === 'ALIS_IADE' ? quantity : -quantity;
+    await prisma.productLocationStock.update({
+      where: { id: stock.id },
+      data: { qtyOnHand: { increment: qtyChange } },
+    });
+  }
+
+  /**
+   * SATIS/ALIS iptal için sadece cari geri alır (stok hareketi oluşturmaz).
+   * Stok hesaplaması iptal faturaları dikkate almadığı için ek kayıt gerekmez.
+   */
+  private async reverseCariOnlyForInvoice(fatura: any, prisma: any) {
+    const genelToplam = Number(fatura.genelToplam);
+    await prisma.cariHareket.deleteMany({
+      where: {
+        cariId: fatura.cariId,
+        belgeTipi: 'FATURA',
+        belgeNo: fatura.faturaNo,
+      },
+    });
+    const bakiyeUpdate =
+      fatura.faturaTipi === 'SATIS' || fatura.faturaTipi === 'ALIS_IADE'
+        ? { decrement: genelToplam }
+        : { increment: genelToplam };
+    await prisma.cari.update({
+      where: { id: fatura.cariId },
+      data: { bakiye: bakiyeUpdate },
+    });
+  }
+
+  /**
+   * Reverse cari and stok movements for an already-approved invoice (used before re-applying on edit or on iptal)
+   * @param useIptalTipi - true: hareketlerde IPTAL_GIRIS/IPTAL_CIKIS kullan (iptal için); false: IADE/CIKIS kullan (durum değişikliği için)
+   */
+  private async reverseInvoiceMovements(
+    fatura: any,
+    prisma: any,
+    tenantId?: string | null,
+    useIptalTipi = false,
+  ) {
+    if (!fatura.kalemler?.length) return;
+
+    // Mükerrer stok girişi önleme: Bu fatura için iptal hareketleri zaten varsa işlem yapma
+    if (useIptalTipi) {
+      const gecerliKalemSayisi = fatura.kalemler.filter(
+        (k: any) => k.stokId && (Number(k.miktar) || 0) > 0,
+      ).length;
+      if (gecerliKalemSayisi > 0) {
+        const mevcutIptalSayisi = await prisma.stokHareket.count({
+          where: {
+            aciklama: `Fatura İptali: ${fatura.faturaNo}`,
+            hareketTipi: { in: ['IPTAL_GIRIS', 'IPTAL_CIKIS'] },
+          },
+        });
+        if (mevcutIptalSayisi >= gecerliKalemSayisi) {
+          return; // İptal hareketleri zaten oluşturulmuş, mükerrer işlem yapma
+        }
+      }
+    }
+
+    const genelToplam = Number(fatura.genelToplam);
+    const rawWh = (fatura as any).warehouseId;
+    const transactionWarehouseId = rawWh && String(rawWh).trim() ? String(rawWh).trim() : undefined;
+
+    // 1. Delete cari hareket for this invoice
+    await prisma.cariHareket.deleteMany({
+      where: {
+        cariId: fatura.cariId,
+        belgeTipi: 'FATURA',
+        belgeNo: fatura.faturaNo,
+      },
+    });
+
+    // 2. Reverse cari balance
+    const bakiyeUpdate =
+      fatura.faturaTipi === 'SATIS' || fatura.faturaTipi === 'ALIS_IADE'
+        ? { decrement: genelToplam }
+        : { increment: genelToplam };
+    await prisma.cari.update({
+      where: { id: fatura.cariId },
+      data: { bakiye: bakiyeUpdate },
+    });
+
+    const effectiveTenantId = tenantId ?? fatura.tenantId ?? undefined;
+    const aciklama = useIptalTipi
+      ? `Fatura İptali: ${fatura.faturaNo}`
+      : `Fatura düzenleme (geri alım): ${fatura.faturaNo}`;
+
+    // 3. Create reversing StokHareket for each kalem (iptal ise IPTAL_GIRIS/IPTAL_CIKIS, değilse IADE/CIKIS)
+    for (const kalem of fatura.kalemler) {
+      if (!kalem.stokId) continue;
+      const miktar = Number(kalem.miktar) || 0;
+      if (miktar <= 0) continue;
+      const birimFiyat =
+        typeof kalem.birimFiyat === 'object' && kalem.birimFiyat != null && 'toNumber' in kalem.birimFiyat
+          ? (kalem.birimFiyat as any).toNumber()
+          : Number(kalem.birimFiyat);
+
+      let reverseTip: 'GIRIS' | 'CIKIS' | 'IADE' | 'IPTAL_GIRIS' | 'IPTAL_CIKIS';
+      if (useIptalTipi) {
+        if (fatura.faturaTipi === 'SATIS') reverseTip = 'IPTAL_GIRIS';
+        else if (fatura.faturaTipi === 'ALIS') reverseTip = 'IPTAL_CIKIS';
+        else if (fatura.faturaTipi === 'SATIS_IADE') reverseTip = 'IPTAL_CIKIS';
+        else reverseTip = 'IPTAL_GIRIS'; // ALIS_IADE
+      } else {
+        if (fatura.faturaTipi === 'SATIS') reverseTip = 'IADE';
+        else if (fatura.faturaTipi === 'ALIS') reverseTip = 'CIKIS';
+        else if (fatura.faturaTipi === 'SATIS_IADE') reverseTip = 'CIKIS';
+        else reverseTip = 'GIRIS'; // ALIS_IADE
+      }
+
+      await prisma.stokHareket.create({
+        data: {
+          stokId: kalem.stokId,
+          hareketTipi: reverseTip,
+          miktar,
+          birimFiyat,
+          aciklama,
+          warehouseId: transactionWarehouseId ?? null,
+          ...(effectiveTenantId && { tenantId: effectiveTenantId }),
+        },
+      });
+
+      // 4. Reverse warehouse stock when WMS enabled
+      if (transactionWarehouseId) {
+        await this.reverseWarehouseStockForInvoice(
+          transactionWarehouseId,
+          kalem.stokId,
+          miktar,
+          fatura.faturaTipi,
+          prisma,
+        );
+      }
+    }
+
+    // SATIS with deliveryNoteId may have used irsaliye depoId
+    if (fatura.faturaTipi === 'SATIS' && fatura.deliveryNoteId && !transactionWarehouseId) {
+      const satisIrsaliyesi = await prisma.satisIrsaliyesi.findUnique({
+        where: { id: fatura.deliveryNoteId },
+        select: { depoId: true },
+      });
+      if (satisIrsaliyesi?.depoId) {
+        for (const kalem of fatura.kalemler) {
+          if (!kalem.stokId) continue;
+          const miktar = Number(kalem.miktar) || 0;
+          if (miktar <= 0) continue;
+          await this.reverseWarehouseStockForInvoice(
+            satisIrsaliyesi.depoId,
+            kalem.stokId,
+            miktar,
+            fatura.faturaTipi,
+            prisma,
+          );
+        }
+      }
+    }
+
+    // ALIS may use depoId from satinAlmaIrsaliye
+    if (fatura.faturaTipi === 'ALIS' && !transactionWarehouseId && fatura.satinAlmaIrsaliyeId) {
+      const irsaliye = await prisma.satınAlmaIrsaliyesi.findUnique({
+        where: { id: fatura.satinAlmaIrsaliyeId },
+        select: { depoId: true },
+      });
+      if (irsaliye?.depoId) {
+        for (const kalem of fatura.kalemler) {
+          if (!kalem.stokId) continue;
+          const miktar = Number(kalem.miktar) || 0;
+          if (miktar <= 0) continue;
+          await this.reverseWarehouseStockForInvoice(
+            irsaliye.depoId,
+            kalem.stokId,
+            miktar,
+            fatura.faturaTipi,
+            prisma,
+          );
+        }
+      }
+    }
   }
 
   /**

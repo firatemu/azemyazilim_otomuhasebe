@@ -329,6 +329,7 @@ export default function SatinAlmaIrsaliyesiDetayPage() {
                 <Table>
                   <TableHead>
                     <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                      <TableCell sx={{ fontWeight: 600 }}>Malzeme Kodu</TableCell>
                       <TableCell sx={{ fontWeight: 600 }}>Stok</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>Miktar</TableCell>
                       <TableCell align="right" sx={{ fontWeight: 600 }}>Birim Fiyat</TableCell>
@@ -341,15 +342,11 @@ export default function SatinAlmaIrsaliyesiDetayPage() {
                   <TableBody>
                     {irsaliye.kalemler.map((kalem, index) => (
                       <TableRow key={kalem.id || index} hover>
+                        <TableCell>{kalem.stok?.stokKodu || '-'}</TableCell>
                         <TableCell>
                           <Typography variant="body2" fontWeight="500">
                             {kalem.stok?.stokAdi || '-'}
                           </Typography>
-                          {kalem.stok?.stokKodu && (
-                            <Typography variant="caption" color="text.secondary">
-                              {kalem.stok.stokKodu}
-                            </Typography>
-                          )}
                         </TableCell>
                         <TableCell align="right">{kalem.miktar}</TableCell>
                         <TableCell align="right">{formatCurrency(kalem.birimFiyat)}</TableCell>

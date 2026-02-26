@@ -21,11 +21,10 @@ export class StokHareketService {
       where.stokId = stokId;
     }
 
-    // Tenant filtresi (Stok üzerinden)
+    // SaaS: Sadece bu tenant'a ait hareketler (StokHareket.tenantId = kullanıcı tenantId)
+    // tenantId boş hareketler listelenmez; satış faturalarına tenantId atanmalı
     if (tenantId) {
-      where.stok = {
-        tenantId: tenantId
-      };
+      where.tenantId = tenantId;
     }
 
     if (hareketTipi) {
@@ -66,6 +65,7 @@ export class StokHareketService {
                 select: {
                   faturaNo: true,
                   faturaTipi: true,
+                  durum: true,
                   cari: {
                     select: {
                       unvan: true,

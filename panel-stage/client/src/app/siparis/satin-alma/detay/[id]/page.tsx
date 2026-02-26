@@ -342,7 +342,7 @@ export default function SatinAlmaSiparisDetayPage() {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell sx={{ fontWeight: 600 }}>Stok Kodu</TableCell>
+                    <TableCell sx={{ fontWeight: 600 }}>Malzeme Kodu</TableCell>
                     <TableCell sx={{ fontWeight: 600 }}>Stok Adı</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>Miktar</TableCell>
                     <TableCell align="right" sx={{ fontWeight: 600 }}>Birim Fiyat</TableCell>

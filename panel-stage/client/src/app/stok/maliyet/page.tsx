@@ -225,48 +225,42 @@ export default function MaliyetlendirmePage() {
       return;
     }
 
-    let success = 0;
-    let failed = 0;
+    // Tek istekte toplu hesaplama (429 rate limit önlemi)
+    const stokIds = filteredStocks.map((s) => s.id);
+    const stokMap = new Map(filteredStocks.map((s) => [s.id, s]));
 
-    const rows: ResultRow[] = [];
+    try {
+      const response = await axios.post('/costing/calculate-bulk', { stokIds });
+      const bulkResults = response.data?.results ?? [];
 
-    for (const stok of filteredStocks) {
-      try {
-        const response = await axios.post('/costing/calculate', { stokId: stok.id });
-        const cost = response.data?.cost ?? 0;
-        rows.push({
-          stokId: stok.id,
-          stokKodu: stok.stokKodu,
-          stokAdi: stok.stokAdi,
-          marka: stok.marka,
-          cost,
-          status: 'success',
-          computedAt: new Date().toISOString(),
-        });
-        success += 1;
-      } catch (error: any) {
-        console.error(`Maliyet hesaplanamadı: ${stok.stokKodu}`, error);
-        rows.push({
-          stokId: stok.id,
-          stokKodu: stok.stokKodu,
-          stokAdi: stok.stokAdi,
-          marka: stok.marka,
-          cost: 0,
-          status: 'failed',
-          message: error?.response?.data?.message ?? 'Beklenmeyen bir hata oluştu.',
-          computedAt: null,
-        });
-        failed += 1;
-      } finally {
-        setProcessedCount((prev) => prev + 1);
-      }
+      const rows: ResultRow[] = bulkResults.map((r: { stokId: string; stokKodu: string; stokAdi: string; cost: number; status: string; message?: string }) => {
+        const stok = stokMap.get(r.stokId);
+        return {
+          stokId: r.stokId,
+          stokKodu: r.stokKodu,
+          stokAdi: r.stokAdi,
+          marka: stok?.marka ?? null,
+          cost: r.cost ?? 0,
+          status: r.status as 'success' | 'failed',
+          message: r.message ?? undefined,
+          computedAt: r.status === 'success' ? new Date().toISOString() : null,
+        };
+      });
+
+      const success = rows.filter((r) => r.status === 'success').length;
+      const failed = rows.filter((r) => r.status === 'failed').length;
+
+      setProcessedCount(filteredStocks.length);
+      setResultRows(rows);
+      setSummaryMessage(
+        `Toplam ${filteredStocks.length} malzeme işlendi. Başarılı: ${success}, Hatalı: ${failed}.`,
+      );
+    } catch (error: any) {
+      setErrorMessage(error?.response?.data?.message ?? 'Toplu maliyet hesaplama başarısız.');
+      setResultRows([]);
+    } finally {
+      setProcessing(false);
     }
-
-    setResultRows(rows);
-    setSummaryMessage(
-      `Toplam ${filteredStocks.length} malzeme işlendi. Başarılı: ${success}, Hatalı: ${failed}.`,
-    );
-    setProcessing(false);
   };
 
   const progress =
@@ -280,7 +274,7 @@ export default function MaliyetlendirmePage() {
             Maliyetlendirme Servisi
           </Typography>
           <Typography variant="body2" color="text.secondary">
-            Satın alma faturalarındaki onaylı net birim fiyatlara göre ağırlıklı ortalama maliyet
+            Satın alma faturalarındaki onaylı KDV dahil birim fiyatlara göre ağırlıklı ortalama maliyet
             hesaplanır. Stok sıfırlandığında ortalama sıfırlanır ve yeni girişlerle yeniden
             başlatılır.
           </Typography>

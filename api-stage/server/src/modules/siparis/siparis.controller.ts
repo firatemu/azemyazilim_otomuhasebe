@@ -33,6 +33,7 @@ export class SiparisController {
       query.siparisTipi,
       query.search,
       query.cariId,
+      query.durum as any,
     );
   }
 

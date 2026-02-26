@@ -70,6 +70,7 @@ export default function DuzenleAlisFaturasiPage() {
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
   const [warehouses, setWarehouses] = useState<any[]>([]);
+  const [warehousesFetched, setWarehousesFetched] = useState(false);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -110,12 +111,14 @@ export default function DuzenleAlisFaturasiPage() {
       const response = await axios.get('/warehouse?active=true');
       const warehouseList = response.data || [];
       setWarehouses(warehouseList);
+      setWarehousesFetched(true);
 
       if (warehouseList.length === 0) {
         showSnackbar('Sistemde tanımlı ambar bulunamadı! Lütfen önce bir ambar tanımlayın.', 'error');
       }
     } catch (error) {
       console.error('Ambar listesi alınamadı:', error);
+      setWarehousesFetched(true);
     }
   };
 
@@ -396,11 +399,11 @@ export default function DuzenleAlisFaturasiPage() {
               Fatura Bilgileri
             </Typography>
             <Divider sx={{ mb: 2 }} />
-            {warehouses.length === 0 && (
-              <Alert severity="error" sx={{ mb: 2 }}>
-                Sistemde tanımlı ambar bulunmamaktadır. İşlem yapabilmek için lütfen önce ambar tanımlayınız.
-              </Alert>
-            )}
+{warehousesFetched && warehouses.length === 0 && (
+                <Alert severity="error" sx={{ mb: 2 }}>
+                  Sistemde tanımlı ambar bulunmamaktadır. İşlem yapabilmek için lütfen önce ambar tanımlayınız.
+                </Alert>
+              )}
           </Box>
 
           <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>

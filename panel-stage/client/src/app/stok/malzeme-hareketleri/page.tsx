@@ -46,16 +46,22 @@ interface FaturaKalemi {
   tutar: number;
 }
 
+interface FaturaInfo {
+  faturaNo?: string;
+  faturaTipi?: string;
+  durum?: string;
+}
+
 interface StokHareket {
   id: string;
   stokId: string;
-  hareketTipi: 'GIRIS' | 'CIKIS' | 'SATIS' | 'IADE' | 'SAYIM';
+  hareketTipi: 'GIRIS' | 'CIKIS' | 'SATIS' | 'IADE' | 'SAYIM' | 'IPTAL_GIRIS' | 'IPTAL_CIKIS';
   miktar: number;
   birimFiyat: number;
   aciklama?: string;
   createdAt: string;
   stok: Stok;
-  faturaKalemi?: FaturaKalemi | null;
+  faturaKalemi?: (FaturaKalemi & { fatura?: FaturaInfo }) | null;
 }
 
 interface Stats {
@@ -115,29 +121,73 @@ export default function MalzemeHareketleriPage() {
       case 'CIKIS': return <TrendingDown sx={{ color: '#ef4444' }} />;
       case 'SATIS': return <ShoppingCart sx={{ color: '#3b82f6' }} />;
       case 'IADE': return <Inventory sx={{ color: '#f59e0b' }} />;
+      case 'IPTAL_GIRIS':
+      case 'IPTAL_CIKIS': return <Inventory sx={{ color: '#ef4444' }} />;
       default: return null;
     }
   };
 
-  const getHareketColor = (tip: string) => {
+  const getHareketColor = (hareket: StokHareket) => {
+    const tip = hareket.hareketTipi;
+    if (tip === 'SATIS' && hareket.faturaKalemi?.fatura?.durum === 'IPTAL') return 'error';
     switch (tip) {
       case 'GIRIS': return 'success';
       case 'CIKIS': return 'error';
       case 'SATIS': return 'primary';
       case 'IADE': return 'warning';
+      case 'IPTAL_GIRIS':
+      case 'IPTAL_CIKIS': return 'error';
       default: return 'default';
     }
   };
 
-  const getHareketLabel = (tip: string) => {
+  const getHareketLabel = (hareket: StokHareket) => {
+    const tip = hareket.hareketTipi;
+    const faturaTipi = hareket.faturaKalemi?.fatura?.faturaTipi;
+    const durum = hareket.faturaKalemi?.fatura?.durum;
+    if (tip === 'SATIS' && durum === 'IPTAL') return 'Satış faturası iptal';
+    if (tip === 'GIRIS' && faturaTipi === 'ALIS' && durum === 'IPTAL') return 'Satınalma faturası iptal';
+    if (tip === 'IADE' && faturaTipi === 'SATIS_IADE' && durum === 'IPTAL') return 'Satış iadesi iptal';
+    if (tip === 'IADE' && faturaTipi === 'ALIS_IADE' && durum === 'IPTAL') return 'Alış iadesi iptal';
     switch (tip) {
-      case 'GIRIS': return 'Giriş';
-      case 'CIKIS': return 'Çıkış';   // Satınalma iade dahil
-      case 'SATIS': return 'Çıkış';   // Satış faturası
-      case 'IADE': return 'Giriş';   // Satış iade faturası
+      case 'GIRIS': return faturaTipi === 'ALIS' ? 'Satınalma faturası' : 'Giriş';
+      case 'CIKIS': return 'Çıkış';
+      case 'SATIS': return 'Satış faturası';
+      case 'IADE': return faturaTipi === 'ALIS_IADE' ? 'Alış iadesi' : faturaTipi === 'SATIS_IADE' ? 'Satış iadesi' : 'Giriş';
+      case 'IPTAL_GIRIS':
+      case 'IPTAL_CIKIS': return 'İptal';
       case 'SAYIM': return 'Sayım';
       default: return tip;
     }
+  };
+
+  const getFaturaDurumLabel = (hareket: StokHareket) => {
+    const durum = hareket.faturaKalemi?.fatura?.durum;
+    if (!durum) {
+      // IPTAL_* hareketleri faturaKalemi olmadan oluşturulur - hareket tipinden anlaşılır
+      if (hareket.hareketTipi === 'IPTAL_GIRIS' || hareket.hareketTipi === 'IPTAL_CIKIS') return 'İptal';
+      return '-';
+    }
+    const labels: Record<string, string> = {
+      ONAYLANDI: 'Onaylandı',
+      ACIK: 'Beklemede',
+      IPTAL: 'İptal',
+      KISMEN_ODENDI: 'Kısmen Ödendi',
+      KAPALI: 'Kapalı',
+    };
+    return labels[durum] || durum;
+  };
+
+  const getFaturaDurumColor = (hareket: StokHareket): 'success' | 'error' | 'warning' | 'default' => {
+    const durum = hareket.faturaKalemi?.fatura?.durum;
+    if (!durum) {
+      if (hareket.hareketTipi === 'IPTAL_GIRIS' || hareket.hareketTipi === 'IPTAL_CIKIS') return 'error';
+      return 'default';
+    }
+    if (durum === 'IPTAL') return 'error';
+    if (durum === 'ONAYLANDI') return 'success';
+    if (durum === 'ACIK') return 'warning';
+    return 'default';
   };
 
   return (
@@ -307,8 +357,10 @@ export default function MalzemeHareketleriPage() {
                 <MenuItem value="">Tümü</MenuItem>
                 <MenuItem value="GIRIS">Giriş</MenuItem>
                 <MenuItem value="CIKIS">Çıkış</MenuItem>
-                <MenuItem value="SATIS">Satış</MenuItem>
+                <MenuItem value="SATIS">Satış faturası</MenuItem>
                 <MenuItem value="IADE">İade</MenuItem>
+                <MenuItem value="IPTAL_GIRIS">İptal (giriş)</MenuItem>
+                <MenuItem value="IPTAL_CIKIS">İptal (çıkış)</MenuItem>
                 <MenuItem value="SAYIM">Sayım</MenuItem>
               </Select>
             </FormControl>
@@ -325,6 +377,7 @@ export default function MalzemeHareketleriPage() {
               <TableCell><strong>Ürün Kodu</strong></TableCell>
               <TableCell><strong>Ürün Adı</strong></TableCell>
               <TableCell><strong>Hareket Tipi</strong></TableCell>
+              <TableCell><strong>Fatura Durumu</strong></TableCell>
               <TableCell align="right"><strong>Miktar</strong></TableCell>
               <TableCell align="right"><strong>Birim Fiyat</strong></TableCell>
               <TableCell align="right"><strong>İndirim</strong></TableCell>
@@ -338,7 +391,7 @@ export default function MalzemeHareketleriPage() {
               <TableSkeleton rows={5} columns={10} />
             ) : hareketler.length === 0 ? (
               <TableRow>
-                <TableCell colSpan={10} align="center" sx={{ py: 8 }}>
+                <TableCell colSpan={11} align="center" sx={{ py: 8 }}>
                   <Typography variant="body1" color="text.secondary">
                     Hareket bulunamadı
                   </Typography>
@@ -377,9 +430,17 @@ export default function MalzemeHareketleriPage() {
                   <TableCell>
                     <Chip
                       icon={getHareketIcon(hareket.hareketTipi) ?? undefined}
-                      label={getHareketLabel(hareket.hareketTipi)}
-                      color={getHareketColor(hareket.hareketTipi) as any}
+                      label={getHareketLabel(hareket)}
+                      color={getHareketColor(hareket) as any}
                       size="small"
+                    />
+                  </TableCell>
+                  <TableCell>
+                    <Chip
+                      label={getFaturaDurumLabel(hareket)}
+                      color={getFaturaDurumColor(hareket) as any}
+                      size="small"
+                      variant="outlined"
                     />
                   </TableCell>
                   <TableCell align="right">

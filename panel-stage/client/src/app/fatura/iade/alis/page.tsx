@@ -94,6 +94,10 @@ interface Fatura {
     id: string;
     irsaliyeNo: string;
   };
+  satinAlmaIrsaliye?: {
+    id: string;
+    irsaliyeNo: string;
+  };
 }
 
 export default function AlisIadeFaturalariPage() {
@@ -200,8 +204,8 @@ export default function AlisIadeFaturalariPage() {
           irsaliyeIptal: irsaliyeIptal,
         });
         const mesaj = irsaliyeIptal
-          ? 'Fatura ve bağlı irsaliye iptal edildi. Stoklar ve cari bakiye güncellendi.'
-          : 'Fatura iptal edildi. Stoklar ve cari bakiye güncellendi.';
+          ? 'Fatura ve bağlı irsaliye iptal edildi. Stok hareketleri geri alındı ve cari bakiye güncellendi.'
+          : 'İade faturası iptal edildi. Stok hareketleri geri alındı ve cari bakiye güncellendi.';
         showSnackbar(mesaj, 'success');
         setOpenIptal(false);
         setIrsaliyeIptal(false);
@@ -233,7 +237,7 @@ export default function AlisIadeFaturalariPage() {
       if (pendingDurum.yeniDurum === 'ONAYLANDI') {
         mesaj = 'İade faturası onaylandı. Stoklar düşülecek ve cari bakiye güncellenecek.';
       } else if (pendingDurum.yeniDurum === 'IPTAL') {
-        mesaj = 'Fatura iptal edildi. Stok ve cari işlemleri geri alındı.';
+        mesaj = 'İade faturası iptal edildi. Stok hareketleri geri alındı ve cari bakiye düzeltildi.';
       } else if (pendingDurum.yeniDurum === 'ACIK') {
         mesaj = 'Fatura beklemeye alındı. Stok ve cari işlemleri geri alındı.';
       }
@@ -499,39 +503,13 @@ export default function AlisIadeFaturalariPage() {
               <Print fontSize="small" sx={{ color: '#10b981' }} />
               <Typography variant="body2">Yazdır</Typography>
             </MenuItem>,
-            fatura.durum === 'ACIK' && (
-              <MenuItem
-                key="approve"
-                onClick={() => {
-                  handleDurumChangeRequest(fatura.id, fatura.durum, 'ONAYLANDI');
-                  handleMenuClose();
-                }}
-                sx={{ gap: 1.5, py: 1, '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-3) 15%, transparent)' } }}
-              >
-                <Box sx={{ width: 20, display: 'flex', justifyContent: 'center' }} />
-                <Typography variant="body2" sx={{ color: '#10b981', fontWeight: 600 }}>Onayla</Typography>
-              </MenuItem>
-            ),
-            fatura.durum !== 'ACIK' && fatura.durum !== 'IPTAL' && (
-              <MenuItem
-                key="pending"
-                onClick={() => {
-                  handleDurumChangeRequest(fatura.id, fatura.durum, 'ACIK');
-                  handleMenuClose();
-                }}
-                sx={{ gap: 1.5, py: 1, '&:hover': { bgcolor: 'var(--muted)' } }}
-              >
-                <Box sx={{ width: 20, display: 'flex', justifyContent: 'center' }} />
-                <Typography variant="body2">Beklemeye Al</Typography>
-              </MenuItem>
-            ),
             <MenuItem
               key="cancel"
               onClick={() => {
                 openIptalDialog(fatura);
                 handleMenuClose();
               }}
-              disabled={fatura.durum === 'IPTAL'}
+              disabled={fatura.durum !== 'ONAYLANDI'}
               sx={{ gap: 1.5, py: 1, '&:hover': { bgcolor: 'color-mix(in srgb, var(--destructive) 15%, transparent)' }, '&.Mui-disabled': { opacity: 0.5 } }}
             >
               <Cancel fontSize="small" sx={{ color: fatura.durum === 'IPTAL' ? '#9ca3af' : '#ef4444' }} />
@@ -589,6 +567,7 @@ export default function AlisIadeFaturalariPage() {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
+                          <TableCell>Malzeme Kodu</TableCell>
                           <TableCell>Stok</TableCell>
                           <TableCell>Miktar</TableCell>
                           <TableCell>Birim Fiyat</TableCell>
@@ -607,6 +586,7 @@ export default function AlisIadeFaturalariPage() {
                           const satirToplami = netTutar + kdvTutar;
                           return (
                             <TableRow key={index} hover>
+                              <TableCell>{kalem.stok?.stokKodu || '-'}</TableCell>
                               <TableCell>{kalem.stok?.stokAdi || '-'}</TableCell>
                               <TableCell>{kalem.miktar}</TableCell>
                               <TableCell>{formatCurrency(typeof kalem.birimFiyat === 'object' && kalem.birimFiyat != null && 'toNumber' in kalem.birimFiyat ? (kalem.birimFiyat as any).toNumber() : Number(kalem.birimFiyat))}</TableCell>
@@ -770,6 +750,14 @@ export default function AlisIadeFaturalariPage() {
                   </Typography>
                 </Alert>
               )}
+              {pendingDurum.yeniDurum === 'IPTAL' && (
+                <Alert severity="info" sx={{ mb: 2 }}>
+                  <Typography variant="body2">
+                    • İade stok hareketleri geri alınacak (iptal giriş)<br />
+                    • Cari bakiye düzeltilecek
+                  </Typography>
+                </Alert>
+              )}
               {pendingDurum.yeniDurum === 'ACIK' && (
                 <Alert severity="info" sx={{ mb: 2 }}>
                   <Typography variant="body2">
@@ -822,13 +810,13 @@ export default function AlisIadeFaturalariPage() {
               <Typography variant="body1" sx={{ mb: 2 }}>
                 <strong>{selectedFatura.faturaNo}</strong> nolu iade faturasını iptal etmek istediğinizden emin misiniz?
               </Typography>
-              {selectedFatura.satinAlmaIrsaliyesi && (
-                <Box sx={{ p: 2, bgcolor: 'var(--muted)', borderRadius: 1, mb: 2, border: '1px solid var(--border)' }}>
+              {(selectedFatura.satinAlmaIrsaliyesi || selectedFatura.satinAlmaIrsaliye) && (
+                <Box sx={{ p: 2, bgcolor: '#f9fafb', borderRadius: 1, mb: 2, border: '1px solid #e5e7eb' }}>
                   <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
                     Bu faturaya bağlı bir irsaliye bulunmaktadır:
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    İrsaliye No: <strong>{selectedFatura.satinAlmaIrsaliyesi.irsaliyeNo}</strong>
+                    İrsaliye No: <strong>{(selectedFatura.satinAlmaIrsaliyesi || selectedFatura.satinAlmaIrsaliye)?.irsaliyeNo}</strong>
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <input
@@ -842,6 +830,13 @@ export default function AlisIadeFaturalariPage() {
                       Bağlı olduğu irsaliye de iptal edilsin mi?
                     </Typography>
                   </Box>
+                  {irsaliyeIptal && (
+                    <Alert severity="info" sx={{ mt: 2 }}>
+                      <Typography variant="body2">
+                        İrsaliye iptal edildiğinde, irsaliye durumu güncellenir. (Stok sadece onaylı faturalardan hesaplanır)
+                      </Typography>
+                    </Alert>
+                  )}
                 </Box>
               )}
             </Box>

@@ -35,9 +35,9 @@ import {
   useTheme,
 } from '@mui/material';
 import { Delete, Save, ArrowBack, ToggleOn, ToggleOff, LocalShipping } from '@mui/icons-material';
-import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
 import { useRouter, useSearchParams } from 'next/navigation';
+import { useTabStore } from '@/stores/tabStore';
 
 interface Cari {
   id: string;
@@ -74,15 +74,15 @@ interface FaturaKalemi {
   iskontoFormula?: string;
 }
 
-function YeniSatisFaturasiPageContent() {
+type DurumType = 'ACIK' | 'ONAYLANDI' | 'IPTAL';
+
+export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: string; onBack?: () => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const siparisId = searchParams.get('siparisId');
-  const irsaliyeId = searchParams.get('irsaliyeId');
-  // kopyala: useSearchParams bazen ilk render'da boş dönebilir; URL'den yedekle
-  const kopyalaId =
-    searchParams.get('kopyala') ??
-    (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('kopyala') : null);
+  const isEdit = Boolean(editFaturaId);
+  const siparisId = isEdit ? null : searchParams.get('siparisId');
+  const irsaliyeId = isEdit ? null : searchParams.get('irsaliyeId');
+  const kopyalaId = isEdit ? null : (searchParams.get('kopyala') ?? (typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('kopyala') : null));
 
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
@@ -90,6 +90,8 @@ function YeniSatisFaturasiPageContent() {
   const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingSiparis, setLoadingSiparis] = useState(false);
+  const [loadingFatura, setLoadingFatura] = useState(isEdit);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     faturaNo: '',
@@ -98,7 +100,7 @@ function YeniSatisFaturasiPageContent() {
     warehouseId: '',
     tarih: new Date().toISOString().split('T')[0],
     vade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    durum: 'ONAYLANDI' as 'ACIK' | 'ONAYLANDI',
+    durum: 'ONAYLANDI' as DurumType,
     genelIskontoOran: 0,
     genelIskontoTutar: 0,
     aciklama: '',
@@ -119,6 +121,7 @@ function YeniSatisFaturasiPageContent() {
   const [selectedSiparisler, setSelectedSiparisler] = useState<string[]>([]);
   const [loadingSiparisler, setLoadingSiparisler] = useState(false);
   const [siparisSearch, setSiparisSearch] = useState('');
+  const [warehousesFetched, setWarehousesFetched] = useState(false);
   const [stockErrorDialog, setStockErrorDialog] = useState<{
     open: boolean;
     products: Array<{
@@ -262,17 +265,85 @@ function YeniSatisFaturasiPageContent() {
     </Paper>
   );
 
+  const toNumEdit = (v: any): number => {
+    if (v == null || v === '') return 0;
+    if (typeof v === 'number' && !Number.isNaN(v)) return v;
+    if (typeof v === 'object' && v != null && typeof (v as any).toNumber === 'function') return (v as any).toNumber();
+    const n = Number(v);
+    return Number.isNaN(n) ? 0 : n;
+  };
+
+  const fetchFatura = async () => {
+    if (!editFaturaId) return;
+    try {
+      setLoadingFatura(true);
+      const response = await axios.get(`/fatura/${editFaturaId}`);
+      const fatura = response.data;
+      const durumValue = (fatura.durum || 'ONAYLANDI') as DurumType;
+      const warehouseId = fatura.warehouseId ?? fatura.irsaliye?.depoId ?? '';
+      setFormData({
+        faturaNo: fatura.faturaNo,
+        faturaTipi: fatura.faturaTipi,
+        cariId: fatura.cariId,
+        warehouseId: String(warehouseId || ''),
+        tarih: new Date(fatura.tarih).toISOString().split('T')[0],
+        vade: fatura.vade ? new Date(fatura.vade).toISOString().split('T')[0] : '',
+        durum: durumValue,
+        genelIskontoOran: 0,
+        genelIskontoTutar: toNumEdit(fatura.iskonto),
+        aciklama: fatura.aciklama || '',
+        satisElemaniId: fatura.satisElemaniId || '',
+        dovizCinsi: (fatura.dovizCinsi || 'TRY') as 'TRY' | 'USD' | 'EUR' | 'GBP',
+        dovizKuru: toNumEdit(fatura.dovizKuru),
+        kalemler: (fatura.kalemler || []).map((k: any) => {
+          const miktar = toNumEdit(k.miktar) || 1;
+          const birimFiyat = toNumEdit(k.birimFiyat);
+          const baseAmount = miktar * birimFiyat;
+          const iskOran = toNumEdit(k.iskontoOrani);
+          const v = k.kdvOrani ?? (k as any).kdv_orani;
+          const kdvOrani = (v === 0 || v === '0' || (typeof v === 'number' && Number.isFinite(v) && v === 0))
+            ? 0
+            : (v !== undefined && v !== null && v !== '' ? (Number.isFinite(Number(v)) ? Number(v) : 0) : 0);
+          return {
+            stokId: k.stokId,
+            stok: k.stok ? {
+              id: k.stok.id,
+              stokKodu: k.stok.stokKodu,
+              stokAdi: k.stok.stokAdi,
+              satisFiyati: toNumEdit(k.stok.satisFiyati),
+              kdvOrani: toNumEdit(k.stok.kdvOrani),
+              miktar: 0,
+            } : undefined,
+            miktar,
+            birimFiyat,
+            kdvOrani,
+            iskontoOran: iskOran,
+            iskontoTutar: toNumEdit(k.iskontoTutari) || (baseAmount * iskOran) / 100,
+            cokluIskonto: Boolean(k.cokluIskonto),
+            iskontoFormula: k.iskontoFormula ?? '',
+          };
+        }),
+      });
+    } catch (error: any) {
+      showSnackbar(error.response?.data?.message || 'Fatura yüklenirken hata oluştu', 'error');
+      onBack?.();
+    } finally {
+      setLoadingFatura(false);
+    }
+  };
+
   useEffect(() => {
     fetchCariler();
     fetchStoklar();
     fetchSatisElemanlari();
     fetchWarehouses();
 
-    // kopyala ID: hem searchParams hem effect anında URL'den oku (tab/navigation sonrası güncel olsun)
-    const fromUrl =
-      typeof window !== 'undefined'
-        ? new URLSearchParams(window.location.search).get('kopyala')
-        : null;
+    if (isEdit && editFaturaId) {
+      fetchFatura();
+      return;
+    }
+
+    const fromUrl = typeof window !== 'undefined' ? new URLSearchParams(window.location.search).get('kopyala') : null;
     const copyId = kopyalaId || fromUrl;
 
     if (irsaliyeId) {
@@ -284,7 +355,7 @@ function YeniSatisFaturasiPageContent() {
     } else {
       generateFaturaNo();
     }
-  }, [siparisId, irsaliyeId, kopyalaId]);
+  }, [editFaturaId, isEdit]);
 
   const fetchCariler = async () => {
     try {
@@ -302,17 +373,16 @@ function YeniSatisFaturasiPageContent() {
       const response = await axios.get('/warehouse?active=true');
       const warehouseList = response.data || [];
       setWarehouses(warehouseList);
+      setWarehousesFetched(true);
 
       if (warehouseList.length === 0) {
         showSnackbar('Sistemde tanımlı ambar bulunamadı! Lütfen önce bir ambar tanımlayın.', 'error');
         return;
       }
 
-      // Kopyala modunda ambarı fetchFaturaKopyala set edecek; varsayılan atama yapma
-      const isCopyMode =
-        kopyalaId ||
-        (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('kopyala'));
-      if (isCopyMode) return;
+      // Kopyala veya düzenle modunda ambarı başka yer set edecek; varsayılan atama yapma
+      const isCopyMode = kopyalaId || (typeof window !== 'undefined' && new URLSearchParams(window.location.search).get('kopyala'));
+      if (isCopyMode || isEdit) return;
 
       const defaultWarehouse = warehouseList.find((w: any) => w.isDefault);
       if (defaultWarehouse && !formData.warehouseId) {
@@ -322,6 +392,7 @@ function YeniSatisFaturasiPageContent() {
       }
     } catch (error) {
       console.error('Ambar listesi alınamadı:', error);
+      setWarehousesFetched(true);
       showSnackbar('Ambar listesi alınamadı', 'error');
     }
   };
@@ -1021,24 +1092,45 @@ function YeniSatisFaturasiPageContent() {
         showSnackbar('Cari seçimi zorunludur', 'error');
         return;
       }
-
       if (!formData.warehouseId) {
         showSnackbar('Ambar seçimi zorunludur. Lütfen bir ambar seçiniz.', 'error');
         return;
       }
-
-      // Boş stok satırlarını filtrele (stokId boş olanları sil)
       const validKalemler = formData.kalemler.filter(k => k.stokId && k.stokId.trim() !== '');
-
       if (validKalemler.length === 0) {
         showSnackbar('En az bir kalem eklemelisiniz', 'error');
         return;
       }
 
-      // Boş satır sayısı varsa kullanıcıyı bilgilendir
       const removedCount = formData.kalemler.length - validKalemler.length;
-      if (removedCount > 0) {
+      if (removedCount > 0 && !isEdit) {
         showSnackbar(`${removedCount} adet boş satır otomatik olarak kaldırıldı`, 'info');
+      }
+
+      if (isEdit && editFaturaId) {
+        setSaving(true);
+        await axios.put(`/fatura/${editFaturaId}`, {
+          faturaNo: formData.faturaNo?.trim() || undefined,
+          tarih: new Date(formData.tarih).toISOString(),
+          vade: formData.vade ? new Date(formData.vade).toISOString() : null,
+          iskonto: Number(formData.genelIskontoTutar) || 0,
+          aciklama: formData.aciklama || null,
+          warehouseId: formData.warehouseId || null,
+          satisElemaniId: formData.satisElemaniId || null,
+          dovizCinsi: formData.dovizCinsi,
+          dovizKuru: formData.dovizKuru,
+          kalemler: validKalemler.map(k => ({
+            stokId: k.stokId,
+            miktar: Number(k.miktar),
+            birimFiyat: Number(k.birimFiyat),
+            kdvOrani: (k.kdvOrani === 0 || k.kdvOrani === '0') ? 0 : Number(k.kdvOrani),
+            iskontoOrani: Number(k.iskontoOran) || 0,
+            iskontoTutari: Number(k.iskontoTutar) || 0,
+          })),
+        });
+        showSnackbar('Fatura başarıyla güncellendi', 'success');
+        setTimeout(() => onBack?.(), 1500);
+        return;
       }
 
       setLoading(true);
@@ -1054,8 +1146,8 @@ function YeniSatisFaturasiPageContent() {
         durum: formData.durum,
         dovizCinsi: formData.dovizCinsi,
         dovizKuru: formData.dovizKuru,
-        ...(siparisId && { siparisId }), // Sipariş ID'sini gönder (varsa)
-        ...(irsaliyeId && { irsaliyeId }), // İrsaliye ID'sini gönder (varsa)
+        ...(siparisId && { siparisId }),
+        ...(irsaliyeId && { irsaliyeId }),
         warehouseId: formData.warehouseId || null,
         kalemler: validKalemler.map(k => ({
           stokId: k.stokId,
@@ -1066,61 +1158,51 @@ function YeniSatisFaturasiPageContent() {
           iskontoTutari: Number(k.iskontoTutar) || 0,
         })),
       });
-
       showSnackbar('Fatura başarıyla oluşturuldu', 'success');
-      setTimeout(() => {
-        router.push('/fatura/satis');
-      }, 1500);
+      const { removeTab, addTab, setActiveTab } = useTabStore.getState();
+      removeTab('fatura-satis-yeni');
+      addTab({ id: 'fatura-satis', label: 'Satış Faturaları', path: '/fatura/satis' });
+      setActiveTab('fatura-satis');
+      setTimeout(() => router.push('/fatura/satis'), 1500);
     } catch (error: any) {
       const errorMessage = error.response?.data?.message || 'İşlem sırasında hata oluştu';
-
-      // Check if this is a stock error (contains product details)
       if (errorMessage.includes('Yetersiz stok!') && errorMessage.includes('•')) {
-        // Parse the error message to extract product details
-        const lines = errorMessage.split('\n').filter(line => line.trim().startsWith('•'));
-        const products = lines.map(line => {
-          // Format: • PROD-001 - Ürün Adı: Mevcut stok 5, talep edilen 10
+        const lines = errorMessage.split('\n').filter((l: string) => l.trim().startsWith('•'));
+        const products = lines.map((line: string) => {
           const match = line.match(/•\s*(.+?)\s*-\s*(.+?):\s*Mevcut stok\s*(\d+),\s*talep edilen\s*(\d+)/);
-          if (match) {
-            return {
-              stokKodu: match[1].trim(),
-              stokAdi: match[2].trim(),
-              mevcutStok: parseInt(match[3]),
-              talep: parseInt(match[4]),
-            };
-          }
-          return null;
-        }).filter(p => p !== null) as Array<{
-          stokKodu: string;
-          stokAdi: string;
-          mevcutStok: number;
-          talep: number;
-        }>;
-
-        if (products.length > 0) {
-          setStockErrorDialog({ open: true, products });
-        } else {
-          showSnackbar(errorMessage, 'error');
-        }
+          return match ? { stokKodu: match[1].trim(), stokAdi: match[2].trim(), mevcutStok: parseInt(match[3]), talep: parseInt(match[4]) } : null;
+        }).filter((p: any) => p !== null);
+        if (products.length > 0) setStockErrorDialog({ open: true, products });
+        else showSnackbar(errorMessage, 'error');
       } else {
         showSnackbar(errorMessage, 'error');
       }
     } finally {
       setLoading(false);
+      setSaving(false);
     }
   };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
-      currency: 'TRY'
+      currency: formData.dovizCinsi === 'TRY' ? 'TRY' : formData.dovizCinsi,
     }).format(amount);
   };
 
   const totals = calculateTotals();
 
+  if (isEdit && loadingFatura) {
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
+        <CircularProgress size={48} />
+        <Typography variant="body1" sx={{ ml: 2, color: 'text.secondary' }}>Fatura yükleniyor...</Typography>
+      </Box>
+    );
+  }
+
   return (
-    <MainLayout>
+    <>
       <Box sx={{ mb: isMobile ? 2 : 3 }}>
         <Box sx={{
           display: 'flex',
@@ -1130,7 +1212,7 @@ function YeniSatisFaturasiPageContent() {
           mb: 2
         }}>
           <IconButton
-            onClick={() => router.push('/fatura/satis')}
+            onClick={() => { if (isEdit && onBack) onBack(); else router.push('/fatura/satis'); }}
             sx={{
               bgcolor: 'var(--secondary)',
               color: 'var(--secondary-foreground)',
@@ -1146,16 +1228,16 @@ function YeniSatisFaturasiPageContent() {
               color: 'var(--foreground)',
               letterSpacing: '-0.02em'
             }}>
-              Yeni Satış Faturası
+              {isEdit ? 'Satış Faturası Düzenle' : 'Yeni Satış Faturası'}
             </Typography>
             <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
-              {siparisId ? 'Siparişten fatura oluşturuluyor...' : 'Satış faturası oluşturun'}
+              {isEdit ? formData.faturaNo : (siparisId ? 'Siparişten fatura oluşturuluyor...' : 'Satış faturası oluşturun')}
             </Typography>
           </Box>
         </Box>
       </Box>
 
-      {loadingSiparis ? (
+      {!isEdit && loadingSiparis ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 400 }}>
           <Box sx={{ textAlign: 'center' }}>
             <CircularProgress size={48} sx={{ mb: 2 }} />
@@ -1203,7 +1285,7 @@ function YeniSatisFaturasiPageContent() {
                 Fatura Bilgileri
               </Typography>
               <Divider sx={{ mb: 2, borderColor: 'var(--border)' }} />
-              {warehouses.length === 0 && (
+              {warehousesFetched && warehouses.length === 0 && (
                 <Alert severity="error" sx={{ mb: 2 }}>
                   Sistemde tanımlı ambar bulunmamaktadır. İşlem yapabilmek için lütfen önce ambar tanımlayınız.
                 </Alert>
@@ -1255,18 +1337,6 @@ function YeniSatisFaturasiPageContent() {
                       {warehouse.name} {warehouse.isDefault && '(Varsayılan)'}
                     </MenuItem>
                   ))}
-                </Select>
-              </FormControl>
-
-              <FormControl className="form-control-select" required fullWidth>
-                <InputLabel>Durum</InputLabel>
-                <Select
-                  value={formData.durum}
-                  onChange={(e) => setFormData(prev => ({ ...prev, durum: e.target.value as 'ACIK' | 'ONAYLANDI' }))}
-                  label="Durum"
-                >
-                  <MenuItem value="ACIK">Beklemede</MenuItem>
-                  <MenuItem value="ONAYLANDI">Onaylandı</MenuItem>
                 </Select>
               </FormControl>
 
@@ -1971,7 +2041,7 @@ function YeniSatisFaturasiPageContent() {
                   variant="outlined"
                   size="large"
                   fullWidth={isMobile}
-                  onClick={() => router.push('/fatura/satis')}
+                  onClick={() => { if (isEdit && onBack) onBack(); else router.push('/fatura/satis'); }}
                   sx={{
                     textTransform: 'none',
                     fontWeight: 600,
@@ -1991,7 +2061,7 @@ function YeniSatisFaturasiPageContent() {
                   fullWidth={isMobile}
                   startIcon={<Save />}
                   onClick={handleSave}
-                  disabled={loading}
+                  disabled={loading || saving}
                   sx={{
                     bgcolor: 'var(--primary)',
                     color: 'var(--primary-foreground)',
@@ -2007,7 +2077,7 @@ function YeniSatisFaturasiPageContent() {
                     transition: 'all 0.2s ease',
                   }}
                 >
-                  {loading ? 'Kaydediliyor...' : 'Faturayı Kaydet'}
+                  {(loading || saving) ? 'Kaydediliyor...' : (isEdit ? 'Değişiklikleri Kaydet' : 'Faturayı Kaydet')}
                 </Button>
               </Box>
             </Box>
@@ -2076,7 +2146,6 @@ function YeniSatisFaturasiPageContent() {
                         <TableCell padding="checkbox">
                           <Checkbox
                             checked={selectedIrsaliyeler.includes(irsaliye.id)}
-                            stepId={1157}
                             onChange={(e) => {
                               e.stopPropagation();
                               setSelectedIrsaliyeler(prev =>
@@ -2375,20 +2444,18 @@ function YeniSatisFaturasiPageContent() {
           </Button>
         </DialogActions>
       </Dialog>
-    </MainLayout>
+    </>
   );
 }
 
 export default function YeniSatisFaturasiPage() {
   return (
     <Suspense fallback={
-      <MainLayout>
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
-          <CircularProgress />
-        </Box>
-      </MainLayout>
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
+        <CircularProgress />
+      </Box>
     }>
-      <YeniSatisFaturasiPageContent />
+      <SatisFaturaForm />
     </Suspense>
   );
 }

@@ -13,29 +13,58 @@ export class BordroService {
     ) { }
 
     async findAll() {
-        return this.prisma.bordro.findMany({
+        const items = await this.prisma.extended.bordro.findMany({
             orderBy: { tarih: 'desc' },
             include: {
                 cari: { select: { unvan: true } },
-                _count: { select: { cekSenetler: true } }
+                items: {
+                    include: {
+                        cekSenet: { select: { tutar: true } }
+                    }
+                },
+                _count: { select: { items: true } }
             }
+        });
+
+        return items.map(item => {
+            const toplamTutar = item.items.reduce((sum, bi) => sum + Number(bi.cekSenet.tutar), 0);
+            const { items: bordroItems, _count, ...rest } = item;
+            return {
+                ...rest,
+                toplamTutar,
+                evrakSayisi: _count.items
+            };
         });
     }
 
     async findOne(id: string) {
-        return this.prisma.bordro.findUnique({
+        const item = await this.prisma.extended.bordro.findUnique({
             where: { id },
             include: {
                 cari: true,
-                cekSenetler: true,
+                items: {
+                    include: {
+                        cekSenet: true
+                    }
+                },
             }
         });
+
+        if (!item) return null;
+
+        const cekSenetler = item.items.map(bi => bi.cekSenet);
+        const toplamTutar = cekSenetler.reduce((sum, cs) => sum + Number(cs.tutar), 0);
+        return {
+            ...item,
+            cekSenetler,
+            toplamTutar
+        };
     }
 
     async create(dto: CreateBordroDto, userId: string) {
         const tenantId = ClsService.getTenantId();
 
-        return this.prisma.$transaction(async (tx) => {
+        return this.prisma.extended.$transaction(async (tx) => {
             // 1. Create Bordro
             const bordro = await tx.bordro.create({
                 data: {
@@ -45,7 +74,7 @@ export class BordroService {
                     cariId: dto.cariId,
                     bankaHesabiId: dto.bankaHesabiId,
                     aciklama: dto.aciklama,
-                    tenantId: tenantId!,
+                    // tenantId: tenantId!, // Extended client handles this
                     createdById: userId,
                 }
             });
@@ -74,6 +103,15 @@ export class BordroService {
                                     tenantId: tenantId!,
                                     createdBy: userId,
                                     sonBordroId: bordro.id,
+                                }
+                            });
+
+                            // Create BordroItem
+                            await tx.bordroItem.create({
+                                data: {
+                                    bordroId: bordro.id,
+                                    cekSenetId: cek.id,
+                                    tenantId: tenantId!
                                 }
                             });
 
@@ -112,6 +150,15 @@ export class BordroService {
                                 where: { id: cekId },
                                 data: { durum: yeniDurum, sonBordroId: bordro.id }
                             });
+
+                            // Create BordroItem
+                            await tx.bordroItem.create({
+                                data: {
+                                    bordroId: bordro.id,
+                                    cekSenetId: cekId,
+                                    tenantId: tenantId!
+                                }
+                            });
                             await tx.cekSenetLog.create({
                                 data: {
                                     cekSenetId: cekId,
@@ -134,6 +181,15 @@ export class BordroService {
                             await tx.cekSenet.update({
                                 where: { id: cekId },
                                 data: { durum: CekSenetDurum.CIRO_EDILDI, sonBordroId: bordro.id }
+                            });
+
+                            // Create BordroItem
+                            await tx.bordroItem.create({
+                                data: {
+                                    bordroId: bordro.id,
+                                    cekSenetId: cekId,
+                                    tenantId: tenantId!
+                                }
                             });
 
                             // Cari Borç Kaydı (Biz çeki verdik, cari bizden alacaklı duruma geçer ama hareket BORÇ olarak kaydedilir - yani bakiyemiz artar)
@@ -162,7 +218,7 @@ export class BordroService {
                     // Kendi çekimizi veriyoruz
                     if (dto.yeniCekler && dto.yeniCekler.length > 0) {
                         for (const cekDto of dto.yeniCekler) {
-                            await tx.cekSenet.create({
+                            const cek = await tx.cekSenet.create({
                                 data: {
                                     tip: cekDto.tip,
                                     portfoyTip: 'BORC',
@@ -179,6 +235,15 @@ export class BordroService {
                                     tenantId: tenantId!,
                                     createdBy: userId,
                                     sonBordroId: bordro.id,
+                                }
+                            });
+
+                            // Create BordroItem
+                            await tx.bordroItem.create({
+                                data: {
+                                    bordroId: bordro.id,
+                                    cekSenetId: cek.id,
+                                    tenantId: tenantId!
                                 }
                             });
 
@@ -216,6 +281,15 @@ export class BordroService {
                             await tx.cekSenet.update({
                                 where: { id: cekId },
                                 data: { durum: CekSenetDurum.IADE_EDILDI, sonBordroId: bordro.id }
+                            });
+
+                            // Create BordroItem
+                            await tx.bordroItem.create({
+                                data: {
+                                    bordroId: bordro.id,
+                                    cekSenetId: cekId,
+                                    tenantId: tenantId!
+                                }
                             });
 
                             if (dto.cariId) {

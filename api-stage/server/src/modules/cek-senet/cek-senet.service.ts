@@ -4,36 +4,45 @@ import { CreateCekSenetDto, UpdateCekSenetDto } from './dto/create-cek-senet.dto
 import { CekSenetIslemDto } from './dto/cek-senet-islem.dto';
 import { CekSenetTip, CekSenetDurum } from '@prisma/client';
 import { ClsService } from '../../common/services/cls.service';
+import { TenantResolverService } from '../../common/services/tenant-resolver.service';
+import { buildTenantWhereClause } from '../../common/utils/staging.util';
 
 @Injectable()
 export class CekSenetService {
-    constructor(private prisma: PrismaService) { }
+    constructor(
+        private prisma: PrismaService,
+        private tenantResolver: TenantResolverService,
+    ) { }
 
     async findAll(query: any) {
+        const tenantId = await this.tenantResolver.resolveForQuery();
         const { durum, tip, borclu, vadeBaslangic, vadeBitis } = query;
-        const where: any = {};
+        const where: any = {
+            ...buildTenantWhereClause(tenantId ?? undefined),
+            deletedAt: null,
+        };
 
         if (durum) where.durum = durum;
         if (tip) where.tip = tip;
-        if (borclu) where.borclu = { contains: borclu, mode: 'insensitive' };
+        if (borclu) where.cari = { unvan: { contains: borclu, mode: 'insensitive' as const } };
         if (vadeBaslangic || vadeBitis) {
             where.vade = {};
             if (vadeBaslangic) where.vade.gte = new Date(vadeBaslangic);
             if (vadeBitis) where.vade.lte = new Date(vadeBitis);
         }
 
-        return this.prisma.cekSenet.findMany({
+        return this.prisma.extended.cekSenet.findMany({
             where,
             orderBy: { vade: 'asc' },
             include: {
-                // sonBordro: { include: { cari: true } } // Relation does not exist
-            }
+                cari: { select: { unvan: true } },
+            },
         });
     }
 
     async findOne(id: string) {
-        const cekSenet = await this.prisma.cekSenet.findUnique({
-            where: { id },
+        const cekSenet = await this.prisma.extended.cekSenet.findFirst({
+            where: { id, deletedAt: null },
             include: {
                 logs: {
                     orderBy: { createdAt: 'desc' },
@@ -49,9 +58,7 @@ export class CekSenetService {
 
     // Tekil çek oluşturma (Genelde Giriş Bordrosu içinde kullanılır)
     async create(dto: CreateCekSenetDto, bordroId?: string) {
-        const tenantId = ClsService.getTenantId();
-
-        return this.prisma.cekSenet.create({
+        return this.prisma.extended.cekSenet.create({
             data: {
                 tip: dto.tip,
                 portfoyTip: 'ALACAK', // Default
@@ -64,16 +71,68 @@ export class CekSenetService {
                 cekNo: dto.evrakNo, // Use evrakNo as cekNo
                 durum: CekSenetDurum.PORTFOYDE,
                 aciklama: dto.aciklama,
-                tenantId: tenantId!,
             }
         });
     }
 
-    async update(id: string, dto: UpdateCekSenetDto) {
-        return this.prisma.cekSenet.update({
+    async update(id: string, dto: UpdateCekSenetDto, userId?: string) {
+        const data: any = {};
+        if (dto.evrakNo !== undefined) data.cekNo = dto.evrakNo;
+        if (dto.vadeTarihi !== undefined) data.vade = new Date(dto.vadeTarihi);
+        if (dto.banka !== undefined) data.banka = dto.banka;
+        if (dto.sube !== undefined) data.sube = dto.sube;
+        if (dto.hesapNo !== undefined) data.hesapNo = dto.hesapNo;
+        if (dto.aciklama !== undefined) data.aciklama = dto.aciklama;
+        if (userId) data.updatedBy = userId;
+        return this.prisma.extended.cekSenet.update({
             where: { id },
-            data: dto
+            data,
         });
+    }
+
+    async remove(id: string, userId: string) {
+        const cek = await this.prisma.extended.cekSenet.findUnique({
+            where: { id },
+            include: { cari: { select: { unvan: true } } },
+        });
+        if (!cek) throw new NotFoundException('Çek/Senet bulunamadı');
+        if (cek.deletedAt) throw new BadRequestException('Evrak zaten silinmiş');
+        const cariUnvan = (cek.cari as any)?.unvan?.trim() || 'Bilinmeyen';
+        await this.prisma.extended.$transaction([
+            this.prisma.extended.deletedCekSenet.create({
+                data: {
+                    originalId: cek.id,
+                    tip: cek.tip,
+                    portfoyTip: cek.portfoyTip,
+                    cariId: cek.cariId,
+                    cariUnvan,
+                    tutar: cek.tutar,
+                    vade: cek.vade,
+                    banka: cek.banka,
+                    sube: cek.sube,
+                    hesapNo: cek.hesapNo,
+                    cekNo: cek.cekNo,
+                    seriNo: cek.seriNo,
+                    durum: cek.durum ?? CekSenetDurum.PORTFOYDE,
+                    tahsilTarihi: cek.tahsilTarihi,
+                    tahsilKasaId: cek.tahsilKasaId,
+                    ciroEdildi: cek.ciroEdildi,
+                    ciroTarihi: cek.ciroTarihi,
+                    ciroEdilen: cek.ciroEdilen,
+                    aciklama: cek.aciklama,
+                    originalCreatedBy: cek.createdBy,
+                    originalUpdatedBy: cek.updatedBy,
+                    originalCreatedAt: cek.createdAt,
+                    originalUpdatedAt: cek.updatedAt,
+                    deletedBy: userId,
+                },
+            }),
+            this.prisma.extended.cekSenet.update({
+                where: { id },
+                data: { deletedAt: new Date(), deletedBy: userId },
+            }),
+        ]);
+        return { success: true };
     }
 
     // Durum Değiştirme ve Kısmi Tahsilat İşlemi
@@ -117,7 +176,7 @@ export class CekSenetService {
             if (dto.kasaId) {
                 // Kasaya Giriş
                 const description = `${cek.cekNo || cek.seriNo} nolu Çek Tahsilatı (${islemTipi})`;
-                const kasaHareket = await this.prisma.kasaHareket.create({
+                const kasaHareket = await this.prisma.extended.kasaHareket.create({
                     data: {
                         kasaId: dto.kasaId,
                         hareketTipi: 'TAHSILAT',
@@ -137,7 +196,7 @@ export class CekSenetService {
             } else if (dto.bankaHesapId) {
                 // Bankaya Giriş
                 const description = `${cek.cekNo || cek.seriNo} nolu Çek Tahsilatı (${islemTipi})`;
-                const bankaHareket = await this.prisma.bankaHesapHareket.create({
+                const bankaHareket = await this.prisma.extended.bankaHesapHareket.create({
                     data: {
                         hesapId: dto.bankaHesapId,
                         hareketTipi: 'GELEN',
@@ -153,15 +212,15 @@ export class CekSenetService {
         }
 
         // 4. Update Çek ve Create Log
-        const [updatedCek, log] = await this.prisma.$transaction([
-            this.prisma.cekSenet.update({
+        const [updatedCek, log] = await this.prisma.extended.$transaction([
+            this.prisma.extended.cekSenet.update({
                 where: { id: dto.cekSenetId },
                 data: {
                     durum: dto.yeniDurum,
                     kalanTutar: yeniKalanTutar,
                 }
             }),
-            this.prisma.cekSenetLog.create({
+            this.prisma.extended.cekSenetLog.create({
                 data: {
                     cekSenetId: dto.cekSenetId,
                     actionType: 'UPDATE',
@@ -183,11 +242,9 @@ export class CekSenetService {
     }
 
     async getYaklasanCekler(baslangic: Date, bitis: Date) {
-        const tenantId = ClsService.getTenantId();
-
-        return this.prisma.cekSenet.findMany({
+        return this.prisma.extended.cekSenet.findMany({
             where: {
-                tenantId: tenantId!,
+                deletedAt: null,
                 vade: {
                     gte: baslangic,
                     lte: bitis,

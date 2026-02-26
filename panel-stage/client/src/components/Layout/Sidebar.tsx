@@ -147,7 +147,7 @@ const menuItems = [
   },
   {
     id: 'fatura',
-    label: 'Fatura',
+    label: 'Faturalar',
     icon: Receipt,
     color: '#1e293b',
     bgColor: '#f1f5f9',
@@ -174,7 +174,7 @@ const menuItems = [
   },
   {
     id: 'siparis',
-    label: 'Sipariş',
+    label: 'Siparişler',
     icon: ShoppingCart,
     color: '#0891b2',
     bgColor: '#ecfeff',
@@ -184,23 +184,14 @@ const menuItems = [
     ],
   },
   {
-    id: 'satis-irsaliyesi',
-    label: 'Satış İrsaliyesi',
+    id: 'irsaliyeler',
+    label: 'İrsaliyeler',
     icon: LocalShipping,
     color: '#334155',
     bgColor: '#f8fafc',
     subItems: [
-      { id: 'satis-irsaliyesi-liste', label: 'Satış İrsaliyeleri', icon: ReceiptLong, path: '/satis-irsaliyesi', color: '#8b5cf6' },
-    ],
-  },
-  {
-    id: 'satin-alma-irsaliyesi',
-    label: 'Satın Alma İrsaliyesi',
-    icon: LocalShipping,
-    color: '#06b6d4',
-    bgColor: '#ecfeff',
-    subItems: [
-      { id: 'satin-alma-irsaliyesi-liste', label: 'Satın Alma İrsaliyeleri', icon: ReceiptLong, path: '/satin-alma-irsaliyesi', color: '#06b6d4' },
+      { id: 'satis-irsaliyesi-liste', label: 'Satış İrsaliyesi', icon: ReceiptLong, path: '/satis-irsaliyesi', color: '#8b5cf6' },
+      { id: 'satin-alma-irsaliyesi-liste', label: 'Satın Alma İrsaliyesi', icon: ReceiptLong, path: '/satin-alma-irsaliyesi', color: '#06b6d4' },
     ],
   },
   { id: 'tahsilat', label: 'Tahsilat & Ödeme', icon: Payment, path: '/tahsilat', color: '#10b981', bgColor: '#ecfdf5' },
@@ -249,7 +240,24 @@ const menuItems = [
       { id: 'depo-raporlar', label: 'Depo Raporları', icon: Assessment, path: '/depo/raporlar', color: '#14b8a6' },
     ],
   },
-  { id: 'masraf', label: 'Masraf', icon: AttachMoney, path: '/masraf', color: '#ef4444', bgColor: '#fef2f2' },
+  {
+    id: 'masraf-yonetimi',
+    label: 'Masraf Yönetimi',
+    icon: AttachMoney,
+    color: '#ef4444',
+    bgColor: '#fef2f2',
+    subItems: [
+      { id: 'masraf', label: 'Masraf', icon: AttachMoney, path: '/masraf', color: '#ef4444' },
+    ],
+  },
+  {
+    id: 'sirket-araclari',
+    label: 'Şirket Araçları',
+    icon: DirectionsCar,
+    color: '#10b981',
+    bgColor: '#ecfdf5',
+    path: '/sirket-araclari', // Aktif hale getirilene kadar yer tutucu
+  },
   {
     id: 'raporlama',
     label: 'Raporlama',

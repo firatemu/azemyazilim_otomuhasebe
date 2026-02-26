@@ -3,7 +3,6 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo } from 'react';
-import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
 import { getProfitByInvoice, type ProfitByInvoiceResponse } from '@/services/invoiceProfitService';
 import { useTabStore } from '@/stores/tabStore';
@@ -655,7 +654,7 @@ export default function SatisFaturalariPage() {
       if (pendingDurum.yeniDurum === 'ONAYLANDI') {
         mesaj = 'Fatura onaylandı. Stoklar düşüldü ve cari bakiye güncellendi.';
       } else if (pendingDurum.yeniDurum === 'IPTAL') {
-        mesaj = 'Fatura iptal edildi. Stoklar geri eklendi ve cari bakiye düzeltildi.';
+        mesaj = 'Fatura iptal edildi. Cari bakiye düzeltildi. (İptal faturalar stok hesaplamasında dikkate alınmaz)';
       } else if (pendingDurum.yeniDurum === 'ACIK') {
         mesaj = 'Fatura beklemeye alındı. Stok ve cari işlemleri geri alındı.';
       }
@@ -1229,7 +1228,7 @@ export default function SatisFaturalariPage() {
   };
 
   return (
-    <MainLayout>
+    <>
       <Box sx={{ p: 3 }}>
         {/* Header */}
         <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
@@ -1357,6 +1356,7 @@ export default function SatisFaturalariPage() {
                     <Table size="small">
                       <TableHead>
                         <TableRow sx={{ bgcolor: '#f8fafc' }}>
+                          <TableCell sx={{ fontWeight: 600 }}>Malzeme Kodu</TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>Stok</TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>Miktar</TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>Birim Fiyat</TableCell>
@@ -1369,6 +1369,7 @@ export default function SatisFaturalariPage() {
                       <TableBody>
                         {selectedFatura.kalemler.map((kalem: any, index: any) => (
                           <TableRow key={index} hover>
+                            <TableCell>{kalem.stok?.stokKodu || '-'}</TableCell>
                             <TableCell>{kalem.stok?.stokAdi || '-'}</TableCell>
                             <TableCell>{kalem.miktar}</TableCell>
                             <TableCell>{formatCurrency(kalem.birimFiyat)}</TableCell>
@@ -1579,7 +1580,7 @@ export default function SatisFaturalariPage() {
                   {irsaliyeIptal && (
                     <Alert severity="info" sx={{ mt: 2 }}>
                       <Typography variant="body2">
-                        İrsaliye iptal edildiğinde, irsaliye kalemleri stoğa geri eklenecektir.
+                        İrsaliye iptal edildiğinde, irsaliye durumu güncellenir. (Stok sadece onaylı faturalardan hesaplanır)
                       </Typography>
                     </Alert>
                   )}
@@ -1828,7 +1829,7 @@ export default function SatisFaturalariPage() {
             <MenuItem
               key="cancel"
               onClick={() => { handleMenuClose(); openIptalDialog(fatura); }}
-              disabled={fatura.durum === 'IPTAL'}
+              disabled={fatura.durum !== 'ONAYLANDI'}
               sx={{ color: 'error.main' }}
             >
               <ListItemIcon><Cancel fontSize="small" color="error" /></ListItemIcon>
@@ -1856,6 +1857,6 @@ export default function SatisFaturalariPage() {
           {snackbar.message}
         </Alert>
       </Snackbar>
-    </MainLayout>
+    </>
   );
 }

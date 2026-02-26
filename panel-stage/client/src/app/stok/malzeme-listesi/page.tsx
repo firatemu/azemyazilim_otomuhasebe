@@ -1308,16 +1308,51 @@ export default function MalzemeListesiPage() {
   const getHareketLabel = (hareket: any) => {
     const tip = hareket?.hareketTipi || '';
     const faturaTipi = hareket?.faturaKalemi?.fatura?.faturaTipi;
+    const durum = hareket?.faturaKalemi?.fatura?.durum;
+    if (tip === 'SATIS' && durum === 'IPTAL') return 'Satış faturası iptal';
+    if (tip === 'GIRIS' && faturaTipi === 'ALIS' && durum === 'IPTAL') return 'Satınalma faturası iptal';
+    if (tip === 'IADE' && faturaTipi === 'SATIS_IADE' && durum === 'IPTAL') return 'Satış iadesi iptal';
+    if (tip === 'IADE' && faturaTipi === 'ALIS_IADE' && durum === 'IPTAL') return 'Alış iadesi iptal';
     const labels: Record<string, string> = {
       GIRIS: faturaTipi === 'ALIS' ? 'Satınalma faturası' : 'Giriş',
       CIKIS: 'Çıkış',
       SATIS: 'Satış faturası',
       IADE: faturaTipi === 'ALIS_IADE' ? 'Alış iadesi' : faturaTipi === 'SATIS_IADE' ? 'Satış iadesi' : 'İade',
+      IPTAL_GIRIS: 'İptal',
+      IPTAL_CIKIS: 'İptal',
       SAYIM: 'Sayım',
       SAYIM_FAZLA: 'Sayım fazlası',
       SAYIM_EKSIK: 'Sayım eksiği',
     };
     return labels[tip] || tip;
+  };
+
+  const getFaturaDurumLabel = (hareket: any) => {
+    const durum = hareket?.faturaKalemi?.fatura?.durum;
+    if (!durum) {
+      if (hareket?.hareketTipi === 'IPTAL_GIRIS' || hareket?.hareketTipi === 'IPTAL_CIKIS') return 'İptal';
+      return '-';
+    }
+    const labels: Record<string, string> = {
+      ONAYLANDI: 'Onaylandı',
+      ACIK: 'Beklemede',
+      IPTAL: 'İptal',
+      KISMEN_ODENDI: 'Kısmen Ödendi',
+      KAPALI: 'Kapalı',
+    };
+    return labels[durum] || durum;
+  };
+
+  const getFaturaDurumColor = (hareket: any): 'success' | 'error' | 'warning' | 'default' => {
+    const durum = hareket?.faturaKalemi?.fatura?.durum;
+    if (!durum) {
+      if (hareket?.hareketTipi === 'IPTAL_GIRIS' || hareket?.hareketTipi === 'IPTAL_CIKIS') return 'error';
+      return 'default';
+    }
+    if (durum === 'IPTAL') return 'error';
+    if (durum === 'ONAYLANDI') return 'success';
+    if (durum === 'ACIK') return 'warning';
+    return 'default';
   };
 
   // Eşdeğer ürünler dialog handler
@@ -1357,6 +1392,8 @@ export default function MalzemeListesiPage() {
       CIKIS: 'error',
       SATIS: 'primary',
       IADE: 'warning',
+      IPTAL_GIRIS: 'error',
+      IPTAL_CIKIS: 'error',
       SAYIM: 'default',
       SAYIM_FAZLA: 'success',
       SAYIM_EKSIK: 'error',
@@ -1853,6 +1890,8 @@ export default function MalzemeListesiPage() {
                   <MenuItem value="CIKIS">Çıkış</MenuItem>
                   <MenuItem value="SATIS">Satış faturası</MenuItem>
                   <MenuItem value="IADE">İade</MenuItem>
+                  <MenuItem value="IPTAL_GIRIS">İptal (giriş)</MenuItem>
+                  <MenuItem value="IPTAL_CIKIS">İptal (çıkış)</MenuItem>
                   <MenuItem value="SAYIM">Sayım</MenuItem>
                   <MenuItem value="SAYIM_FAZLA">Sayım fazlası</MenuItem>
                   <MenuItem value="SAYIM_EKSIK">Sayım eksiği</MenuItem>
@@ -1865,6 +1904,7 @@ export default function MalzemeListesiPage() {
                     <TableRow>
                       <TableCell sx={{ color: 'var(--foreground)' }}><strong>Tarih</strong></TableCell>
                       <TableCell sx={{ color: 'var(--foreground)' }}><strong>İşlem Türü</strong></TableCell>
+                      <TableCell sx={{ color: 'var(--foreground)' }}><strong>Fatura Durumu</strong></TableCell>
                       <TableCell sx={{ color: 'var(--foreground)' }}><strong>Ambar</strong></TableCell>
                       <TableCell sx={{ color: 'var(--foreground)' }}><strong>Cari</strong></TableCell>
                       <TableCell align="right" sx={{ color: 'var(--foreground)' }}><strong>Miktar</strong></TableCell>
@@ -1878,7 +1918,7 @@ export default function MalzemeListesiPage() {
                       <TableSkeleton rows={5} columns={6} />
                     ) : hareketler.length === 0 ? (
                       <TableRow>
-                        <TableCell colSpan={8} align="center" sx={{ py: 6 }}>
+                        <TableCell colSpan={9} align="center" sx={{ py: 6 }}>
                           <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
                             Bu ürün için hareket kaydı bulunamadı.
                           </Typography>
@@ -1902,6 +1942,14 @@ export default function MalzemeListesiPage() {
                                 label={getHareketLabel(hareket)}
                                 color={getHareketColor(hareket.hareketTipi)}
                                 size="small"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Chip
+                                label={getFaturaDurumLabel(hareket)}
+                                color={getFaturaDurumColor(hareket)}
+                                size="small"
+                                variant="outlined"
                               />
                             </TableCell>
                             <TableCell>

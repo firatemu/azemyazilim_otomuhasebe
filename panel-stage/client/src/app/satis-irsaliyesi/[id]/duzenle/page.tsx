@@ -482,17 +482,6 @@ export default function DuzenleSatisIrsaliyesiPage() {
                   ))}
                 </Select>
               </FormControl>
-              <FormControl sx={{ flex: '1 1 200px' }} required>
-                <InputLabel>Durum</InputLabel>
-                <Select
-                  value={formData.durum}
-                  onChange={(e) => setFormData(prev => ({ ...prev, durum: e.target.value as 'FATURALANMADI' | 'FATURALANDI' }))}
-                  label="Durum"
-                >
-                  <MenuItem value="FATURALANMADI">Faturalanmadı</MenuItem>
-                  <MenuItem value="FATURALANDI">Faturalandı</MenuItem>
-                </Select>
-              </FormControl>
             </Box>
 
             <Box>

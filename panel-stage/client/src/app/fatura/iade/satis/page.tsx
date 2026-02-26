@@ -92,7 +92,7 @@ interface Fatura {
     createdAt: string;
     message: string;
   }>;
-  satinAlmaIrsaliyesi?: {
+  irsaliye?: {
     id: string;
     irsaliyeNo: string;
   };
@@ -379,8 +379,8 @@ export default function SatisIadeFaturalariPage() {
           irsaliyeIptal: irsaliyeIptal,
         });
         const mesaj = irsaliyeIptal
-          ? 'Fatura ve bağlı irsaliye başarıyla iptal edildi. Stoklar ve cari bakiye güncellendi.'
-          : 'Fatura başarıyla iptal edildi. Stoklar ve cari bakiye güncellendi.';
+          ? 'Fatura ve bağlı irsaliye iptal edildi. Stok hareketleri geri alındı ve cari bakiye güncellendi.'
+          : 'İade faturası iptal edildi. Stok hareketleri geri alındı ve cari bakiye güncellendi.';
         showSnackbar(mesaj, 'success');
         setOpenIptal(false);
         setIrsaliyeIptal(false);
@@ -424,7 +424,7 @@ export default function SatisIadeFaturalariPage() {
       if (pendingDurum.yeniDurum === 'ONAYLANDI') {
         mesaj = 'Fatura onaylandı. Stoklar eklendi ve cari bakiye güncellendi.';
       } else if (pendingDurum.yeniDurum === 'IPTAL') {
-        mesaj = 'Fatura iptal edildi. Stoklar geri çıkarıldı ve cari bakiye düzeltildi.';
+        mesaj = 'İade faturası iptal edildi. Stok hareketleri geri alındı ve cari bakiye düzeltildi.';
       } else if (pendingDurum.yeniDurum === 'ACIK') {
         mesaj = 'Fatura beklemeye alındı. Stok ve cari işlemleri geri alındı.';
       }
@@ -969,49 +969,13 @@ export default function SatisIadeFaturalariPage() {
             </MenuItem>,
 
 
-            fatura.durum === 'ACIK' && (
-              <MenuItem
-                key="approve"
-                onClick={() => {
-                  handleDurumChangeRequest(fatura.id, fatura.durum, 'ONAYLANDI');
-                  handleMenuClose();
-                }}
-                sx={{
-                  gap: 1.5,
-                  py: 1,
-                  '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-3) 15%, transparent)' }
-                }}
-              >
-                <Box sx={{ width: 20, display: 'flex', justifyContent: 'center' }} />
-                <Typography variant="body2" sx={{ color: '#10b981', fontWeight: 600 }}>Onayla</Typography>
-              </MenuItem>
-            ),
-
-            fatura.durum !== 'ACIK' && (
-              <MenuItem
-                key="panding"
-                onClick={() => {
-                  handleDurumChangeRequest(fatura.id, fatura.durum, 'ACIK');
-                  handleMenuClose();
-                }}
-                sx={{
-                  gap: 1.5,
-                  py: 1,
-                  '&:hover': { bgcolor: 'var(--muted)' }
-                }}
-              >
-                <Box sx={{ width: 20, display: 'flex', justifyContent: 'center' }} />
-                <Typography variant="body2">Beklemeye Al</Typography>
-              </MenuItem>
-            ),
-
             <MenuItem
               key="cancel"
               onClick={() => {
                 openIptalDialog(fatura);
                 handleMenuClose();
               }}
-              disabled={fatura.durum === 'IPTAL'}
+              disabled={fatura.durum !== 'ONAYLANDI'}
               sx={{
                 gap: 1.5,
                 py: 1,
@@ -1092,6 +1056,7 @@ export default function SatisIadeFaturalariPage() {
                     <Table size="small">
                       <TableHead>
                         <TableRow>
+                          <TableCell>Malzeme Kodu</TableCell>
                           <TableCell>Stok</TableCell>
                           <TableCell>Miktar</TableCell>
                           <TableCell>Birim Fiyat</TableCell>
@@ -1111,6 +1076,7 @@ export default function SatisIadeFaturalariPage() {
 
                           return (
                             <TableRow key={index} hover>
+                              <TableCell>{kalem.stok?.stokKodu || '-'}</TableCell>
                               <TableCell>{kalem.stok?.stokAdi || '-'}</TableCell>
                               <TableCell>{kalem.miktar}</TableCell>
                               <TableCell>{formatCurrency(kalem.birimFiyat)}</TableCell>
@@ -1328,8 +1294,8 @@ export default function SatisIadeFaturalariPage() {
               {pendingDurum.yeniDurum === 'IPTAL' && (
                 <Alert severity="info" sx={{ mb: 2 }}>
                   <Typography variant="body2">
-                    • Stok hareketi oluşturulacak (çıkış - iptal)<br />
-                    • Cari bakiye azalacak
+                    • İade stok hareketleri geri alınacak (iptal çıkış)<br />
+                    • Cari bakiye düzeltilecek
                   </Typography>
                 </Alert>
               )}
@@ -1387,19 +1353,19 @@ export default function SatisIadeFaturalariPage() {
               <Typography variant="body1" sx={{ mb: 2 }}>
                 <strong>{selectedFatura.faturaNo}</strong> nolu faturayı iptal etmek istediğinizden emin misiniz?
               </Typography>
-              {selectedFatura.satinAlmaIrsaliyesi && (
+              {selectedFatura.irsaliye && (
                 <Box sx={{
                   p: 2,
-                  bgcolor: 'var(--muted)',
+                  bgcolor: '#f9fafb',
                   borderRadius: 1,
                   mb: 2,
-                  border: '1px solid var(--border)'
+                  border: '1px solid #e5e7eb'
                 }}>
                   <Typography variant="body2" sx={{ mb: 1, fontWeight: 600 }}>
                     Bu faturaya bağlı bir irsaliye bulunmaktadır:
                   </Typography>
                   <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    İrsaliye No: <strong>{selectedFatura.satinAlmaIrsaliyesi.irsaliyeNo}</strong>
+                    İrsaliye No: <strong>{selectedFatura.irsaliye.irsaliyeNo}</strong>
                   </Typography>
                   <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <input
@@ -1421,7 +1387,7 @@ export default function SatisIadeFaturalariPage() {
                   {irsaliyeIptal && (
                     <Alert severity="info" sx={{ mt: 2 }}>
                       <Typography variant="body2">
-                        İrsaliye iptal edildiğinde, irsaliye kalemleri stoğa geri çıkarılacaktır.
+                        İrsaliye iptal edildiğinde, irsaliye durumu güncellenir. (Stok sadece onaylı faturalardan hesaplanır)
                       </Typography>
                     </Alert>
                   )}

@@ -181,22 +181,27 @@ export class StockMoveService {
       throw new NotFoundException('Ürün bulunamadı');
     }
 
-    // Ürünün toplam stok miktarını hesapla (StokHareket tablosundan)
+    // Ürünün toplam stok miktarını hesapla (StokHareket tablosundan, iptal faturalar hariç)
     const stokHareketler = await this.prisma.stokHareket.findMany({
       where: { stokId: putAwayDto.productId },
+      include: { faturaKalemi: { include: { fatura: { select: { durum: true } } } } },
     });
 
     let toplamStok = 0;
     stokHareketler.forEach((hareket) => {
+      if ((hareket as any).faturaKalemi?.fatura?.durum === 'IPTAL') return;
       if (
         hareket.hareketTipi === 'GIRIS' ||
-        hareket.hareketTipi === 'SAYIM_FAZLA'
+        hareket.hareketTipi === 'SAYIM_FAZLA' ||
+        hareket.hareketTipi === 'IADE' ||
+        hareket.hareketTipi === 'IPTAL_GIRIS'
       ) {
         toplamStok += hareket.miktar;
       } else if (
         hareket.hareketTipi === 'CIKIS' ||
         hareket.hareketTipi === 'SATIS' ||
-        hareket.hareketTipi === 'SAYIM_EKSIK'
+        hareket.hareketTipi === 'SAYIM_EKSIK' ||
+        hareket.hareketTipi === 'IPTAL_CIKIS'
       ) {
         toplamStok -= hareket.miktar;
       }

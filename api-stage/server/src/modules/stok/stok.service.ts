@@ -150,23 +150,27 @@ export class StokService {
       // Eğer raf field'ı boşsa, productLocationStocks'ten al ve miktar hesapla
       const dataWithDetails = await Promise.all(
         initialData.map(async (stok) => {
-          // Stok hareketlerinden toplam miktarı hesapla
+          // Stok hareketlerinden toplam miktarı hesapla (iptal faturalara ait hareketler hariç - sadece onaylı faturalar dikkate alınır)
           const stokHareketler = await this.prisma.stokHareket.findMany({
             where: { stokId: stok.id },
+            include: { faturaKalemi: { include: { fatura: { select: { durum: true } } } } },
           });
 
           let miktar = 0;
           stokHareketler.forEach((hareket) => {
+            if ((hareket as any).faturaKalemi?.fatura?.durum === 'IPTAL') return;
             if (
               hareket.hareketTipi === 'GIRIS' ||
               hareket.hareketTipi === 'SAYIM_FAZLA' ||
-              hareket.hareketTipi === 'IADE'
+              hareket.hareketTipi === 'IADE' ||
+              hareket.hareketTipi === 'IPTAL_GIRIS'
             ) {
               miktar += hareket.miktar;
             } else if (
               hareket.hareketTipi === 'CIKIS' ||
               hareket.hareketTipi === 'SATIS' ||
-              hareket.hareketTipi === 'SAYIM_EKSIK'
+              hareket.hareketTipi === 'SAYIM_EKSIK' ||
+              hareket.hareketTipi === 'IPTAL_CIKIS'
             ) {
               miktar -= hareket.miktar;
             }
@@ -669,19 +673,24 @@ export class StokService {
       esdegerler.map(async (urun) => {
         const stokHareketler = await this.prisma.stokHareket.findMany({
           where: { stokId: urun.id },
+          include: { faturaKalemi: { include: { fatura: { select: { durum: true } } } } },
         });
 
         let miktar = 0;
         stokHareketler.forEach((hareket) => {
+          if ((hareket as any).faturaKalemi?.fatura?.durum === 'IPTAL') return;
           if (
             hareket.hareketTipi === 'GIRIS' ||
-            hareket.hareketTipi === 'SAYIM_FAZLA'
+            hareket.hareketTipi === 'SAYIM_FAZLA' ||
+            hareket.hareketTipi === 'IADE' ||
+            hareket.hareketTipi === 'IPTAL_GIRIS'
           ) {
             miktar += hareket.miktar;
           } else if (
             hareket.hareketTipi === 'CIKIS' ||
             hareket.hareketTipi === 'SATIS' ||
-            hareket.hareketTipi === 'SAYIM_EKSIK'
+            hareket.hareketTipi === 'SAYIM_EKSIK' ||
+            hareket.hareketTipi === 'IPTAL_CIKIS'
           ) {
             miktar -= hareket.miktar;
           }

@@ -749,17 +749,6 @@ function YeniAlisIadeFaturasiContent() {
               </Select>
             </FormControl>
             <FormControl fullWidth required>
-              <InputLabel>Durum</InputLabel>
-              <Select
-                value={formData.durum}
-                onChange={(e) => setFormData(prev => ({ ...prev, durum: e.target.value as 'ACIK' | 'ONAYLANDI' }))}
-                label="Durum"
-              >
-                <MenuItem value="ACIK">Beklemede</MenuItem>
-                <MenuItem value="ONAYLANDI">Onaylandı</MenuItem>
-              </Select>
-            </FormControl>
-            <FormControl fullWidth required>
               <InputLabel>Döviz</InputLabel>
               <Select
                 value={formData.dovizCinsi}

@@ -68,8 +68,11 @@ model Tenant {
   workOrders             WorkOrder[]
   partRequests           PartRequest[]
   inventoryTransactions  InventoryTransaction[]
-  serviceInvoices        ServiceInvoice[]
+  bordroItems            BordroItem[]
   journalEntries         JournalEntry[]
+  serviceInvoices        ServiceInvoice[]
+  companyVehicles        CompanyVehicle[]
+  vehicleExpenses        VehicleExpense[]
 
   @@index([subdomain])
   @@index([domain])
@@ -1650,8 +1653,27 @@ model Bordro {
   createdBy     User?        @relation("BordroCreatedBy", fields: [createdById], references: [id])
   tenant        Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   cekSenetler   CekSenet[]   @relation("CekSenetSonBordro")
+  items         BordroItem[]
 
   @@map("bordrolar")
+}
+
+model BordroItem {
+  id          String   @id @default(uuid())
+  bordroId    String
+  cekSenetId  String
+  tenantId    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  bordro      Bordro   @relation(fields: [bordroId], references: [id], onDelete: Cascade)
+  cekSenet    CekSenet @relation(fields: [cekSenetId], references: [id], onDelete: Cascade)
+  tenant      Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([bordroId])
+  @@index([cekSenetId])
+  @@index([tenantId])
+  @@map("bordro_items")
 }
 
 model CekSenet {
@@ -1690,6 +1712,7 @@ model CekSenet {
   updatedByUser User?          @relation("CekSenetUpdatedBy", fields: [updatedBy], references: [id])
   sonBordroId   String?
   sonBordro     Bordro?        @relation("CekSenetSonBordro", fields: [sonBordroId], references: [id])
+  bordroItems   BordroItem[]
 
   @@index([tenantId])
   @@index([tenantId, vade])
@@ -1789,6 +1812,7 @@ model Personel {
   maasPlanlari     MaasPlani[]
   maasOdemeler     MaasOdeme[]
   avanslar         Avans[]
+  companyVehicles  CompanyVehicle[]
   createdByUser    User?           @relation("PersonelCreatedBy", fields: [createdBy], references: [id])
   tenant           Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
   updatedByUser    User?           @relation("PersonelUpdatedBy", fields: [updatedBy], references: [id])
@@ -2667,6 +2691,8 @@ enum HareketTipi {
   CIKIS
   SATIS
   IADE
+  IPTAL_GIRIS
+  IPTAL_CIKIS
   SAYIM
   SAYIM_FAZLA
   SAYIM_EKSIK
@@ -3261,4 +3287,70 @@ model TenantPurgeAudit {
   @@index([adminId])
   @@index([createdAt])
   @@map("tenant_purge_audits")
+}
+
+// ========== Company Vehicles Module ==========
+
+model CompanyVehicle {
+  id                 String           @id @default(uuid())
+  tenantId           String?
+  plaka              String
+  marka              String
+  model              String
+  yil                Int?
+  saseno             String?
+  motorNo            String?
+  tescilTarihi       DateTime?
+  aracTipi           String?
+  yakitTipi          String?
+  durum              Boolean          @default(true)
+  zimmetliPersonelId String?
+  ruhsatGorselUrl    String?
+  notlar             String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  deletedAt          DateTime?
+  tenant             Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  personel           Personel?        @relation(fields: [zimmetliPersonelId], references: [id], onDelete: SetNull)
+  expenses           VehicleExpense[]
+
+  @@unique([plaka, tenantId])
+  @@index([tenantId])
+  @@index([zimmetliPersonelId])
+  @@map("company_vehicles")
+}
+
+enum VehicleExpenseType {
+  YAKIT
+  BAKIM
+  MUAYENE
+  TRAFIK_SIGORTASI
+  KASKO
+  CEZA
+  OGS_HGS
+  OTOPARK
+  YIKAMA
+  DIGER
+}
+
+model VehicleExpense {
+  id          String             @id @default(uuid())
+  tenantId    String?
+  vehicleId   String
+  masrafTipi  VehicleExpenseType
+  tarih       DateTime           @default(now())
+  tutar       Decimal            @db.Decimal(12, 2)
+  aciklama    String?
+  belgeNo     String?
+  kilometre   Int?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  deletedAt   DateTime?
+  tenant      Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle     CompanyVehicle     @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([vehicleId])
+  @@index([tarih])
+  @@map("vehicle_expenses")
 }

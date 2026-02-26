@@ -1,5 +1,5 @@
 import { IsOptional, IsString, IsEnum } from 'class-validator';
-import { SiparisTipi } from '@prisma/client';
+import { SiparisTipi, SiparisDurum } from '@prisma/client';
 
 export class QuerySiparisDto {
   @IsOptional()
@@ -13,6 +13,10 @@ export class QuerySiparisDto {
   @IsOptional()
   @IsEnum(SiparisTipi)
   siparisTipi?: SiparisTipi;
+
+  @IsOptional()
+  @IsEnum(SiparisDurum)
+  durum?: SiparisDurum;
 
   @IsOptional()
   @IsString()

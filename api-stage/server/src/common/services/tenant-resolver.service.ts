@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException } from '@nestjs/common';
+import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
 import { TenantContextService } from './tenant-context.service';
 import { PrismaService } from '../prisma.service';
 import { isStagingEnvironment } from '../utils/staging.util';
@@ -19,6 +19,7 @@ export class TenantResolverService {
 
   constructor(
     private readonly tenantContext: TenantContextService,
+    @Inject(forwardRef(() => PrismaService))
     private readonly prisma: PrismaService,
   ) { }
 

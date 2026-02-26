@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, Put, Query, UseGuards, Request } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, Put, Delete, Query, UseGuards, Request } from '@nestjs/common';
 import { CekSenetService } from './cek-senet.service';
 import { UpdateCekSenetDto } from './dto/create-cek-senet.dto';
 import { CekSenetIslemDto } from './dto/cek-senet-islem.dto';
@@ -31,8 +31,13 @@ export class CekSenetController {
     }
 
     @Put(':id')
-    update(@Param('id') id: string, @Body() dto: UpdateCekSenetDto) {
-        return this.cekSenetService.update(id, dto);
+    update(@Param('id') id: string, @Body() dto: UpdateCekSenetDto, @Request() req) {
+        return this.cekSenetService.update(id, dto, req.user?.id);
+    }
+
+    @Delete(':id')
+    remove(@Param('id') id: string, @Request() req) {
+        return this.cekSenetService.remove(id, req.user.id);
     }
 
     @Post('islem')

@@ -10,11 +10,14 @@ import {
     Grid,
     Paper,
     LinearProgress,
+    IconButton,
+    Tooltip,
 } from '@mui/material';
 import {
     DataGrid,
     GridColDef,
     GridToolbar,
+    GridRenderCellParams,
 } from '@mui/x-data-grid';
 import {
     Add,
@@ -22,11 +25,53 @@ import {
     ArrowBack,
     ReceiptLong,
     TrendingUp,
-    AccountBalanceWallet,
+    Visibility,
 } from '@mui/icons-material';
 import axios from '@/lib/axios';
 import { useRouter } from 'next/navigation';
 import MainLayout from '@/components/Layout/MainLayout';
+
+const BORDRO_TYPE_CONFIG: Record<string, { label: string, color: string, bg: string, icon: React.ReactNode }> = {
+    MUSTERI_EVRAK_GIRISI: {
+        label: 'Müşteri Evrak Girişi',
+        color: '#22c55e',
+        bg: 'rgba(34, 197, 94, 0.1)',
+        icon: <ArrowBack fontSize="small" />
+    },
+    IADE_BORDROSU: {
+        label: 'İade Bordrosu',
+        color: '#22c55e',
+        bg: 'rgba(34, 197, 94, 0.1)',
+        icon: <ArrowBack fontSize="small" />
+    },
+    BORC_EVRAK_CIKISI: {
+        label: 'Borç Evrak Çıkışı',
+        color: '#eab308',
+        bg: 'rgba(234, 179, 8, 0.1)',
+        icon: <ArrowForward fontSize="small" />
+    },
+    CARIYE_EVRAK_CIROSU: {
+        label: 'Cariye Evrak Cirosu',
+        color: '#eab308',
+        bg: 'rgba(234, 179, 8, 0.1)',
+        icon: <ArrowForward fontSize="small" />
+    },
+    BANKA_TAHSIL_CIROSU: {
+        label: 'Bankaya Tahsil Cirosu',
+        color: '#eab308',
+        bg: 'rgba(234, 179, 8, 0.1)',
+        icon: <ArrowForward fontSize="small" />
+    },
+    BANKA_TEMINAT_CIROSU: {
+        label: 'Bankaya Teminat Cirosu',
+        color: '#eab308',
+        bg: 'rgba(234, 179, 8, 0.1)',
+        icon: <ArrowForward fontSize="small" />
+    },
+};
+
+const GIRIS_TYPES = ['MUSTERI_EVRAK_GIRISI', 'IADE_BORDROSU'];
+const CIKIS_TYPES = ['BORC_EVRAK_CIKISI', 'CARIYE_EVRAK_CIROSU', 'BANKA_TAHSIL_CIROSU', 'BANKA_TEMINAT_CIROSU'];
 
 export default function BordroPage() {
     const router = useRouter();
@@ -51,8 +96,8 @@ export default function BordroPage() {
     // Summary Calculations
     const stats = useMemo(() => {
         const total = rows.length;
-        const girisCount = rows.filter((r: any) => r.tip === 'GIRIS_BORDROSU').length;
-        const cikisCount = rows.filter((r: any) => r.tip === 'CIKIS_BORDROSU').length;
+        const girisCount = rows.filter((r: any) => GIRIS_TYPES.includes(r.tip)).length;
+        const cikisCount = rows.filter((r: any) => CIKIS_TYPES.includes(r.tip)).length;
 
         return {
             total,
@@ -68,7 +113,8 @@ export default function BordroPage() {
             field: 'bordroNo',
             headerName: 'Bordro No',
             flex: 1,
-            renderCell: (params) => (
+            minWidth: 140,
+            renderCell: (params: GridRenderCellParams) => (
                 <Typography variant="body2" fontWeight={600} color="primary.main">
                     {params.value}
                 </Typography>
@@ -78,27 +124,37 @@ export default function BordroPage() {
             field: 'tip',
             headerName: 'İşlem Tipi',
             flex: 1,
-            renderCell: (params) => (
-                <Chip
-                    label={params.value === 'GIRIS_BORDROSU' ? 'Giriş Bordrosu' : 'Çıkış Bordrosu'}
-                    sx={{
-                        bgcolor: params.value === 'GIRIS_BORDROSU' ? 'rgba(34, 197, 94, 0.1)' : 'rgba(234, 179, 8, 0.1)',
-                        color: params.value === 'GIRIS_BORDROSU' ? '#22c55e' : '#eab308',
-                        fontWeight: 700,
-                        border: '1px solid currentColor',
-                        '& .MuiChip-icon': { color: 'inherit' }
-                    }}
-                    icon={params.value === 'GIRIS_BORDROSU' ? <ArrowBack fontSize="small" /> : <ArrowForward fontSize="small" />}
-                    size="small"
-                />
-            )
+            minWidth: 220,
+            renderCell: (params: GridRenderCellParams) => {
+                const config = BORDRO_TYPE_CONFIG[params.value as string] || {
+                    label: params.value,
+                    color: '#64748b',
+                    bg: 'rgba(100, 116, 139, 0.1)',
+                    icon: <ReceiptLong fontSize="small" />
+                };
+                return (
+                    <Chip
+                        label={config.label}
+                        sx={{
+                            bgcolor: config.bg,
+                            color: config.color,
+                            fontWeight: 700,
+                            border: '1px solid currentColor',
+                            '& .MuiChip-icon': { color: 'inherit' }
+                        }}
+                        icon={config.icon}
+                        size="small"
+                    />
+                );
+            }
         },
         {
             field: 'tarih',
             headerName: 'İşlem Tarihi',
             flex: 1,
-            valueGetter: (value) => value ? new Date(value) : null,
-            renderCell: (params) => (
+            minWidth: 130,
+            valueGetter: (value: any) => value ? new Date(value) : null,
+            renderCell: (params: GridRenderCellParams) => (
                 <Typography variant="body2" color="text.secondary">
                     {params.value ? new Date(params.value).toLocaleDateString('tr-TR') : '-'}
                 </Typography>
@@ -108,8 +164,9 @@ export default function BordroPage() {
             field: 'cari',
             headerName: 'Cari Hesabı',
             flex: 1.5,
-            valueGetter: (_, row) => row?.cari?.unvan || '-',
-            renderCell: (params) => (
+            minWidth: 200,
+            valueGetter: (_: any, row: any) => row?.cari?.unvan || '-',
+            renderCell: (params: GridRenderCellParams) => (
                 <Typography variant="body2" fontWeight={500}>
                     {params.value}
                 </Typography>
@@ -121,153 +178,150 @@ export default function BordroPage() {
             width: 100,
             align: 'center',
             headerAlign: 'center',
-            valueGetter: (_, row) => row?._count?.cekSenetler || 0,
-            renderCell: (params) => (
-                <Chip label={params.value} size="small" sx={{ fontWeight: 600, minWidth: 40 }} />
+            valueGetter: (_: any, row: any) => row?._count?.cekSenetler || 0,
+            renderCell: (params: GridRenderCellParams) => (
+                <Chip label={params.value as React.ReactNode} size="small" sx={{ fontWeight: 600, minWidth: 40 }} />
+            )
+        },
+        {
+            field: 'toplamTutar',
+            headerName: 'Toplam Tutar',
+            flex: 1,
+            minWidth: 150,
+            renderCell: (params: GridRenderCellParams) => (
+                <Typography variant="body2" fontWeight={700} color="primary.main">
+                    {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(params.value || 0)}
+                </Typography>
+            )
+        },
+        {
+            field: 'actions',
+            headerName: 'İşlem',
+            width: 120,
+            align: 'center',
+            headerAlign: 'center',
+            sortable: false,
+            filterable: false,
+            renderCell: (params: GridRenderCellParams) => (
+                <Tooltip title="Görüntüle">
+                    <IconButton
+                        size="small"
+                        color="primary"
+                        onClick={() => router.push(`/bordro/${params.row.id}`)}
+                    >
+                        <Visibility fontSize="small" />
+                    </IconButton>
+                </Tooltip>
             )
         },
     ];
 
     return (
         <MainLayout>
-            <Box sx={{ maxWidth: '1600px', mx: 'auto', p: { xs: 1, md: 3 } }}>
+            <Box sx={{ maxWidth: '1600px', mx: 'auto', p: { xs: 1, sm: 2, md: 4 } }}>
                 {/* Header Section */}
-                <Box display="flex" justifyContent="space-between" alignItems="center" mb={4} flexWrap="wrap" gap={2}>
+                <Box mb={4} sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 3 }}>
                     <Box>
-                        <Typography variant="h4" fontWeight={800} sx={{
-                            background: 'linear-gradient(45deg, var(--foreground) 30%, var(--primary) 90%)',
-                            WebkitBackgroundClip: 'text',
-                            WebkitTextFillColor: 'transparent',
-                            mb: 0.5
-                        }}>
+                        <Typography variant="h4" fontWeight={800} sx={{ color: 'text.primary', mb: 1, letterSpacing: '-0.5px' }}>
                             Bordro Yönetimi
                         </Typography>
-                        <Typography variant="body2" color="text.secondary" fontWeight={500}>
-                            Çek ve senet bordro işlemlerini buradan yönetebilirsiniz.
+                        <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 600 }}>
+                            İşletmenizin tüm çek, senet ve nakit akışını yönetin. Giriş ve çıkış bordrolarını güvenle oluşturun ve takip edin.
                         </Typography>
                     </Box>
-                    <Box gap={2} display="flex">
+                    <Box display="flex" gap={2} sx={{ width: { xs: '100%', sm: 'auto' }, flexDirection: { xs: 'column', sm: 'row' } }}>
                         <Button
                             variant="outlined"
-                            sx={{
-                                borderRadius: '12px',
-                                px: 3,
-                                fontWeight: 700,
-                                borderColor: '#22c55e',
-                                color: '#22c55e',
-                                '&:hover': { borderColor: '#16a34a', bgcolor: 'rgba(34, 197, 94, 0.05)' }
-                            }}
-                            startIcon={<Add />}
+                            color="success"
+                            startIcon={<ArrowBack />}
                             onClick={() => router.push('/bordro/yeni?tip=GIRIS')}
+                            fullWidth
+                            sx={{ borderRadius: 2, px: 3, py: 1, textTransform: 'none', fontWeight: 600, borderWidth: 2, '&:hover': { borderWidth: 2 }, width: { xs: '100%', sm: 'auto' } }}
                         >
-                            Giriş Bordrosu
+                            Yeni Giriş Bordrosu
                         </Button>
                         <Button
                             variant="contained"
-                            sx={{
-                                borderRadius: '12px',
-                                px: 3,
-                                fontWeight: 700,
-                                bgcolor: '#eab308',
-                                '&:hover': { bgcolor: '#ca8a04' }
-                            }}
+                            color="warning"
                             startIcon={<ArrowForward />}
                             onClick={() => router.push('/bordro/yeni?tip=CIKIS')}
+                            fullWidth
+                            sx={{ borderRadius: 2, px: 3, py: 1, textTransform: 'none', fontWeight: 700, boxShadow: 'none', '&:hover': { boxShadow: '0 4px 12px rgba(234, 179, 8, 0.25)' }, width: { xs: '100%', sm: 'auto' } }}
                         >
-                            Çıkış Bordrosu
+                            Yeni Çıkış Bordrosu
                         </Button>
                     </Box>
                 </Box>
 
-                {/* Dashboard Cards */}
-                <Grid container spacing={3} mb={4}>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                        <Paper elevation={0} sx={{
-                            p: 3, borderRadius: '20px', border: '1px solid var(--border)',
-                            bgcolor: 'var(--card)', position: 'relative', overflow: 'hidden'
-                        }}>
-                            <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase' }}>
-                                        Toplam Bordro
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight={800} sx={{ my: 1 }}>{stats.total}</Typography>
+                {/* Metrics Cards */}
+                <Grid container spacing={2} mb={4}>
+                    {[
+                        { title: 'Toplam İşlem Hacmi', value: stats.total, icon: <ReceiptLong color="primary" />, color: '#3b82f6', progress: 100 },
+                        { title: 'Bekleyen Girişler', value: stats.girisCount, icon: <ArrowBack sx={{ color: '#059669' }} />, color: '#059669', progress: stats.girisPercent },
+                        { title: 'Gerçekleşen Çıkışlar', value: stats.cikisCount, icon: <ArrowForward sx={{ color: '#d97706' }} />, color: '#d97706', progress: stats.cikisPercent },
+                        { title: 'Aylık Büyüme', value: '+12.4%', icon: <TrendingUp sx={{ color: '#4f46e5' }} />, color: '#4f46e5', caption: 'Geçen aya kıyasla', progress: undefined },
+                    ].map((stat, index) => (
+                        <Grid item xs={12} sm={6} md={3} key={index}>
+                            <Card elevation={0} sx={{
+                                p: 2,
+                                borderRadius: 3,
+                                border: '1px solid',
+                                borderColor: 'divider',
+                                boxShadow: '0 2px 10px 0 rgba(0,0,0,0.02)',
+                                transition: 'transform 0.2s, box-shadow 0.2s',
+                                '&:hover': {
+                                    transform: 'translateY(-2px)',
+                                    boxShadow: '0 8px 24px 0 rgba(0,0,0,0.08)'
+                                },
+                                display: 'flex',
+                                alignItems: 'center',
+                                gap: 2,
+                                height: '100%'
+                            }}>
+                                <Box sx={{ p: 1.5, borderRadius: 2, bgcolor: `${stat.color}15`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {stat.icon}
                                 </Box>
-                                <ReceiptLong sx={{ color: 'var(--primary)', fontSize: 40, opacity: 0.2 }} />
-                            </Box>
-                            <Box mt={2}>
-                                <LinearProgress variant="determinate" value={100} sx={{ height: 6, borderRadius: 3, bgcolor: 'var(--muted)', '& .MuiLinearProgress-bar': { bgcolor: 'var(--primary)' } }} />
-                            </Box>
-                        </Paper>
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                        <Paper elevation={0} sx={{
-                            p: 3, borderRadius: '20px', border: '1px solid var(--border)',
-                            bgcolor: 'var(--card)'
-                        }}>
-                            <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase' }}>
-                                        Giriş Bordroları
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight={800} sx={{ my: 1, color: '#22c55e' }}>{stats.girisCount}</Typography>
+                                <Box flexGrow={1} overflow="hidden">
+                                    <Box display="flex" alignItems="baseline" gap={1} mb={0.5}>
+                                        <Typography variant="caption" color="text.secondary" fontWeight={600} noWrap sx={{ letterSpacing: 0.5, textTransform: 'uppercase' }}>
+                                            {stat.title}
+                                        </Typography>
+                                        <Typography variant="h6" fontWeight={800} sx={{ color: 'text.primary', lineHeight: 1.2 }}>
+                                            {stat.value}
+                                        </Typography>
+                                    </Box>
+
+                                    {stat.progress !== undefined ? (
+                                        <Box sx={{ width: '100%', mt: 1 }}>
+                                            <LinearProgress variant="determinate" value={stat.progress} sx={{ height: 4, borderRadius: 2, bgcolor: 'action.hover', '& .MuiLinearProgress-bar': { bgcolor: stat.color } }} />
+                                        </Box>
+                                    ) : (
+                                        <Typography variant="caption" color="text.secondary" fontWeight={500} sx={{ display: 'block', mt: 0.5 }}>
+                                            {stat.caption}
+                                        </Typography>
+                                    )}
                                 </Box>
-                                <ArrowBack sx={{ color: '#22c55e', fontSize: 40, opacity: 0.2 }} />
-                            </Box>
-                            <Box mt={2}>
-                                <LinearProgress variant="determinate" value={stats.girisPercent} sx={{ height: 6, borderRadius: 3, bgcolor: 'var(--muted)', '& .MuiLinearProgress-bar': { bgcolor: '#22c55e' } }} />
-                            </Box>
-                        </Paper>
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                        <Paper elevation={0} sx={{
-                            p: 3, borderRadius: '20px', border: '1px solid var(--border)',
-                            bgcolor: 'var(--card)'
-                        }}>
-                            <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase' }}>
-                                        Çıkış Bordroları
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight={800} sx={{ my: 1, color: '#eab308' }}>{stats.cikisCount}</Typography>
-                                </Box>
-                                <ArrowForward sx={{ color: '#eab308', fontSize: 40, opacity: 0.2 }} />
-                            </Box>
-                            <Box mt={2}>
-                                <LinearProgress variant="determinate" value={stats.cikisPercent} sx={{ height: 6, borderRadius: 3, bgcolor: 'var(--muted)', '& .MuiLinearProgress-bar': { bgcolor: '#eab308' } }} />
-                            </Box>
-                        </Paper>
-                    </Grid>
-                    <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                        <Paper elevation={0} sx={{
-                            p: 3, borderRadius: '20px', border: '1px solid var(--border)',
-                            bgcolor: 'var(--card)', backgroundImage: 'linear-gradient(135deg, rgba(var(--primary-rgb), 0.05) 0%, transparent 100%)'
-                        }}>
-                            <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                                <Box>
-                                    <Typography variant="caption" color="text.secondary" fontWeight={700} sx={{ textTransform: 'uppercase' }}>
-                                        Trend
-                                    </Typography>
-                                    <Typography variant="h4" fontWeight={800} sx={{ my: 1 }}>+12%</Typography>
-                                </Box>
-                                <TrendingUp sx={{ color: 'var(--primary)', fontSize: 40, opacity: 0.2 }} />
-                            </Box>
-                            <Typography variant="caption" color="#22c55e" fontWeight={700}>
-                                Son 30 güne göre artış
-                            </Typography>
-                        </Paper>
-                    </Grid>
+                            </Card>
+                        </Grid>
+                    ))}
                 </Grid>
 
                 {/* Main Content Area */}
                 <Card elevation={0} sx={{
-                    borderRadius: '24px',
-                    border: '1px solid var(--border)',
-                    bgcolor: 'var(--card)',
+                    borderRadius: 3,
+                    border: '1px solid',
+                    borderColor: 'divider',
+                    boxShadow: '0 4px 20px 0 rgba(0,0,0,0.04)',
                     overflow: 'hidden',
-                    boxShadow: 'var(--shadow-lg)'
+                    width: '100%',
+                    overflowX: 'auto'
                 }}>
-                    <Box sx={{ height: 600, width: '100%', p: 1 }}>
+                    <Box sx={{ borderBottom: 1, borderColor: 'divider', p: 2, display: 'flex', alignItems: 'center', bgcolor: 'background.paper', justifyContent: 'space-between' }}>
+                        <Typography variant="h6" fontWeight={700} color="text.primary">
+                            Son Bordro Hareketleri
+                        </Typography>
+                    </Box>
+                    <Box sx={{ height: 650, width: '100%' }}>
                         <DataGrid
                             rows={rows}
                             columns={columns}
@@ -279,32 +333,41 @@ export default function BordroPage() {
                             slotProps={{
                                 toolbar: {
                                     showQuickFilter: true,
-                                    sx: { p: 2, '& .MuiButton-root': { fontWeight: 600, color: 'text.secondary' } }
+                                    sx: { p: 2, borderBottom: '1px solid', borderColor: 'divider' }
                                 },
                             }}
                             sx={{
                                 border: 'none',
                                 '& .MuiDataGrid-columnHeaders': {
-                                    bgcolor: 'var(--muted)',
-                                    color: 'var(--foreground)',
-                                    fontWeight: 700,
-                                    fontSize: '0.85rem',
+                                    bgcolor: 'background.default',
+                                    color: 'text.secondary',
+                                    fontWeight: 600,
+                                    fontSize: '0.75rem',
                                     textTransform: 'uppercase',
-                                    letterSpacing: '0.05em'
+                                    letterSpacing: '0.05em',
+                                    borderBottom: '1px solid',
+                                    borderColor: 'divider'
                                 },
                                 '& .MuiDataGrid-cell': {
-                                    borderColor: 'var(--border)',
-                                    py: 2
+                                    borderColor: 'divider',
+                                    py: 1.5,
+                                    fontSize: '0.875rem'
                                 },
                                 '& .MuiDataGrid-row:hover': {
-                                    bgcolor: 'rgba(var(--primary-rgb), 0.02)'
+                                    bgcolor: 'action.hover'
                                 },
                                 '& .MuiDataGrid-footerContainer': {
-                                    borderTop: '1px solid var(--border)'
+                                    borderTop: '1px solid',
+                                    borderColor: 'divider',
+                                    bgcolor: 'background.default'
                                 }
                             }}
                             disableRowSelectionOnClick
                             getRowHeight={() => 'auto'}
+                            initialState={{
+                                pagination: { paginationModel: { pageSize: 15 } }
+                            }}
+                            pageSizeOptions={[15, 25, 50]}
                         />
                     </Box>
                 </Card>

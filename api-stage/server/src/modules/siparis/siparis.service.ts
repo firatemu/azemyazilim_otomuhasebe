@@ -52,6 +52,7 @@ export class SiparisService {
     siparisTipi?: SiparisTipi,
     search?: string,
     cariId?: string,
+    durum?: SiparisDurum,
   ) {
     const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
@@ -67,6 +68,10 @@ export class SiparisService {
 
     if (cariId) {
       where.cariId = cariId;
+    }
+
+    if (durum) {
+      where.durum = durum;
     }
 
     if (search) {
