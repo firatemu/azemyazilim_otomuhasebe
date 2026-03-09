@@ -1,4 +1,4 @@
-import { Injectable, BadRequestException, Inject, forwardRef } from '@nestjs/common';
+import { Injectable, BadRequestException } from '@nestjs/common';
 import { TenantContextService } from './tenant-context.service';
 import { PrismaService } from '../prisma.service';
 import { isStagingEnvironment } from '../utils/staging.util';
@@ -19,7 +19,6 @@ export class TenantResolverService {
 
   constructor(
     private readonly tenantContext: TenantContextService,
-    @Inject(forwardRef(() => PrismaService))
     private readonly prisma: PrismaService,
   ) { }
 
@@ -51,26 +50,44 @@ export class TenantResolverService {
 
     try {
       // Veritabanından oku
-      const parameter = await this.prisma.systemParameter.findFirst({
+      const parameter = await this.prisma.extended.systemParameter.findFirst({
         where: {
           key: 'STAGING_DEFAULT_TENANT_ID',
           tenantId: null, // Explicitly query global parameter
         },
       });
 
-      if (parameter && typeof parameter.value === 'string') {
-        this.cachedStagingDefaultTenantId = parameter.value;
-        return parameter.value;
+      if (parameter && parameter.value != null) {
+        const v = parameter.value;
+        const id = typeof v === 'string' ? v : (v as any)?.id ?? (v as any)?.value;
+        if (typeof id === 'string' && id.length > 0) {
+          this.cachedStagingDefaultTenantId = id;
+          return id;
+        }
       }
     } catch (error) {
-      // Hata durumunda fallback kullan
       console.warn('[TenantResolverService] SystemParameter okuma hatası, fallback kullanılıyor:', error);
     }
 
-    // Fallback: .env dosyasından oku
-    const fallbackId = process.env.STAGING_DEFAULT_TENANT_ID || 'cmi5of04z0000ksb3g5eyu6ts';
-    this.cachedStagingDefaultTenantId = fallbackId || null;
-    return this.cachedStagingDefaultTenantId;
+    // Fallback: .env
+    let fallbackId = process.env.STAGING_DEFAULT_TENANT_ID || null;
+    if (fallbackId) {
+      this.cachedStagingDefaultTenantId = fallbackId;
+      return fallbackId;
+    }
+    // Fallback: veritabanında tek tenant varsa onu kullan (staging için)
+    try {
+      const first = await this.prisma.extended.tenant.findFirst({
+        where: { status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (first?.id) {
+        this.cachedStagingDefaultTenantId = first.id;
+        return first.id;
+      }
+    } catch (_) { /* ignore */ }
+    this.cachedStagingDefaultTenantId = null;
+    return null;
   }
 
   private async resolve(options: {
@@ -81,7 +98,7 @@ export class TenantResolverService {
 
     // 2. Yoksa ve userId verilmişse: User.tenantId al; varsa context'e set et
     if (!tenantId && options.userId) {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.prisma.extended.user.findUnique({
         where: { id: options.userId },
         select: { tenantId: true },
       });
@@ -95,7 +112,7 @@ export class TenantResolverService {
     if (!tenantId && isStagingEnvironment()) {
       const defaultId = await this.getStagingDefaultTenantId();
       if (defaultId) {
-        const exists = await this.prisma.tenant.findUnique({
+        const exists = await this.prisma.extended.tenant.findUnique({
           where: { id: defaultId },
           select: { id: true },
         });
@@ -111,7 +128,7 @@ export class TenantResolverService {
 
     // 4. Elde edilen tenantId null değilse DB'de varlık kontrolü
     if (tenantId) {
-      const tenant = await this.prisma.tenant.findUnique({
+      const tenant = await this.prisma.extended.tenant.findUnique({
         where: { id: tenantId },
         select: { id: true },
       });

@@ -22,9 +22,9 @@ export class CustomerVehicleService {
 
     const finalTenantId = (dto as any).tenantId ?? tenantId ?? undefined;
 
-    const existingWhere: any = { plaka: dto.plaka };
+    const existingWhere: any = { plate: dto.plaka };
     if (finalTenantId) existingWhere.tenantId = finalTenantId;
-    const existingPlaka = await this.prisma.customerVehicle.findFirst({
+    const existingPlaka = await this.prisma.extended.customerVehicle.findFirst({
       where: existingWhere,
     });
     if (existingPlaka) {
@@ -32,9 +32,9 @@ export class CustomerVehicleService {
     }
 
     if (dto.saseno) {
-      const existingSasenoWhere: any = { saseno: dto.saseno };
+      const existingSasenoWhere: any = { chassisno: dto.saseno };
       if (finalTenantId) existingSasenoWhere.tenantId = finalTenantId;
-      const existingSaseno = await this.prisma.customerVehicle.findFirst({
+      const existingSaseno = await this.prisma.extended.customerVehicle.findFirst({
         where: existingSasenoWhere,
       });
       if (existingSaseno) {
@@ -42,21 +42,36 @@ export class CustomerVehicleService {
       }
     }
 
-    const cari = await this.prisma.cari.findFirst({
-      where: { id: dto.cariId, ...buildTenantWhereClause(finalTenantId) },
+    const cari = await this.prisma.extended.account.findFirst({
+      where: { id: dto.accountId, ...buildTenantWhereClause(finalTenantId) },
     });
     if (!cari) {
-      throw new BadRequestException('Cari bulunamadı');
+      throw new BadRequestException('Account not found');
     }
 
-    const data: any = { ...dto, tenantId: finalTenantId };
-    if (dto.tescilTarihi) {
-      data.tescilTarihi = new Date(dto.tescilTarihi);
-    }
-    return this.prisma.customerVehicle.create({
+    const data: any = {
+      tenantId: finalTenantId,
+      accountId: dto.accountId,
+      plate: dto.plaka,
+      chassisno: dto.saseno,
+      year: dto.yil,
+      mileage: dto.km,
+      brand: dto.aracMarka,
+      model: dto.aracModel,
+      engineSize: dto.aracMotorHacmi,
+      fuelType: dto.aracYakitTipi,
+      registrationNo: dto.ruhsatNo,
+      registrationOwner: dto.ruhsatSahibi,
+      enginePower: dto.motorGucu,
+      transmission: dto.sanziman,
+      color: dto.renk,
+      notes: dto.notes,
+      ...(dto.tescilTarihi && { registrationDate: new Date(dto.tescilTarihi) }),
+    };
+    return this.prisma.extended.customerVehicle.create({
       data,
       include: {
-        cari: { select: { id: true, cariKodu: true, unvan: true } },
+        account: { select: { id: true, code: true, title: true } },
       },
     });
   }
@@ -65,7 +80,7 @@ export class CustomerVehicleService {
     page = 1,
     limit = 50,
     search?: string,
-    cariId?: string,
+    accountId?: string,
   ) {
     const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
@@ -73,28 +88,28 @@ export class CustomerVehicleService {
 
     if (search) {
       where.OR = [
-        { plaka: { contains: search, mode: 'insensitive' } },
-        { saseno: { contains: search, mode: 'insensitive' } },
-        { aracMarka: { contains: search, mode: 'insensitive' } },
-        { aracModel: { contains: search, mode: 'insensitive' } },
+        { plate: { contains: search, mode: 'insensitive' } },
+        { chassisno: { contains: search, mode: 'insensitive' } },
+        { brand: { contains: search, mode: 'insensitive' } },
+        { model: { contains: search, mode: 'insensitive' } },
       ];
     }
 
-    if (cariId) {
-      where.cariId = cariId;
+    if (accountId) {
+      where.accountId = accountId;
     }
 
     const [data, total] = await Promise.all([
-      this.prisma.customerVehicle.findMany({
+      this.prisma.extended.customerVehicle.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          cari: { select: { id: true, cariKodu: true, unvan: true } },
+          account: { select: { id: true, code: true, title: true } },
         },
       }),
-      this.prisma.customerVehicle.count({ where }),
+      this.prisma.extended.customerVehicle.count({ where }),
     ]);
 
     return {
@@ -108,15 +123,15 @@ export class CustomerVehicleService {
 
   async findOne(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const vehicle = await this.prisma.customerVehicle.findFirst({
+    const vehicle = await this.prisma.extended.customerVehicle.findFirst({
       where: { id, ...buildTenantWhereClause(tenantId ?? undefined) },
       include: {
-        cari: { select: { id: true, cariKodu: true, unvan: true } },
+        account: { select: { id: true, code: true, title: true } },
       },
     });
 
     if (!vehicle) {
-      throw new NotFoundException(`Müşteri aracı bulunamadı: ${id}`);
+      throw new NotFoundException(`Customer vehicle not found: id`);
     }
 
     return vehicle;
@@ -127,9 +142,9 @@ export class CustomerVehicleService {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
     if (dto.plaka) {
-      const existingPlaka = await this.prisma.customerVehicle.findFirst({
+      const existingPlaka = await this.prisma.extended.customerVehicle.findFirst({
         where: {
-          plaka: dto.plaka,
+          plate: dto.plaka,
           id: { not: id },
           ...buildTenantWhereClause(tenantId ?? undefined),
         },
@@ -140,9 +155,9 @@ export class CustomerVehicleService {
     }
 
     if (dto.saseno) {
-      const existingSaseno = await this.prisma.customerVehicle.findFirst({
+      const existingSaseno = await this.prisma.extended.customerVehicle.findFirst({
         where: {
-          saseno: dto.saseno,
+          chassisno: dto.saseno,
           id: { not: id },
           ...buildTenantWhereClause(tenantId ?? undefined),
         },
@@ -152,22 +167,38 @@ export class CustomerVehicleService {
       }
     }
 
-    const updateData: any = { ...dto };
+    const updateData: any = {
+      ...(dto.accountId && { accountId: dto.accountId }),
+      ...(dto.plaka && { plate: dto.plaka }),
+      ...(dto.saseno !== undefined && { chassisno: dto.saseno }),
+      ...(dto.yil !== undefined && { year: dto.yil }),
+      ...(dto.km !== undefined && { mileage: dto.km }),
+      ...(dto.aracMarka && { brand: dto.aracMarka }),
+      ...(dto.aracModel && { model: dto.aracModel }),
+      ...(dto.aracMotorHacmi !== undefined && { engineSize: dto.aracMotorHacmi }),
+      ...(dto.aracYakitTipi !== undefined && { fuelType: dto.aracYakitTipi }),
+      ...(dto.ruhsatNo !== undefined && { registrationNo: dto.ruhsatNo }),
+      ...(dto.ruhsatSahibi !== undefined && { registrationOwner: dto.ruhsatSahibi }),
+      ...(dto.motorGucu !== undefined && { enginePower: dto.motorGucu }),
+      ...(dto.sanziman !== undefined && { transmission: dto.sanziman }),
+      ...(dto.renk !== undefined && { color: dto.renk }),
+      ...(dto.notes !== undefined && { notes: dto.notes }),
+    };
     if (dto.tescilTarihi !== undefined) {
-      updateData.tescilTarihi = dto.tescilTarihi ? new Date(dto.tescilTarihi) : null;
+      updateData.registrationDate = dto.tescilTarihi ? new Date(dto.tescilTarihi) : null;
     }
-    return this.prisma.customerVehicle.update({
+    return this.prisma.extended.customerVehicle.update({
       where: { id },
       data: updateData,
       include: {
-        cari: { select: { id: true, cariKodu: true, unvan: true } },
+        account: { select: { id: true, code: true, title: true } },
       },
     });
   }
 
   async remove(id: string) {
     await this.findOne(id);
-    return this.prisma.customerVehicle.delete({
+    return this.prisma.extended.customerVehicle.delete({
       where: { id },
     });
   }

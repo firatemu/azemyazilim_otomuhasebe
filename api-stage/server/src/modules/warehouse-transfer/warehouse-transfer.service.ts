@@ -21,39 +21,39 @@ export class WarehouseTransferService {
     private codeTemplateService: CodeTemplateService,
   ) { }
 
-  async findAll(durum?: string) {
+  async findAll(status?: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
     const where: any = {
       ...buildTenantWhereClause(tenantId ?? undefined),
       deletedAt: null,
     };
-    if (durum) where.durum = durum;
+    if (status) where.status = status;
 
-    return this.prisma.warehouseTransfer.findMany({
+    return this.prisma.extended.warehouseTransfer.findMany({
       where,
       include: {
         fromWarehouse: true,
         toWarehouse: true,
-        kalemler: {
+        items: {
           include: {
-            stok: {
+            product: {
               select: {
                 id: true,
-                stokKodu: true,
-                stokAdi: true,
-                birim: true,
-                marka: true,
+                code: true,
+                name: true,
+                unit: true,
+                brand: true,
               },
             },
           },
         },
-        hazirlayanUser: {
+        preparedByUser: {
           select: { id: true, fullName: true },
         },
-        onaylayanUser: {
+        approvedByUser: {
           select: { id: true, fullName: true },
         },
-        teslimAlanUser: {
+        receivedByUser: {
           select: { id: true, fullName: true },
         },
       },
@@ -63,7 +63,7 @@ export class WarehouseTransferService {
 
   async findOne(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const transfer = await this.prisma.warehouseTransfer.findFirst({
+    const transfer = await this.prisma.extended.warehouseTransfer.findFirst({
       where: {
         id,
         ...buildTenantWhereClause(tenantId ?? undefined),
@@ -72,20 +72,20 @@ export class WarehouseTransferService {
       include: {
         fromWarehouse: true,
         toWarehouse: true,
-        kalemler: {
+        items: {
           include: {
-            stok: true,
+            product: true,
             fromLocation: true,
             toLocation: true,
           },
         },
-        hazirlayanUser: {
+        preparedByUser: {
           select: { id: true, fullName: true, email: true },
         },
-        onaylayanUser: {
+        approvedByUser: {
           select: { id: true, fullName: true, email: true },
         },
-        teslimAlanUser: {
+        receivedByUser: {
           select: { id: true, fullName: true, email: true },
         },
         logs: {
@@ -100,7 +100,7 @@ export class WarehouseTransferService {
     });
 
     if (!transfer) {
-      throw new NotFoundException('Transfer fişi bulunamadı');
+      throw new NotFoundException('Transfer slip not found');
     }
 
     return transfer;
@@ -126,54 +126,54 @@ export class WarehouseTransferService {
       );
     } catch (error) {
       // Fallback to manual numbering
-      const count = await this.prisma.warehouseTransfer.count({
+      const count = await this.prisma.extended.warehouseTransfer.count({
         where: buildTenantWhereClause(tenantId ?? undefined),
       });
       transferNo = `TRF-${String(count + 1).padStart(6, '0')}`;
     }
 
-    // Kaynak ambarda yeterli stok var mı kontrol et
-    for (const kalem of createDto.kalemler) {
+    // Kaynak ambarda yeterli product var mı kontrol et
+    for (const kalem of createDto.items) {
       const stock = await this.checkStock(
         createDto.fromWarehouseId,
-        kalem.stokId,
+        kalem.productId,
       );
-      if (stock < kalem.miktar) {
-        const product = await this.prisma.stok.findUnique({
-          where: { id: kalem.stokId },
-          select: { stokKodu: true, stokAdi: true },
+      if (stock < kalem.quantity) {
+        const product = await this.prisma.extended.product.findUnique({
+          where: { id: kalem.productId },
+          select: { code: true, name: true },
         });
         throw new BadRequestException(
-          `${product?.stokKodu} - ${product?.stokAdi} için kaynak ambarda yeterli stok yok. Mevcut: ${stock}, İstenen: ${kalem.miktar}`,
+          `${(product as any)?.code} - ${(product as any)?.name} için kaynak ambarda yeterli product yok. Mevcut: ${stock}, İstenen: ${kalem.quantity}`,
         );
       }
     }
 
     // Transfer fişi oluştur
-    const transfer = await this.prisma.warehouseTransfer.create({
+    const transfer = await this.prisma.extended.warehouseTransfer.create({
       data: {
         transferNo,
         ...(tenantId && { tenantId }),
-        tarih: new Date(createDto.tarih),
+        date: new Date(createDto.date),
         fromWarehouseId: createDto.fromWarehouseId,
         toWarehouseId: createDto.toWarehouseId,
-        durum: 'HAZIRLANIYOR',
+        status: 'PREPARING',
         driverName: createDto.driverName,
         vehiclePlate: createDto.vehiclePlate,
-        aciklama: createDto.aciklama,
+        notes: createDto.notes,
         createdBy: createDto.userId,
-        hazirlayanUserId: createDto.userId,
-        kalemler: {
-          create: createDto.kalemler.map((kalem) => ({
-            stokId: kalem.stokId,
-            miktar: kalem.miktar,
+        preparedById: createDto.userId,
+        items: {
+          create: createDto.items.map((kalem) => ({
+            productId: kalem.productId,
+            quantity: kalem.quantity,
             fromLocationId: kalem.fromLocationId,
             toLocationId: kalem.toLocationId,
           })),
         },
       },
       include: {
-        kalemler: { include: { stok: true } },
+        items: { include: { product: true } },
         fromWarehouse: true,
         toWarehouse: true,
       },
@@ -189,7 +189,7 @@ export class WarehouseTransferService {
 
   async update(id: string, updateDto: UpdateWarehouseTransferDto) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const transfer = await this.prisma.warehouseTransfer.findFirst({
+    const transfer = await this.prisma.extended.warehouseTransfer.findFirst({
       where: {
         id,
         ...buildTenantWhereClause(tenantId ?? undefined),
@@ -198,17 +198,17 @@ export class WarehouseTransferService {
     });
 
     if (!transfer) {
-      throw new NotFoundException('Transfer fişi bulunamadı');
+      throw new NotFoundException('Transfer slip not found');
     }
 
-    if (transfer.durum !== 'HAZIRLANIYOR') {
+    if ((transfer as any).status !== 'PREPARING') {
       throw new BadRequestException(
-        'Sadece hazırlanıyor durumundaki fişler düzenlenebilir',
+        'Sadece hazırlanıyor statusundaki fişler düzenlenebilir',
       );
     }
 
-    const { userId, kalemler, ...dataToUpdate } = updateDto;
-    return this.prisma.warehouseTransfer.update({
+    const { userId, items, ...dataToUpdate } = updateDto;
+    return this.prisma.extended.warehouseTransfer.update({
       where: { id },
       data: {
         ...dataToUpdate,
@@ -218,31 +218,31 @@ export class WarehouseTransferService {
   }
 
   async approve(id: string, userId: string) {
-    const transfer = await this.prisma.warehouseTransfer.findUnique({
+    const transfer = await this.prisma.extended.warehouseTransfer.findUnique({
       where: { id },
-      include: { kalemler: true },
+      include: { items: true },
     });
 
-    if (!transfer) throw new NotFoundException('Transfer fişi bulunamadı');
-    if (transfer.durum !== 'HAZIRLANIYOR') {
+    if (!transfer) throw new NotFoundException('Transfer slip not found');
+    if ((transfer as any).status !== 'PREPARING') {
       throw new BadRequestException(
-        'Sadece hazırlanıyor durumundaki fişler onaylanabilir',
+        'Sadece hazırlanıyor statusundaki fişler onaylanabilir',
       );
     }
 
     // Stok kontrolü tekrar yap
-    for (const kalem of transfer.kalemler) {
+    for (const kalem of (transfer as any).items) {
       const stock = await this.checkStock(
         transfer.fromWarehouseId,
-        kalem.stokId,
+        kalem.productId,
       );
-      if (stock < kalem.miktar) {
-        const product = await this.prisma.stok.findUnique({
-          where: { id: kalem.stokId },
-          select: { stokKodu: true, stokAdi: true },
+      if (stock < kalem.quantity) {
+        const product = await this.prisma.extended.product.findUnique({
+          where: { id: kalem.productId },
+          select: { code: true, name: true },
         });
         throw new BadRequestException(
-          `${product?.stokKodu} - ${product?.stokAdi} için kaynak ambarda yeterli stok yok. Mevcut: ${stock}, İstenen: ${kalem.miktar}`,
+          `${(product as any)?.code} - ${(product as any)?.name} için kaynak ambarda yeterli product yok. Mevcut: ${stock}, İstenen: ${kalem.quantity}`,
         );
       }
     }
@@ -256,15 +256,15 @@ export class WarehouseTransferService {
     );
 
     // Stok hareketlerini oluştur
-    for (const kalem of transfer.kalemler) {
-      await this.prisma.stockMove.create({
+    for (const kalem of (transfer as any).items) {
+      await this.prisma.extended.stockMove.create({
         data: {
-          productId: kalem.stokId,
+          productId: kalem.productId,
           fromWarehouseId: transfer.fromWarehouseId,
           fromLocationId: kalem.fromLocationId || fromDefaultLocation.id,
           toWarehouseId: transfer.toWarehouseId,
           toLocationId: kalem.toLocationId || toDefaultLocation.id,
-          qty: kalem.miktar,
+          qty: kalem.quantity,
           moveType: 'TRANSFER',
           refType: 'WarehouseTransfer',
           refId: transfer.id,
@@ -276,55 +276,55 @@ export class WarehouseTransferService {
       await this.updateProductLocationStock(
         transfer.fromWarehouseId,
         kalem.fromLocationId,
-        kalem.stokId,
-        -kalem.miktar,
+        kalem.productId,
+        -kalem.quantity,
       );
 
       // ProductLocationStock güncelle - Hedef ambara ekle
       await this.updateProductLocationStock(
         transfer.toWarehouseId,
         kalem.toLocationId || kalem.fromLocationId,
-        kalem.stokId,
-        kalem.miktar,
+        kalem.productId,
+        kalem.quantity,
       );
     }
 
-    // Transfer durumunu güncelle
-    const updated = await this.prisma.warehouseTransfer.update({
+    // Transfer statusunu güncelle
+    const updated = await this.prisma.extended.warehouseTransfer.update({
       where: { id },
       data: {
-        durum: 'YOLDA',
-        onaylayanUserId: userId,
-        sevkTarihi: new Date(),
+        status: 'IN_TRANSIT',
+        approvedById: userId,
+        shippingDate: new Date(),
         updatedBy: userId,
       },
     });
 
     await this.createLog(id, userId, 'UPDATE', {
-      action: 'Transfer fişi onaylandı ve stok hareketleri oluşturuldu',
+      action: 'Transfer fişi onaylandı ve product hareketleri oluşturuldu',
     });
 
     return updated;
   }
 
   async complete(id: string, userId: string) {
-    const transfer = await this.prisma.warehouseTransfer.findUnique({
+    const transfer = await this.prisma.extended.warehouseTransfer.findUnique({
       where: { id },
     });
 
-    if (!transfer) throw new NotFoundException('Transfer fişi bulunamadı');
-    if (transfer.durum !== 'YOLDA') {
+    if (!transfer) throw new NotFoundException('Transfer slip not found');
+    if ((transfer as any).status !== 'IN_TRANSIT') {
       throw new BadRequestException(
-        'Sadece yolda durumundaki fişler tamamlanabilir',
+        'Sadece yolda statusundaki fişler tamamlanabilir',
       );
     }
 
-    const updated = await this.prisma.warehouseTransfer.update({
+    const updated = await this.prisma.extended.warehouseTransfer.update({
       where: { id },
       data: {
-        durum: 'TAMAMLANDI',
-        teslimAlanUserId: userId,
-        teslimTarihi: new Date(),
+        status: 'COMPLETED',
+        receivedById: userId,
+        deliveryDate: new Date(),
         updatedBy: userId,
       },
     });
@@ -337,44 +337,44 @@ export class WarehouseTransferService {
   }
 
   async cancel(id: string, userId: string, reason?: string) {
-    const transfer = await this.prisma.warehouseTransfer.findUnique({
+    const transfer = await this.prisma.extended.warehouseTransfer.findUnique({
       where: { id },
-      include: { kalemler: true },
+      include: { items: true },
     });
 
-    if (!transfer) throw new NotFoundException('Transfer fişi bulunamadı');
-    if (transfer.durum === 'TAMAMLANDI') {
+    if (!transfer) throw new NotFoundException('Transfer slip not found');
+    if ((transfer as any).status === 'COMPLETED') {
       throw new BadRequestException('Tamamlanmış fişler iptal edilemez');
     }
-    if (transfer.durum === 'IPTAL') {
+    if ((transfer as any).status === 'CANCELLED') {
       throw new BadRequestException('Fiş zaten iptal edilmiş');
     }
 
-    // Eğer YOLDA durumundaysa stok hareketlerini geri al
-    if (transfer.durum === 'YOLDA') {
-      for (const kalem of transfer.kalemler) {
+    // Eğer YOLDA statusundaysa product hareketlerini geri al
+    if ((transfer as any).status === 'IN_TRANSIT') {
+      for (const kalem of (transfer as any).items) {
         // Kaynak ambara geri ekle
         await this.updateProductLocationStock(
           transfer.fromWarehouseId,
           kalem.fromLocationId,
-          kalem.stokId,
-          kalem.miktar,
+          kalem.productId,
+          kalem.quantity,
         );
 
         // Hedef ambardan düş
         await this.updateProductLocationStock(
           transfer.toWarehouseId,
           kalem.toLocationId || kalem.fromLocationId,
-          kalem.stokId,
-          -kalem.miktar,
+          kalem.productId,
+          -kalem.quantity,
         );
       }
     }
 
-    const updated = await this.prisma.warehouseTransfer.update({
+    const updated = await this.prisma.extended.warehouseTransfer.update({
       where: { id },
       data: {
-        durum: 'IPTAL',
+        status: 'CANCELLED',
         updatedBy: userId,
       },
     });
@@ -388,18 +388,18 @@ export class WarehouseTransferService {
   }
 
   async remove(id: string) {
-    const transfer = await this.prisma.warehouseTransfer.findUnique({
+    const transfer = await this.prisma.extended.warehouseTransfer.findUnique({
       where: { id },
     });
 
-    if (!transfer) throw new NotFoundException('Transfer fişi bulunamadı');
-    if (transfer.durum === 'YOLDA' || transfer.durum === 'TAMAMLANDI') {
+    if (!transfer) throw new NotFoundException('Transfer slip not found');
+    if ((transfer as any).status === 'IN_TRANSIT' || (transfer as any).status === 'COMPLETED') {
       throw new BadRequestException(
         'Yolda veya tamamlanmış fişler silinemez. Önce iptal edin.',
       );
     }
 
-    return this.prisma.warehouseTransfer.update({
+    return this.prisma.extended.warehouseTransfer.update({
       where: { id },
       data: {
         deletedAt: new Date(),
@@ -411,7 +411,7 @@ export class WarehouseTransferService {
     warehouseId: string,
     productId: string,
   ): Promise<number> {
-    const result = await this.prisma.productLocationStock.aggregate({
+    const result = await this.prisma.extended.productLocationStock.aggregate({
       where: { warehouseId, productId },
       _sum: { qtyOnHand: true },
     });
@@ -431,7 +431,7 @@ export class WarehouseTransferService {
       finalLocationId = defaultLocation.id;
     }
 
-    const existing = await this.prisma.productLocationStock.findUnique({
+    const existing = await this.prisma.extended.productLocationStock.findUnique({
       where: {
         warehouseId_locationId_productId: {
           warehouseId,
@@ -445,15 +445,15 @@ export class WarehouseTransferService {
       const newQty = existing.qtyOnHand + qtyChange;
       if (newQty < 0) {
         throw new BadRequestException(
-          'Stok miktarı negatif olamaz',
+          'Stok quantityı negatif olamaz',
         );
       }
-      await this.prisma.productLocationStock.update({
+      await this.prisma.extended.productLocationStock.update({
         where: { id: existing.id },
         data: { qtyOnHand: newQty },
       });
     } else if (qtyChange > 0) {
-      await this.prisma.productLocationStock.create({
+      await this.prisma.extended.productLocationStock.create({
         data: {
           warehouseId,
           locationId: finalLocationId,
@@ -465,14 +465,14 @@ export class WarehouseTransferService {
   }
 
   private async getDefaultLocation(warehouseId: string) {
-    const location = await this.prisma.location.findFirst({
+    const location = await this.prisma.extended.location.findFirst({
       where: { warehouseId, active: true },
       orderBy: { code: 'asc' },
     });
 
     if (!location) {
       throw new BadRequestException(
-        'Ambarda aktif lokasyon bulunamadı',
+        'Active location not found in warehouse',
       );
     }
 
@@ -485,7 +485,7 @@ export class WarehouseTransferService {
     actionType: string,
     changes: any,
   ) {
-    await this.prisma.warehouseTransferLog.create({
+    await this.prisma.extended.warehouseTransferLog.create({
       data: {
         transferId,
         userId,

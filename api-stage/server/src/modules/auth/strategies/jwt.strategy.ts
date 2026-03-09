@@ -22,14 +22,20 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private redisService: RedisService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        (req: any) => {
+          // SSE (EventSource) query parameter üzerinden token gönderebilir
+          return req?.query?.token || null;
+        }
+      ]),
       secretOrKey: process.env.JWT_ACCESS_SECRET || 'secret',
       passReqToCallback: true,
     } as any);
   }
 
   async validate(req: any, payload: JwtPayload) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: payload.sub },
       include: {
         tenant: {
@@ -41,7 +47,7 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
 
     if (!user || !user.isActive) {
-      throw new UnauthorizedException('Kullanıcı bulunamadı veya aktif değil');
+      throw new UnauthorizedException('User not found or not active');
     }
 
     // Token Version kontrolü - JWT'deki version ile DB'deki version karşılaştır
@@ -64,10 +70,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     // Tenant kontrolü (SUPER_ADMIN hariç ve staging hariç)
     if (user.tenantId && !isSuperAdmin && !isStaging) {
       if (!user.tenant) {
-        throw new UnauthorizedException('Tenant bulunamadı');
+        throw new UnauthorizedException('Tenant not found');
       }
 
-      // Tenant durumu kontrolü
+      // Tenant statusu kontrolü
       if (user.tenant.status !== 'ACTIVE' && user.tenant.status !== 'TRIAL') {
         throw new UnauthorizedException('Tenant aktif değil');
       }

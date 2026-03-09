@@ -1,16 +1,8 @@
-# HOT RELOAD / DEV CONFIGURATION
-# Usage: docker compose -f docker-compose.base.yml -f docker-compose.staging.dev.yml up -d
-# Migrations: docker compose --env-file .env.staging -f docker-compose.base.yml -f docker-compose.staging.dev.yml run --rm migrate-staging
+# HOT RELOAD / DEV (base + bu dosya; developer mod + panel volume)
+# Kullanım: docker compose -f docker-compose.base.yml -f docker-compose.staging.dev.yml up -d
+# Tercih: Tek dosya için docker-compose.dev.yml kullanın (Caddy/migrate yok).
 
 services:
-  migrate-staging:
-    build:
-      context: ../../api-stage
-      dockerfile: server/Dockerfile.migrate
-    env_file:
-      - ../../.env.staging
-    networks: [ app_net ]
-
   backend-staging:
     build:
       context: ../../api-stage
@@ -39,18 +31,20 @@ services:
       - .env.staging
     environment:
       NODE_ENV: development
+      NEXT_PUBLIC_DEVELOPER_MODE: "true"
       HOSTNAME: "0.0.0.0"
       PORT: "3000"
       NEXT_TELEMETRY_DISABLED: "1"
-      CHOKIDAR_USEPOLLING: "false"
-      WATCHPACK_POLLING: "false"
+      # Docker içinde dosya değişikliği algılansın diye polling zorunlu
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
       # Panel /api/* isteklerini backend container'a yönlendirir (login vb.)
       API_PROXY_TARGET: "http://backend-staging:3000"
     volumes:
       - ../../panel-stage/client:/app
       - panel_stage_node_modules:/app/node_modules
       - panel_stage_next_cache:/app/.next
-    command: sh -c "corepack enable && pnpm install && pnpm dev:fast"
+    command: sh -c "corepack enable && pnpm install && pnpm dev"
     networks: [ app_net ]
     depends_on:
       - backend-staging

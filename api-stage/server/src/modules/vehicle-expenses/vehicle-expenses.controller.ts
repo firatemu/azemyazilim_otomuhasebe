@@ -19,13 +19,13 @@ export class VehicleExpensesController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'Tüm araç masraflarını listeler' })
+    @ApiOperation({ summary: 'Tüm araç expensesını listeler' })
     findAll() {
         return this.vehicleExpensesService.findAll();
     }
 
     @Get('vehicle/:vehicleId')
-    @ApiOperation({ summary: 'Belirtilen aracın masraflarını listeler' })
+    @ApiOperation({ summary: 'Belirtilen aracın expensesını listeler' })
     findByVehicle(@Param('vehicleId') vehicleId: string) {
         return this.vehicleExpensesService.findByVehicle(vehicleId);
     }

@@ -17,7 +17,7 @@ export class TenantPurgeService {
         adminEmail: string;
         ipAddress: string;
     }): Promise<void> {
-        const tenant = await this.prisma.tenant.findUnique({
+        const tenant = await this.prisma.extended.tenant.findUnique({
             where: { id: params.tenantId },
         });
 
@@ -43,7 +43,7 @@ export class TenantPurgeService {
         const result = await this.storage.purgeTenantData(params.tenantId);
 
         // 2. Update tenant status
-        await this.prisma.tenant.update({
+        await this.prisma.extended.tenant.update({
             where: { id: params.tenantId },
             data: {
                 status: 'PURGED',
@@ -52,7 +52,7 @@ export class TenantPurgeService {
         });
 
         // 3. Create audit log
-        await this.prisma.tenantPurgeAudit.create({
+        await this.prisma.extended.tenantPurgeAudit.create({
             data: {
                 tenantId: params.tenantId,
                 adminId: params.adminId,
@@ -75,7 +75,7 @@ export class TenantPurgeService {
     }
 
     async listPurgeableTenants() {
-        return this.prisma.tenant.findMany({
+        return this.prisma.extended.tenant.findMany({
             where: {
                 status: {
                     in: ['CANCELLED', 'SUSPENDED', 'EXPIRED'],
@@ -98,7 +98,7 @@ export class TenantPurgeService {
     }
 
     async getPurgeAuditLog(tenantId?: string) {
-        return this.prisma.tenantPurgeAudit.findMany({
+        return this.prisma.extended.tenantPurgeAudit.findMany({
             where: tenantId ? { tenantId } : undefined,
             include: {
                 tenant: {

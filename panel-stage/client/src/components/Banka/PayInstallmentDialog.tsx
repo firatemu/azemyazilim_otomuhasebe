@@ -88,7 +88,7 @@ export default function PayInstallmentDialog({ open, onClose, onSuccess, plan }:
 
     const fetchBankaHesaplar = async () => {
         try {
-            const response = await axios.get('/banka/ozet');
+            const response = await axios.get('/bank/ozet');
             const vadesizHesaplar: BankaHesap[] = [];
             response.data.bankalar?.forEach((banka: any) => {
                 banka.hesaplar?.forEach((hesap: any) => {
@@ -105,7 +105,7 @@ export default function PayInstallmentDialog({ open, onClose, onSuccess, plan }:
 
     const fetchKasalar = async () => {
         try {
-            const response = await axios.get('/kasa');
+            const response = await axios.get('/cashbox');
             setKasalar(response.data.filter((k: Kasa) => k.kasaAdi !== 'Silinen Kayıtlar'));
         } catch (error) {
             console.error('Kasalar yüklenemedi:', error);

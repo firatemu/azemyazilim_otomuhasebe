@@ -2,51 +2,51 @@ import { IsString, IsOptional, IsBoolean, IsNumber, IsDateString, IsUUID } from 
 
 export class CreateCompanyVehicleDto {
     @IsString()
-    plaka: string;
+    plate: string;
 
     @IsString()
-    marka: string;
+    brand: string;
 
     @IsString()
     model: string;
 
     @IsNumber()
     @IsOptional()
-    yil?: number;
+    year?: number;
 
     @IsString()
     @IsOptional()
-    saseno?: string;
+    chassisno?: string;
 
     @IsString()
     @IsOptional()
-    motorNo?: string;
+    engineNo?: string;
 
     @IsDateString()
     @IsOptional()
-    tescilTarihi?: string;
+    registrationDate?: string;
 
     @IsString()
     @IsOptional()
-    aracTipi?: string;
+    vehicleType?: string;
 
     @IsString()
     @IsOptional()
-    yakitTipi?: string;
+    fuelType?: string;
 
     @IsBoolean()
     @IsOptional()
-    durum?: boolean;
+    isActive?: boolean;
 
     @IsUUID()
     @IsOptional()
-    zimmetliPersonelId?: string;
+    assignedEmployeeId?: string;
 
     @IsString()
     @IsOptional()
-    ruhsatGorselUrl?: string;
+    registrationImageUrl?: string;
 
     @IsString()
     @IsOptional()
-    notlar?: string;
+    notes?: string;
 }

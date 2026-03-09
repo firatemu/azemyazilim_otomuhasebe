@@ -6,7 +6,17 @@ import {
   IsEnum,
   Min,
 } from 'class-validator';
-import { StockMoveType } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
+
+export enum StockMoveType {
+  PUT_AWAY = 'PUT_AWAY',
+  TRANSFER = 'TRANSFER',
+  PICKING = 'PICKING',
+  ADJUSTMENT = 'ADJUSTMENT',
+  SALE = 'SALE',
+  RETURN = 'RETURN',
+  DAMAGE = 'DAMAGE'
+}
 
 export class CreateStockMoveDto {
   @IsString()
@@ -33,6 +43,7 @@ export class CreateStockMoveDto {
   @Min(1)
   qty: number; // Miktar (pozitif)
 
+  @ApiProperty({ enum: StockMoveType })
   @IsEnum(StockMoveType)
   moveType: StockMoveType; // PUT_AWAY, TRANSFER, vb.
 

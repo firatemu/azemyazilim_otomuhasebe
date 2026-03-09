@@ -48,14 +48,20 @@ export const editFileName = (req: any, file: any, callback: any) => {
     // Türkçe karakterleri ve özel karakterleri temizle
     const trMap: { [key: string]: string } = {
         'ç': 'c', 'ğ': 'g', 'ı': 'i', 'ö': 'o', 'ş': 's', 'ü': 'u',
+        'İ': 'i', 'Ğ': 'g', 'Ü': 'u', 'Ş': 's', 'Ö': 'o', 'Ç': 'c',
         ' ': '_', '-': '_', '.': '_'
     };
 
-    // Slugification logic
-    name = name.replace(/[çğıöşü\s\-\.]/g, (match) => trMap[match] || '_');
+    // Slugification logic: Unicode normalize and then replace
+    name = name.replace(/[çğıöşüÇĞİÖŞÜ\s\-\.]/g, (match) => trMap[match] || '_');
     name = name.replace(/[^a-z0-9_]/g, ''); // Sadece güvenli karakterleri tut
     name = name.replace(/_+/g, '_'); // Çift alt çizgileri temizle
     name = name.replace(/^_|_$/g, ''); // Baştaki ve sondaki alt çizgileri temizle
+
+    // Eğer isim tamamen temizlendiyse varsayılan bir isim ver
+    if (!name) {
+        name = 'upload';
+    }
 
     const randomName = Array(4)
         .fill(null)

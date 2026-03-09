@@ -6,26 +6,26 @@ export class CreateVehicleExpenseDto {
     vehicleId: string;
 
     @IsEnum(VehicleExpenseType)
-    masrafTipi: VehicleExpenseType;
+    expenseType: VehicleExpenseType;
 
     @IsDateString()
     @IsOptional()
-    tarih?: string;
+    date?: string;
 
     @IsNumber()
     @Min(0)
-    tutar: number;
+    amount: number;
 
     @IsString()
     @IsOptional()
-    aciklama?: string;
+    notes?: string;
 
     @IsString()
     @IsOptional()
-    belgeNo?: string;
+    documentNo?: string;
 
     @IsNumber()
     @IsOptional()
     @Min(0)
-    kilometre?: number;
+    mileage?: number;
 }

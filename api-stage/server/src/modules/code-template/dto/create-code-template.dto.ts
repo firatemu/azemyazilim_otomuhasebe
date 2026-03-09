@@ -7,9 +7,12 @@ import {
   IsBoolean,
   IsOptional,
 } from 'class-validator';
-import { ModuleType } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
+
+import { ModuleType } from '../code-template.enums';
 
 export class CreateCodeTemplateDto {
+  @ApiProperty({ enum: ModuleType })
   @IsEnum(ModuleType)
   module: ModuleType;
 

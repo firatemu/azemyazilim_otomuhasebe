@@ -1,16 +1,16 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../../common/prisma.service';
 import { CreatePriceCardDto } from './dto/create-price-card.dto';
-import { PriceCardType } from '@prisma/client';
+import { PriceCardType } from './dto/create-price-card.dto';
 import { FindPriceCardsDto } from './dto/find-price-cards.dto';
 
 @Injectable()
 export class PriceCardService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async create(createDto: CreatePriceCardDto, userId?: string) {
     const {
-      stokId,
+      productId,
       type = PriceCardType.SALE,
       price,
       currency = 'TRY',
@@ -19,15 +19,15 @@ export class PriceCardService {
       note,
     } = createDto;
 
-    return this.prisma.$transaction(async (tx) => {
-      const stok = await tx.stok.findUnique({ where: { id: stokId } });
-      if (!stok) {
-        throw new NotFoundException('Stok kaydı bulunamadı');
+    return this.prisma.extended.$transaction(async (tx) => {
+      const product = await tx.product.findUnique({ where: { id: productId } });
+      if (!product) {
+        throw new NotFoundException('Stock record not found');
       }
 
       const priceCard = await tx.priceCard.create({
         data: {
-          stokId,
+          productId,
           type,
           price,
           currency,
@@ -40,15 +40,15 @@ export class PriceCardService {
       });
 
       if (type === PriceCardType.SALE) {
-        await tx.stok.update({
-          where: { id: stokId },
+        await tx.product.update({
+          where: { id: productId },
           data: {
             satisFiyati: price,
           },
         });
       } else if (type === PriceCardType.PURCHASE) {
-        await tx.stok.update({
-          where: { id: stokId },
+        await tx.product.update({
+          where: { id: productId },
           data: {
             alisFiyati: price,
           },
@@ -59,11 +59,11 @@ export class PriceCardService {
     });
   }
 
-  async findByStok(stokId: string, query: FindPriceCardsDto) {
+  async findByStok(productId: string, query: FindPriceCardsDto) {
     const type = query.type ?? PriceCardType.SALE;
-    return this.prisma.priceCard.findMany({
+    return this.prisma.extended.priceCard.findMany({
       where: {
-        stokId,
+        productId,
         type,
       },
       orderBy: {
@@ -81,10 +81,10 @@ export class PriceCardService {
     });
   }
 
-  async findLatest(stokId: string, type: PriceCardType = PriceCardType.SALE) {
-    return this.prisma.priceCard.findFirst({
+  async findLatest(productId: string, type: PriceCardType = PriceCardType.SALE) {
+    return this.prisma.extended.priceCard.findFirst({
       where: {
-        stokId,
+        productId,
         type,
       },
       orderBy: {

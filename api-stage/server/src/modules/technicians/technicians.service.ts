@@ -28,7 +28,7 @@ export class TechniciansService {
     }
 
     const [data, total] = await Promise.all([
-      this.prisma.user.findMany({
+      this.prisma.extended.user.findMany({
         where,
         skip,
         take: limit,
@@ -45,7 +45,7 @@ export class TechniciansService {
         },
         orderBy: { fullName: 'asc' },
       }),
-      this.prisma.user.count({ where }),
+      this.prisma.extended.user.count({ where }),
     ]);
 
     return {
@@ -69,7 +69,7 @@ export class TechniciansService {
     const rawPassword = dto.password ?? crypto.randomBytes(12).toString('hex');
     const hashedPassword = await bcrypt.hash(rawPassword, 10);
 
-    return this.prisma.user.create({
+    return this.prisma.extended.user.create({
       data: {
         email,
         username,

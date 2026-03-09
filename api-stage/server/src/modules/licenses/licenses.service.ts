@@ -9,13 +9,13 @@ export class LicensesService {
     private prisma: PrismaService,
     private licenseService: LicenseService,
     private invitationService: InvitationService,
-  ) {}
+  ) { }
 
   /**
-   * Tenant'ın lisans durumunu getir
+   * Tenant'ın lisans statusunu getir
    */
   async getTenantLicenseStatus(tenantId: string) {
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { tenantId },
       include: {
         plan: true,
@@ -28,13 +28,13 @@ export class LicensesService {
     });
 
     if (!subscription) {
-      throw new BadRequestException('Abonelik bulunamadı');
+      throw new BadRequestException('Subscription not found');
     }
 
     const totalLimit = await this.licenseService.getTotalUserLimit(tenantId);
     const activeCount = await this.licenseService.getActiveLicensedUserCount(tenantId);
 
-    // Modül lisans durumları
+    // Modül lisans statusları
     const moduleStatuses = await Promise.all(
       subscription.moduleLicenses.map(async (ml) => {
         const assigned = await this.licenseService.getAssignedModuleLicenseCount(
@@ -65,18 +65,18 @@ export class LicensesService {
    * Kullanıcıya ana paket lisansı ata
    */
   async assignBasePlanLicense(userId: string, assignedBy: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
     });
 
     if (!user || !user.tenantId) {
-      throw new BadRequestException('Kullanıcı bulunamadı');
+      throw new BadRequestException('User not found');
     }
 
     // Kullanıcı limiti kontrolü
     const canAdd = await this.licenseService.canAddUser(user.tenantId);
     if (!canAdd) {
-      throw new ForbiddenException('Kullanıcı limiti aşıldı. Ek kullanıcı satın almanız gerekiyor.');
+      throw new ForbiddenException('User limit exceeded. You need to purchase additional users.');
     }
 
     await this.licenseService.assignBasePlanLicense(userId, assignedBy);
@@ -111,7 +111,7 @@ export class LicensesService {
    * Tenant'ın tüm lisanslı kullanıcılarını getir
    */
   async getTenantLicensedUsers(tenantId: string) {
-    const users = await this.prisma.user.findMany({
+    const users = await this.prisma.extended.user.findMany({
       where: {
         tenantId,
         licenses: {
@@ -140,7 +140,7 @@ export class LicensesService {
    * Tenant'ın tüm kullanıcılarını getir (lisanslı ve lisanssız)
    */
   async getAllTenantUsers(tenantId: string) {
-    const users = await this.prisma.user.findMany({
+    const users = await this.prisma.extended.user.findMany({
       where: {
         tenantId,
       },
@@ -166,15 +166,15 @@ export class LicensesService {
    * Ek kullanıcı satın al
    */
   async purchaseAdditionalUsers(tenantId: string, quantity: number) {
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { tenantId },
     });
 
     if (!subscription) {
-      throw new BadRequestException('Abonelik bulunamadı');
+      throw new BadRequestException('Subscription not found');
     }
 
-    await this.prisma.subscription.update({
+    await this.prisma.extended.subscription.update({
       where: { tenantId },
       data: {
         additionalUsers: {
@@ -184,7 +184,7 @@ export class LicensesService {
     });
 
     return {
-      message: `${quantity} ek kullanıcı başarıyla eklendi`,
+      message: `${quantity} additional users successfully added`,
       newTotal: subscription.additionalUsers + quantity,
     };
   }
@@ -197,24 +197,24 @@ export class LicensesService {
     moduleSlug: string,
     quantity: number,
   ) {
-    const module = await this.prisma.module.findUnique({
+    const module = await this.prisma.extended.module.findUnique({
       where: { slug: moduleSlug },
     });
 
     if (!module) {
-      throw new BadRequestException(`Modül bulunamadı: ${moduleSlug}`);
+      throw new BadRequestException(`Module not found: ${moduleSlug}`);
     }
 
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { tenantId },
     });
 
     if (!subscription) {
-      throw new BadRequestException('Abonelik bulunamadı');
+      throw new BadRequestException('Subscription not found');
     }
 
     // Mevcut lisans var mı kontrol et
-    const existing = await this.prisma.moduleLicense.findFirst({
+    const existing = await this.prisma.extended.moduleLicense.findFirst({
       where: {
         subscriptionId: subscription.id,
         moduleId: module.id,
@@ -223,7 +223,7 @@ export class LicensesService {
 
     if (existing) {
       // Mevcut lisansı güncelle
-      await this.prisma.moduleLicense.update({
+      await this.prisma.extended.moduleLicense.update({
         where: { id: existing.id },
         data: {
           quantity: {
@@ -233,7 +233,7 @@ export class LicensesService {
       });
     } else {
       // Yeni lisans oluştur
-      await this.prisma.moduleLicense.create({
+      await this.prisma.extended.moduleLicense.create({
         data: {
           subscriptionId: subscription.id,
           moduleId: module.id,
@@ -243,7 +243,7 @@ export class LicensesService {
     }
 
     return {
-      message: `${module.name} modülü için ${quantity} lisans başarıyla eklendi`,
+      message: `${quantity} licenses for module ${module.name} successfully added`,
     };
   }
 }

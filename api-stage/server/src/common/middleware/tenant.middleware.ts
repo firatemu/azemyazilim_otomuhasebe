@@ -39,26 +39,44 @@ export class TenantMiddleware implements NestMiddleware {
 
     try {
       // Veritabanından oku
-      const parameter = await this.prisma.systemParameter.findFirst({
+      const parameter = await this.prisma.extended.systemParameter.findFirst({
         where: {
           key: 'STAGING_DEFAULT_TENANT_ID',
           tenantId: null, // Explicitly query global parameter
         },
       });
 
-      if (parameter && typeof parameter.value === 'string') {
-        this.cachedStagingDefaultTenantId = parameter.value;
-        return parameter.value;
+      if (parameter && parameter.value != null) {
+        const v = parameter.value;
+        const id = typeof v === 'string' ? v : (v as any)?.id ?? (v as any)?.value;
+        if (typeof id === 'string' && id.length > 0) {
+          this.cachedStagingDefaultTenantId = id;
+          return id;
+        }
       }
     } catch (error) {
-      // Hata durumunda fallback kullan
       console.warn('[TenantMiddleware] SystemParameter okuma hatası, fallback kullanılıyor:', error);
     }
 
-    // Fallback: .env dosyasından oku
-    const fallbackId = process.env.STAGING_DEFAULT_TENANT_ID || 'cmi5of04z0000ksb3g5eyu6ts';
-    this.cachedStagingDefaultTenantId = fallbackId || null;
-    return this.cachedStagingDefaultTenantId;
+    // Fallback: .env
+    const fallbackId = process.env.STAGING_DEFAULT_TENANT_ID || null;
+    if (fallbackId) {
+      this.cachedStagingDefaultTenantId = fallbackId;
+      return fallbackId;
+    }
+    // Fallback: veritabanında tek/ilk aktif tenant (staging için)
+    try {
+      const first = await this.prisma.extended.tenant.findFirst({
+        where: { status: 'ACTIVE' },
+        select: { id: true },
+      });
+      if (first?.id) {
+        this.cachedStagingDefaultTenantId = first.id;
+        return first.id;
+      }
+    } catch (_) { /* ignore */ }
+    this.cachedStagingDefaultTenantId = null;
+    return null;
   }
 
   async use(req: Request, res: Response, next: NextFunction) {
@@ -122,7 +140,7 @@ export class TenantMiddleware implements NestMiddleware {
 
     // 3. User bazlı kontroller (Token varsa)
     if (jwtPayload?.sub) {
-      const user = await this.prisma.user.findUnique({
+      const user = await this.prisma.extended.user.findUnique({
         where: { id: jwtPayload.sub },
         include: { tenant: true },
       });

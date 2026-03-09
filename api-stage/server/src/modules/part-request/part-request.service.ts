@@ -9,7 +9,8 @@ import { TenantResolverService } from '../../common/services/tenant-resolver.ser
 import { SystemParameterService } from '../system-parameter/system-parameter.service';
 import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreatePartRequestDto, SupplyPartRequestDto } from './dto';
-import { PartRequestStatus, PartWorkflowStatus } from '@prisma/client';
+import { PartRequestStatus } from './dto/create-part-request.dto';
+import { PartWorkflowStatus, Prisma } from '@prisma/client';
 import {
   canTransitionPartRequestStatus,
 } from './domain/part-request-status.machine';
@@ -20,7 +21,7 @@ export class PartRequestService {
     private prisma: PrismaService,
     private tenantResolver: TenantResolverService,
     private systemParameterService: SystemParameterService,
-  ) {}
+  ) { }
 
   async create(dto: CreatePartRequestDto, requestedBy: string) {
     const tenantId = await this.tenantResolver.resolveForCreate({
@@ -29,7 +30,7 @@ export class PartRequestService {
 
     const finalTenantId = (dto as any).tenantId ?? tenantId ?? undefined;
 
-    const workOrder = await this.prisma.workOrder.findFirst({
+    const workOrder = await this.prisma.extended.workOrder.findFirst({
       where: {
         id: dto.workOrderId,
         ...buildTenantWhereClause(finalTenantId),
@@ -37,36 +38,36 @@ export class PartRequestService {
     });
 
     if (!workOrder) {
-      throw new NotFoundException('İş emri bulunamadı');
+      throw new NotFoundException('Work order not found');
     }
 
     if (workOrder.status === 'INVOICED_CLOSED' || workOrder.status === 'CANCELLED') {
-      throw new BadRequestException('Bu iş emrine parça talebi eklenemez');
+      throw new BadRequestException('Part request cannot be added to this work order');
     }
 
-    const partRequest = await this.prisma.partRequest.create({
+    const partRequest = await this.prisma.extended.partRequest.create({
       data: {
         tenantId: finalTenantId,
         workOrderId: dto.workOrderId,
         requestedBy,
         description: dto.description,
-        stokId: dto.stokId || null,
+        productId: dto.productId || null,
         requestedQty: dto.requestedQty,
         status: PartRequestStatus.REQUESTED,
       },
       include: {
-        stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+        product: { select: { id: true, code: true, name: true } },
         requestedByUser: { select: { id: true, fullName: true } },
         workOrder: { select: { id: true, workOrderNo: true } },
       },
     });
 
-    await this.prisma.workOrder.update({
+    await this.prisma.extended.workOrder.update({
       where: { id: dto.workOrderId },
       data: { partWorkflowStatus: PartWorkflowStatus.PARTS_PENDING },
     });
 
-    await this.prisma.workOrderActivity.create({
+    await this.prisma.extended.workOrderActivity.create({
       data: {
         workOrderId: dto.workOrderId,
         action: 'PART_WORKFLOW_CHANGED',
@@ -102,18 +103,18 @@ export class PartRequestService {
     const skip = (page - 1) * limit;
 
     const [data, total] = await Promise.all([
-      this.prisma.partRequest.findMany({
+      this.prisma.extended.partRequest.findMany({
         where,
         skip,
         take: limit,
         orderBy: { createdAt: 'desc' },
         include: {
-          stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+          product: { select: { id: true, code: true, name: true } },
           requestedByUser: { select: { id: true, fullName: true } },
           workOrder: { select: { id: true, workOrderNo: true, status: true } },
         },
       }),
-      this.prisma.partRequest.count({ where }),
+      this.prisma.extended.partRequest.count({ where }),
     ]);
 
     return {
@@ -127,17 +128,17 @@ export class PartRequestService {
 
   async findOne(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const partRequest = await this.prisma.partRequest.findFirst({
+    const partRequest = await this.prisma.extended.partRequest.findFirst({
       where: { id, ...buildTenantWhereClause(tenantId ?? undefined) },
       include: {
-        stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+        product: { select: { id: true, code: true, name: true } },
         requestedByUser: { select: { id: true, fullName: true } },
         workOrder: { select: { id: true, workOrderNo: true, status: true } },
       },
     });
 
     if (!partRequest) {
-      throw new NotFoundException(`Parça talebi bulunamadı: ${id}`);
+      throw new NotFoundException(`Part request not found: ${id}`);
     }
 
     return partRequest;
@@ -146,13 +147,13 @@ export class PartRequestService {
   async supply(id: string, dto: SupplyPartRequestDto, suppliedBy: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.extended.$transaction(async (tx) => {
       const partRequest = await tx.partRequest.findFirst({
         where: { id, ...buildTenantWhereClause(tenantId ?? undefined) },
       });
 
       if (!partRequest) {
-        throw new NotFoundException('Parça talebi bulunamadı');
+        throw new NotFoundException('Part request not found');
       }
 
       if (
@@ -162,21 +163,21 @@ export class PartRequestService {
         )
       ) {
         throw new BadRequestException(
-          'Sadece talep edilmiş parçalar tedarik edilebilir',
+          'Only requested parts can be supplied',
         );
       }
 
-      const stok = await tx.stok.findFirst({
+      const product = await tx.product.findFirst({
         where: {
-          id: dto.stokId,
+          id: dto.productId,
           ...buildTenantWhereClause(tenantId ?? undefined),
         },
       });
-      if (!stok) {
-        throw new NotFoundException('Stok bulunamadı');
+      if (!product) {
+        throw new NotFoundException('Stock not found');
       }
 
-      // Stok miktarı kontrolü - sadece "Negatif stok kontrolü" açıksa uygula
+      // Stock quantity check - apply only if "Negative product control" is enabled
       const negativeStockControlEnabled = await this.systemParameterService.getParameterAsBoolean(
         'NEGATIVE_STOCK_CONTROL',
         false,
@@ -189,7 +190,7 @@ export class PartRequestService {
         if (warehouseIds.length > 0) {
           const stockResult = await tx.productLocationStock.aggregate({
             where: {
-              productId: dto.stokId,
+              productId: dto.productId,
               warehouseId: { in: warehouseIds.map((w) => w.id) },
             },
             _sum: { qtyOnHand: true },
@@ -197,7 +198,7 @@ export class PartRequestService {
           const availableQty = Number(stockResult._sum?.qtyOnHand ?? 0);
           if (availableQty < dto.suppliedQty) {
             throw new BadRequestException(
-              `Yeterli stok yok. Mevcut: ${availableQty}, Tedarik edilecek: ${dto.suppliedQty}`,
+              `Not enough product. Available: ${availableQty}, To supply: ${dto.suppliedQty}`,
             );
           }
         }
@@ -206,7 +207,7 @@ export class PartRequestService {
       const updated = await tx.partRequest.update({
         where: { id },
         data: {
-          stokId: dto.stokId,
+          productId: dto.productId,
           suppliedQty: dto.suppliedQty,
           status: PartRequestStatus.SUPPLIED,
           suppliedBy,
@@ -214,7 +215,7 @@ export class PartRequestService {
           version: { increment: 1 },
         },
         include: {
-          stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+          product: { select: { id: true, code: true, name: true } },
           requestedByUser: { select: { id: true, fullName: true } },
           workOrder: { select: { id: true, workOrderNo: true, status: true, customerVehicleId: true } },
         },
@@ -222,19 +223,19 @@ export class PartRequestService {
 
       const pendingCount = await tx.partRequest.count({
         where: {
-          workOrderId: updated.workOrder.id,
+          workOrderId: updated.workOrderId,
           status: PartRequestStatus.REQUESTED,
         },
       });
       const newPartStatus =
         pendingCount === 0 ? PartWorkflowStatus.ALL_PARTS_SUPPLIED : PartWorkflowStatus.PARTIALLY_SUPPLIED;
       await tx.workOrder.update({
-        where: { id: updated.workOrder.id },
+        where: { id: updated.workOrderId },
         data: { partWorkflowStatus: newPartStatus },
       });
       await tx.workOrderActivity.create({
         data: {
-          workOrderId: updated.workOrder.id,
+          workOrderId: updated.workOrderId,
           action: 'PART_WORKFLOW_CHANGED',
           metadata: {
             partWorkflowStatus: newPartStatus,
@@ -248,31 +249,31 @@ export class PartRequestService {
   }
 
   /**
-   * Step 5: Atomik stok düşümü - Tekniker "Kullanıldı" işaretlediğinde
-   * Transaction içinde: PartRequest SUPPLIED -> USED, InventoryTransaction (-qty)
+   * Step 5: Atomic product deduction - When technician marks as "Used"
+   * Within transaction: PartRequest SUPPLIED -> USED, InventoryTransaction (-qty)
    */
   async markAsUsed(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.extended.$transaction(async (tx) => {
       const pr = await tx.partRequest.findFirst({
         where: { id, ...buildTenantWhereClause(tenantId ?? undefined) },
       });
 
       if (!pr) {
-        throw new NotFoundException('Parça talebi bulunamadı');
+        throw new NotFoundException('Part request not found');
       }
 
       if (
         !canTransitionPartRequestStatus(pr.status, PartRequestStatus.USED)
       ) {
         throw new ConflictException(
-          'Sadece tedarik edilmiş parçalar kullanıldı olarak işaretlenebilir',
+          'Only supplied parts can be marked as used',
         );
       }
 
-      if (!pr.stokId || pr.suppliedQty == null) {
-        throw new BadRequestException('Parça talebi stok ve miktar bilgisi eksik');
+      if (!pr.productId || pr.suppliedQty == null) {
+        throw new BadRequestException('Part request product and quantity information is missing');
       }
 
       const updated = await tx.partRequest.updateMany({
@@ -286,7 +287,7 @@ export class PartRequestService {
 
       if (updated.count === 0) {
         throw new ConflictException(
-          'Parça talebi güncellenemedi (optimistic lock hatası - lütfen tekrar deneyin)',
+          'Part request could not be updated (optimistic lock error - please try again)',
         );
       }
 
@@ -294,7 +295,7 @@ export class PartRequestService {
         data: {
           tenantId: pr.tenantId,
           partRequestId: pr.id,
-          stokId: pr.stokId,
+          productId: pr.productId,
           quantity: -pr.suppliedQty,
           transactionType: 'DEDUCTION',
         },
@@ -303,7 +304,7 @@ export class PartRequestService {
       return tx.partRequest.findUniqueOrThrow({
         where: { id },
         include: {
-          stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+          product: { select: { id: true, code: true, name: true } },
           workOrder: { select: { id: true, workOrderNo: true } },
         },
       });
@@ -320,31 +321,31 @@ export class PartRequestService {
       )
     ) {
       throw new BadRequestException(
-        'Sadece talep edilmiş parçalar iptal edilebilir',
+        'Only requested parts can be cancelled',
       );
     }
 
-    const updated = await this.prisma.partRequest.update({
+    const updated = await this.prisma.extended.partRequest.update({
       where: { id },
       data: { status: PartRequestStatus.CANCELLED },
       include: {
-        stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+        product: { select: { id: true, code: true, name: true } },
         workOrder: true,
       },
     });
 
     if (updated.workOrder.partWorkflowStatus === PartWorkflowStatus.PARTS_PENDING ||
-        updated.workOrder.partWorkflowStatus === PartWorkflowStatus.PARTIALLY_SUPPLIED) {
-      const pendingCount = await this.prisma.partRequest.count({
+      updated.workOrder.partWorkflowStatus === PartWorkflowStatus.PARTIALLY_SUPPLIED) {
+      const pendingCount = await this.prisma.extended.partRequest.count({
         where: {
-          workOrderId: updated.workOrder.id,
+          workOrderId: updated.workOrderId,
           status: PartRequestStatus.REQUESTED,
         },
       });
       const newPartStatus =
         pendingCount === 0 ? PartWorkflowStatus.ALL_PARTS_SUPPLIED : PartWorkflowStatus.PARTIALLY_SUPPLIED;
-      await this.prisma.workOrder.update({
-        where: { id: updated.workOrder.id },
+      await this.prisma.extended.workOrder.update({
+        where: { id: updated.workOrderId },
         data: { partWorkflowStatus: newPartStatus },
       });
     }

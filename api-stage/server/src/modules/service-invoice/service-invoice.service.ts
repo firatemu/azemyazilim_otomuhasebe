@@ -25,9 +25,9 @@ export class ServiceInvoiceService {
   ) {}
 
   /**
-   * Step 6: Fatura oluşturma + Muhasebe kaydı
+   * Step 6: Invoice oluşturma + Muhasebe kaydı
    * - SADECE WorkOrderItem'lardan fatura üretilir
-   * - Tüm PartRequest'ler USED olmalı (stok Step 5'te düşüldü)
+   * - Tüm PartRequest'ler USED olmalı (product Step 5'te düşüldü)
    * - STOK DÜŞÜMÜ YAPILMAZ
    */
   async createFromWorkOrder(workOrderId: string, createdBy: string) {
@@ -39,7 +39,7 @@ export class ServiceInvoiceService {
 
     const invoiceNo = await this.codeTemplateService.getNextCode('SERVICE_INVOICE');
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.extended.$transaction(async (tx) => {
       const workOrder = await tx.workOrder.findFirst({
         where: {
           id: workOrderId,
@@ -48,13 +48,13 @@ export class ServiceInvoiceService {
         include: {
           items: true,
           partRequests: true,
-          cari: true,
+          account: true,
           customerVehicle: true,
         },
       });
 
       if (!workOrder) {
-        throw new NotFoundException('İş emri bulunamadı');
+        throw new NotFoundException('Work order not found');
       }
 
       const isReady =
@@ -96,14 +96,14 @@ export class ServiceInvoiceService {
           tenantId: finalTenantId,
           invoiceNo,
           workOrderId,
-          cariId: workOrder.cariId,
+          accountId: workOrder.accountId,
           subtotal: new Decimal(subtotal),
           taxAmount: new Decimal(taxAmount),
           grandTotal: new Decimal(grandTotal),
           createdBy,
         },
         include: {
-          cari: { select: { id: true, cariKodu: true, unvan: true } },
+          account: { select: { id: true, code: true, unvan: true } },
           workOrder: { select: { id: true, workOrderNo: true } },
         },
       });
@@ -190,7 +190,7 @@ export class ServiceInvoiceService {
     });
   }
 
-  async findAll(page = 1, limit = 50, search?: string, cariId?: string) {
+  async findAll(page = 1, limit = 50, search?: string, accountId?: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
     const skip = (page - 1) * limit;
     const where: any = buildTenantWhereClause(tenantId ?? undefined);
@@ -206,20 +206,20 @@ export class ServiceInvoiceService {
       ];
     }
 
-    if (cariId) where.cariId = cariId;
+    if (accountId) where.accountId = accountId;
 
     const [data, total] = await Promise.all([
-      this.prisma.serviceInvoice.findMany({
+      this.prisma.extended.serviceInvoice.findMany({
         where,
         skip,
         take: limit,
         orderBy: { issueDate: 'desc' },
         include: {
-          cari: { select: { id: true, cariKodu: true, unvan: true } },
+          account: { select: { id: true, code: true, unvan: true } },
           workOrder: { select: { id: true, workOrderNo: true, status: true } },
         },
       }),
-      this.prisma.serviceInvoice.count({ where }),
+      this.prisma.extended.serviceInvoice.count({ where }),
     ]);
 
     return {
@@ -233,13 +233,13 @@ export class ServiceInvoiceService {
 
   async findOne(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const invoice = await this.prisma.serviceInvoice.findFirst({
+    const invoice = await this.prisma.extended.serviceInvoice.findFirst({
       where: { id, ...buildTenantWhereClause(tenantId ?? undefined) },
       include: {
-        cari: { select: { id: true, cariKodu: true, unvan: true } },
+        account: { select: { id: true, code: true, unvan: true } },
         workOrder: {
           include: {
-            items: { include: { stok: { select: { id: true, stokKodu: true, stokAdi: true } } } },
+            items: { include: { product: { select: { id: true, code: true, name: true } } } },
             customerVehicle: true,
           },
         },
@@ -248,7 +248,7 @@ export class ServiceInvoiceService {
     });
 
     if (!invoice) {
-      throw new NotFoundException(`Servis faturası bulunamadı: ${id}`);
+      throw new NotFoundException(`Service invoice not found: id`);
     }
 
     return invoice;

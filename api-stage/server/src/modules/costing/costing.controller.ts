@@ -15,11 +15,11 @@ export class CostingController {
 
   @Post('calculate')
   calculate(@Body() body: CalculateCostDto) {
-    return this.costingService.calculateWeightedAverageCost(body.stokId);
+    return this.costingService.calculateWeightedAverageCost(body.productId);
   }
 
   @Post('calculate-bulk')
   calculateBulk(@Body() body: CalculateBulkCostDto) {
-    return this.costingService.calculateWeightedAverageCostBulk(body.stokIds);
+    return this.costingService.calculateWeightedAverageCostBulk(body.productIds);
   }
 }

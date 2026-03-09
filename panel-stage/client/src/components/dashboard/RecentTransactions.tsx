@@ -105,7 +105,7 @@ export default function RecentTransactions({ invoices, payments, loading }: Rece
                 <Button
                     endIcon={<ArrowForward />}
                     size="small"
-                    onClick={() => router.push(tabValue === 0 ? '/fatura' : '/kasa')}
+                    onClick={() => router.push(tabValue === 0 ? '/invoice' : '/cashbox')}
                     sx={{ color: 'text.secondary' }}
                 >
                     Tümünü Gör

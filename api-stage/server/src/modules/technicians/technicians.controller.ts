@@ -3,12 +3,12 @@ import { TechniciansService } from './technicians.service';
 import { CreateTechnicianDto } from './dto/create-technician.dto';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard, Roles } from '../../common/guards/roles.guard';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('technicians')
 export class TechniciansController {
-  constructor(private readonly techniciansService: TechniciansService) {}
+  constructor(private readonly techniciansService: TechniciansService) { }
 
   @Get()
   @Roles(

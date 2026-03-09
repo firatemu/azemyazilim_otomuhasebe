@@ -1,6 +1,8 @@
 networks:
   app_net:
     driver: bridge
+    name: otomuhasebe_app_net
+    external: false
 
 volumes:
   postgres_data:

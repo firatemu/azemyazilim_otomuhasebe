@@ -38,7 +38,7 @@ export class IyzicoService {
     this.logger.log('Creating checkout form', data);
 
     // Subscription bilgilerini al
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { id: data.subscriptionId },
       include: {
         plan: true,
@@ -61,7 +61,7 @@ export class IyzicoService {
     const paymentAmount = data.amount || Number(subscription.plan.price);
 
     // Payment kaydı oluştur
-    const payment = await this.prisma.payment.create({
+    const payment = await this.prisma.extended.payment.create({
       data: {
         subscriptionId: data.subscriptionId,
         amount: paymentAmount,
@@ -92,12 +92,12 @@ export class IyzicoService {
     this.logger.log('Processing refund', { paymentId, amount });
 
     // Update payment status in database
-    const payment = await this.prisma.payment.findFirst({
+    const payment = await this.prisma.extended.payment.findFirst({
       where: { iyzicoPaymentId: paymentId },
     });
 
     if (payment) {
-      await this.prisma.payment.update({
+      await this.prisma.extended.payment.update({
         where: { id: payment.id },
         data: {
           status: 'REFUNDED',
@@ -121,7 +121,7 @@ export class IyzicoService {
     const conversationId = payload.conversationId; // Should contain tenant info if needed
 
     // Find payment by iyzico payment ID
-    const payment = await this.prisma.payment.findFirst({
+    const payment = await this.prisma.extended.payment.findFirst({
       where: { iyzicoPaymentId: paymentId },
       include: {
         subscription: true,
@@ -143,7 +143,7 @@ export class IyzicoService {
     switch (eventType) {
       case 'PAYMENT_SUCCESS':
         // Transactional Provisioning
-        await this.prisma.$transaction(async (tx) => {
+        await this.prisma.extended.$transaction(async (tx) => {
           // 1. Update Payment
           await tx.payment.update({
             where: { id: payment.id },
@@ -199,7 +199,7 @@ export class IyzicoService {
               // 5. Initialize Code Templates
               const templates = [
                 { module: 'INVOICE', prefix: 'FAT', digitCount: 6 },
-                { module: 'CUSTOMER', prefix: 'CARI', digitCount: 5 },
+                { module: 'CUSTOMER', prefix: 'CUSTOMER', digitCount: 5 },
                 { module: 'STOCK', prefix: 'STK', digitCount: 5 },
               ];
 
@@ -231,7 +231,7 @@ export class IyzicoService {
         break;
 
       case 'PAYMENT_FAILED':
-        await this.prisma.payment.update({
+        await this.prisma.extended.payment.update({
           where: { id: payment.id },
           data: {
             status: 'FAILED',
@@ -253,7 +253,7 @@ export class IyzicoService {
     this.logger.log('Handling callback', { token });
 
     // Token ile payment kaydını bul
-    const payment = await this.prisma.payment.findFirst({
+    const payment = await this.prisma.extended.payment.findFirst({
       where: { iyzicoToken: token },
       include: {
         subscription: {
@@ -270,7 +270,7 @@ export class IyzicoService {
       return { success: false, message: 'Payment not found' };
     }
 
-    // İyzico API'den ödeme durumunu kontrol et
+    // İyzico API'den ödeme statusunu kontrol et
     // Burada gerçek İyzico API çağrısı yapılmalı
     // Şimdilik placeholder
 

@@ -14,7 +14,7 @@ export class WarehouseCriticalStockService {
         const tenantId = await this.tenantResolver.resolveForQuery();
 
         // Get all active warehouses
-        const warehouses = await this.prisma.warehouse.findMany({
+        const warehouses = await this.prisma.extended.warehouse.findMany({
             where: {
                 active: true,
                 ...buildTenantWhereClause(tenantId ?? undefined),
@@ -23,7 +23,7 @@ export class WarehouseCriticalStockService {
 
         // Create critical stock records for all warehouses
         const createPromises = warehouses.map((warehouse) =>
-            this.prisma.warehouseCriticalStock.upsert({
+            this.prisma.extended.warehouseCriticalStock.upsert({
                 where: {
                     warehouseId_productId: {
                         warehouseId: warehouse.id,
@@ -45,7 +45,7 @@ export class WarehouseCriticalStockService {
     }
 
     async updateCriticalStock(warehouseId: string, productId: string, criticalQty: number) {
-        return this.prisma.warehouseCriticalStock.upsert({
+        return this.prisma.extended.warehouseCriticalStock.upsert({
             where: {
                 warehouseId_productId: {
                     warehouseId,
@@ -67,7 +67,7 @@ export class WarehouseCriticalStockService {
         const tenantId = await this.tenantResolver.resolveForQuery();
 
         // 1. Get all active warehouses
-        const warehouses = await this.prisma.warehouse.findMany({
+        const warehouses = await this.prisma.extended.warehouse.findMany({
             where: {
                 active: true,
                 ...buildTenantWhereClause(tenantId ?? undefined),
@@ -76,7 +76,7 @@ export class WarehouseCriticalStockService {
         });
 
         // 2. Get all products with their current stock levels
-        const currentStocks = await this.prisma.productLocationStock.findMany({
+        const currentStocks = await this.prisma.extended.productLocationStock.findMany({
             where: {
                 warehouse: {
                     ...buildTenantWhereClause(tenantId ?? undefined),
@@ -84,13 +84,13 @@ export class WarehouseCriticalStockService {
             },
             include: {
                 product: {
-                    select: { id: true, stokKodu: true, stokAdi: true, birim: true, marka: true },
+                    select: { id: true, code: true, name: true, unit: true, brand: true },
                 },
             },
         });
 
         // 3. Get all critical stock settings
-        const criticalStocks = await this.prisma.warehouseCriticalStock.findMany({
+        const criticalStocks = await this.prisma.extended.warehouseCriticalStock.findMany({
             where: {
                 warehouse: {
                     ...buildTenantWhereClause(tenantId ?? undefined),
@@ -107,10 +107,10 @@ export class WarehouseCriticalStockService {
             if (!productMatrix[pId]) {
                 productMatrix[pId] = {
                     productId: pId,
-                    stokKodu: stock.product.stokKodu,
-                    stokAdi: stock.product.stokAdi,
-                    birim: stock.product.birim,
-                    marka: stock.product.marka,
+                    code: (stock.product as any).code,
+                    name: (stock.product as any).name,
+                    birim: (stock.product as any).unit,
+                    marka: (stock.product as any).brand,
                     warehouses: {},
                     overallStatus: 'NORMAL',
                 };
@@ -165,12 +165,12 @@ export class WarehouseCriticalStockService {
         };
     }
 
-    async bulkUpdateFromExcel(data: { stokKodu: string; ambarKodu: string; criticalQty: number }[]) {
+    async bulkUpdateFromExcel(data: { code: string; ambarKodu: string; criticalQty: number }[]) {
         const tenantId = await this.tenantResolver.resolveForQuery();
         const tenantWhere = buildTenantWhereClause(tenantId ?? undefined);
 
         // 1. Get all active warehouses to map codes to IDs
-        const warehouses = await this.prisma.warehouse.findMany({
+        const warehouses = await this.prisma.extended.warehouse.findMany({
             where: {
                 active: true,
                 ...tenantWhere,
@@ -194,19 +194,19 @@ export class WarehouseCriticalStockService {
         });
 
         // 2. Get all involved products to map codes to IDs
-        const rawStokKodlari = data.map((d) => d.stokKodu?.toString().trim().toUpperCase()).filter(Boolean);
+        const rawStokKodlari = data.map((d) => d.code?.toString().trim().toUpperCase()).filter(Boolean);
         const stokKodlari = [...new Set(rawStokKodlari)];
 
         // Find products exactly matching provided codes
-        const products = await this.prisma.stok.findMany({
+        const products = await this.prisma.extended.product.findMany({
             where: {
-                stokKodu: { in: stokKodlari },
+                code: { in: stokKodlari },
                 ...tenantWhere,
             },
-            select: { id: true, stokKodu: true },
+            select: { id: true, code: true },
         });
 
-        const productMap = new Map(products.map((p) => [p.stokKodu.trim().toUpperCase(), p.id]));
+        const productMap = new Map(products.map((p: any) => [p.code.trim().toUpperCase(), p.id]));
 
         // 3. Process updates
         const results = {
@@ -217,7 +217,7 @@ export class WarehouseCriticalStockService {
 
         const updatePromises = data.map(async (row) => {
             const wCodeRaw = row.ambarKodu?.toString().trim().toUpperCase();
-            const pCodeRaw = row.stokKodu?.toString().trim().toUpperCase();
+            const pCodeRaw = row.code?.toString().trim().toUpperCase();
 
             if (!wCodeRaw || !pCodeRaw) {
                 results.skipped++;
@@ -239,13 +239,13 @@ export class WarehouseCriticalStockService {
 
             if (!wId || !pId) {
                 results.skipped++;
-                if (!wId) results.errors.push(`Ambar kodu bulunamadı: ${wCodeRaw}`);
-                if (!pId) results.errors.push(`Stok kodu bulunamadı: ${pCodeRaw}`);
+                if (!wId) results.errors.push(`Warehouse code not found: wCodeRaw`);
+                if (!pId) results.errors.push(`Stock code not found: pCodeRaw`);
                 return;
             }
 
             try {
-                await this.prisma.warehouseCriticalStock.upsert({
+                await this.prisma.extended.warehouseCriticalStock.upsert({
                     where: {
                         warehouseId_productId: {
                             warehouseId: wId,

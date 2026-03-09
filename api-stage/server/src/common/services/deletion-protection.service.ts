@@ -13,8 +13,8 @@ export class DeletionProtectionService {
      */
     async checkCariDeletion(id: string, tenantId: string) {
         // 1. Hareket kontrolü
-        const hareketSayisi = await this.prisma.cariHareket.count({
-            where: { cariId: id, tenantId },
+        const hareketSayisi = await this.prisma.extended.accountMovement.count({
+            where: { accountId: id, tenantId },
         });
 
         if (hareketSayisi > 0) {
@@ -24,25 +24,25 @@ export class DeletionProtectionService {
             );
         }
 
-        // 2. Fatura kontrolü
-        const faturaSayisi = await this.prisma.fatura.count({
-            where: { cariId: id, tenantId, deletedAt: null },
+        // 2. Invoice kontrolü
+        const faturaSayisi = await this.prisma.extended.invoice.count({
+            where: { accountId: id, tenantId, deletedAt: null },
         });
 
         if (faturaSayisi > 0) {
-            await this.logAttempt(id, 'Cari', tenantId, 'Fatura kayıtları bulunduğu için silme engellendi.');
+            await this.logAttempt(id, 'Cari', tenantId, 'Invoice kayıtları bulunduğu için silme engellendi.');
             throw new BadRequestException(
                 'Bu cari karta ait fatura kayıtları bulunduğu için silinemez. Lütfen pasife alınız.',
             );
         }
 
-        // 3. Tahsilat kontrolü
-        const tahsilatSayisi = await this.prisma.tahsilat.count({
-            where: { cariId: id, tenantId },
+        // 3. Collection kontrolü
+        const tahsilatSayisi = await this.prisma.extended.collection.count({
+            where: { accountId: id, tenantId },
         });
 
         if (tahsilatSayisi > 0) {
-            await this.logAttempt(id, 'Cari', tenantId, 'Tahsilat/Ödeme kayıtları bulunduğu için silme engellendi.');
+            await this.logAttempt(id, 'Cari', tenantId, 'Collection/Ödeme kayıtları bulunduğu için silme engellendi.');
             throw new BadRequestException(
                 'Bu cari karta ait tahsilat/ödeme kayıtları bulunduğu için silinemez. Lütfen pasife alınız.',
             );
@@ -58,38 +58,38 @@ export class DeletionProtectionService {
      */
     async checkStokDeletion(id: string, tenantId: string) {
         // 1. Stok hareketi
-        const hareketSayisi = await this.prisma.stokHareket.count({
-            where: { stokId: id, tenantId },
+        const hareketSayisi = await this.prisma.extended.productMovement.count({
+            where: { productId: id, tenantId },
         });
 
         if (hareketSayisi > 0) {
             await this.logAttempt(id, 'Stok', tenantId, 'Stok hareketleri bulunduğu için silme engellendi.');
             throw new BadRequestException(
-                'Bu stok kartına ait hareketler bulunduğu için silinemez. Lütfen pasife alınız.',
+                'Bu product kartına ait hareketler bulunduğu için silinemez. Lütfen pasife alınız.',
             );
         }
 
-        // 2. Fatura kalemleri
-        const faturaKalemSayisi = await this.prisma.faturaKalemi.count({
-            where: { stokId: id, fatura: { tenantId, deletedAt: null } },
+        // 2. Invoice itemsi
+        const faturaKalemSayisi = await this.prisma.extended.invoiceItem.count({
+            where: { productId: id, invoice: { tenantId, deletedAt: null } },
         });
 
         if (faturaKalemSayisi > 0) {
-            await this.logAttempt(id, 'Stok', tenantId, 'Fatura kalemlerinde kullanıldığı için silme engellendi.');
+            await this.logAttempt(id, 'Stok', tenantId, 'Invoice itemsinde kullanıldığı için silme engellendi.');
             throw new BadRequestException(
-                'Bu stok kartı faturalarda işlem gördüğü için silinemez. Lütfen pasife alınız.',
+                'Bu product kartı faturalarda işlem gördüğü için silinemez. Lütfen pasife alınız.',
             );
         }
 
         // 3. Stok transferleri/hareketleri (stock_moves)
-        const stockMoveSayisi = await this.prisma.stockMove.count({
+        const stockMoveSayisi = await this.prisma.extended.stockMove.count({
             where: { productId: id, product: { tenantId } },
         });
 
         if (stockMoveSayisi > 0) {
             await this.logAttempt(id, 'Stok', tenantId, 'Depo hareketleri bulunduğu için silme engellendi.');
             throw new BadRequestException(
-                'Bu stok kartına ait depo hareketleri bulunduğu için silinemez. Lütfen pasife alınız.',
+                'Bu product kartına ait depo hareketleri bulunduğu için silinemez. Lütfen pasife alınız.',
             );
         }
 
@@ -97,37 +97,37 @@ export class DeletionProtectionService {
     }
 
     /**
-     * Fatura silinebilir mi kontrol eder.
-     * @param id Fatura ID
+     * Invoice silinebilir mi kontrol eder.
+     * @param id Invoice ID
      * @param tenantId Tenant ID
      */
     async checkFaturaDeletion(id: string, tenantId: string) {
-        const fatura = await this.prisma.fatura.findUnique({
+        const fatura = await this.prisma.extended.invoice.findUnique({
             where: { id },
-            select: { durum: true, tenantId: true },
+            select: { status: true, tenantId: true },
         });
 
         if (!fatura || fatura.tenantId !== tenantId) {
-            throw new BadRequestException('Fatura bulunamadı.');
+            throw new BadRequestException('Invoice bulunamadı.');
         }
 
         // 1. Onaylılık kontrolü
-        if (fatura.durum === 'ONAYLANDI') {
-            await this.logAttempt(id, 'Fatura', tenantId, 'Onaylı fatura silme denemesi engellendi.');
+        if (fatura.status === 'APPROVED') {
+            await this.logAttempt(id, 'Invoice', tenantId, 'Onaylı fatura silme denemesi engellendi.');
             throw new BadRequestException(
-                'Onaylanmış (Kapatılmış) faturalar silinemez. Lütfen önce iptal ediniz veya durumunu değiştiriniz.',
+                'Onaylanmış (Kapatılmış) faturalar silinemez. Lütfen önce iptal ediniz veya statusunu değiştiriniz.',
             );
         }
 
-        // 2. Tahsilat kontrolü (FaturaTahsilat tablosu)
-        const tahsilatSayisi = await this.prisma.faturaTahsilat.count({
-            where: { faturaId: id, tenantId },
+        // 2. Collection kontrolü (FaturaTahsilat tablosu)
+        const tahsilatSayisi = await this.prisma.extended.invoiceCollection.count({
+            where: { invoiceId: id, tenantId },
         });
 
         if (tahsilatSayisi > 0) {
-            await this.logAttempt(id, 'Fatura', tenantId, 'Tahsilat kaydı olan fatura silme denemesi engellendi.');
+            await this.logAttempt(id, 'Invoice', tenantId, 'Collection kaydı olan fatura silme denemesi engellendi.');
             throw new BadRequestException(
-                'Bu faturaya ait tahsilat kayıtları bulunduğu için silinemez. Lütfen önce tahsilatları siliniz.',
+                'Bu faturaya ait tahsilat kayıtları bulunduğu için silinemez. Lütfen önce collectionsı siliniz.',
             );
         }
 
@@ -139,7 +139,7 @@ export class DeletionProtectionService {
      */
     private async logAttempt(resourceId: string, resource: string, tenantId: string, reason: string) {
         try {
-            await this.prisma.auditLog.create({
+            await this.prisma.extended.auditLog.create({
                 data: {
                     action: 'DELETE_BLOCKED',
                     resource,

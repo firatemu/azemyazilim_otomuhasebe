@@ -10,7 +10,7 @@ import {
 } from '@nestjs/common';
 import { TenantPurgeService } from './tenant-purge.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { UserRole } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @Controller('admin/tenants')
 @UseGuards(JwtAuthGuard)

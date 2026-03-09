@@ -16,7 +16,7 @@ export class WorkOrderItemService {
   constructor(
     private prisma: PrismaService,
     private tenantResolver: TenantResolverService,
-  ) {}
+  ) { }
 
   private calculateTotals(
     quantity: number,
@@ -73,7 +73,7 @@ export class WorkOrderItemService {
   async create(dto: CreateWorkOrderItemDto) {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.extended.$transaction(async (tx) => {
       const workOrder = await tx.workOrder.findFirst({
         where: {
           id: dto.workOrderId,
@@ -82,19 +82,19 @@ export class WorkOrderItemService {
       });
 
       if (!workOrder) {
-        throw new NotFoundException('İş emri bulunamadı');
+        throw new NotFoundException('Work order not found');
       }
 
       if (workOrder.status === WorkOrderStatus.INVOICED_CLOSED || workOrder.status === WorkOrderStatus.CLOSED_WITHOUT_INVOICE) {
-        throw new BadRequestException('Kapatılmış iş emrine kalem eklenemez');
+        throw new BadRequestException('Cannot add item to closed work order');
       }
 
       if (workOrder.status === WorkOrderStatus.CANCELLED) {
-        throw new BadRequestException('İptal edilmiş iş emrine kalem eklenemez');
+        throw new BadRequestException('Cannot add item to cancelled work order');
       }
 
-      if (dto.type === 'PART' && !dto.stokId) {
-        throw new BadRequestException('Parça kalemi için stok seçilmelidir');
+      if (dto.type === 'PART' && !dto.productId) {
+        throw new BadRequestException('Product must be selected for part item');
       }
 
       const taxRate = dto.taxRate ?? 20;
@@ -110,7 +110,7 @@ export class WorkOrderItemService {
           workOrderId: dto.workOrderId,
           type: dto.type,
           description: dto.description,
-          stokId: dto.stokId || null,
+          productId: dto.productId || null,
           quantity: dto.quantity,
           unitPrice,
           taxRate,
@@ -118,7 +118,7 @@ export class WorkOrderItemService {
           totalPrice,
         },
         include: {
-          stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+          product: { select: { id: true, code: true, name: true } },
         },
       });
 
@@ -141,7 +141,7 @@ export class WorkOrderItemService {
 
   async findAll(workOrderId: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const workOrder = await this.prisma.workOrder.findFirst({
+    const workOrder = await this.prisma.extended.workOrder.findFirst({
       where: {
         id: workOrderId,
         ...buildTenantWhereClause(tenantId ?? undefined),
@@ -149,13 +149,13 @@ export class WorkOrderItemService {
     });
 
     if (!workOrder) {
-      throw new NotFoundException('İş emri bulunamadı');
+      throw new NotFoundException('Work order not found');
     }
 
-    return this.prisma.workOrderItem.findMany({
+    return this.prisma.extended.workOrderItem.findMany({
       where: { workOrderId },
       include: {
-        stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+        product: { select: { id: true, code: true, name: true } },
       },
       orderBy: { createdAt: 'asc' },
     });
@@ -164,19 +164,19 @@ export class WorkOrderItemService {
   async findOne(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
     const tenantWhere = buildTenantWhereClause(tenantId ?? undefined);
-    const item = await this.prisma.workOrderItem.findFirst({
+    const item = await this.prisma.extended.workOrderItem.findFirst({
       where: {
         id,
         workOrder: tenantWhere,
       },
       include: {
         workOrder: true,
-        stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+        product: { select: { id: true, code: true, name: true } },
       },
     });
 
     if (!item) {
-      throw new NotFoundException(`Kalem bulunamadı: ${id}`);
+      throw new NotFoundException(`Item not found: ${id}`);
     }
 
     return item;
@@ -185,7 +185,7 @@ export class WorkOrderItemService {
   async update(id: string, dto: UpdateWorkOrderItemDto) {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.extended.$transaction(async (tx) => {
       const item = await tx.workOrderItem.findFirst({
         where: {
           id,
@@ -193,17 +193,17 @@ export class WorkOrderItemService {
         },
         include: {
           workOrder: true,
-          stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+          product: { select: { id: true, code: true, name: true } },
         },
       });
 
       if (!item) {
-        throw new NotFoundException(`Kalem bulunamadı: ${id}`);
+        throw new NotFoundException(`Item not found: ${id}`);
       }
 
       if (item.workOrder.status === WorkOrderStatus.INVOICED_CLOSED || item.workOrder.status === WorkOrderStatus.CLOSED_WITHOUT_INVOICE) {
         throw new BadRequestException(
-          'Kapatılmış iş emri kalemi güncellenemez',
+          'Closed work order item cannot be updated',
         );
       }
 
@@ -227,7 +227,7 @@ export class WorkOrderItemService {
           totalPrice,
         },
         include: {
-          stok: { select: { id: true, stokKodu: true, stokAdi: true } },
+          product: { select: { id: true, code: true, name: true } },
         },
       });
 
@@ -239,7 +239,7 @@ export class WorkOrderItemService {
   async remove(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.extended.$transaction(async (tx) => {
       const item = await tx.workOrderItem.findFirst({
         where: {
           id,
@@ -249,12 +249,12 @@ export class WorkOrderItemService {
       });
 
       if (!item) {
-        throw new NotFoundException(`Kalem bulunamadı: ${id}`);
+        throw new NotFoundException(`Item not found: ${id}`);
       }
 
       if (item.workOrder.status === WorkOrderStatus.INVOICED_CLOSED || item.workOrder.status === WorkOrderStatus.CLOSED_WITHOUT_INVOICE) {
         throw new BadRequestException(
-          'Kapatılmış iş emri kalemi silinemez',
+          'Closed work order item cannot be deleted',
         );
       }
 

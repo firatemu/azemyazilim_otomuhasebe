@@ -14,7 +14,6 @@ module.exports = {
             exec_mode: "fork",
             autorestart: true,
             watch: false,
-            max_memory_restart: "500M",
             error_file: "/var/log/otomuhasebe/panel-stage/error.log",
             out_file: "/var/log/otomuhasebe/panel-stage/out.log",
             log_date_format: "YYYY-MM-DD HH:mm:ss Z",

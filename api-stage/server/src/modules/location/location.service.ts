@@ -176,7 +176,7 @@ export class LocationService {
 
     try {
       
-      const result = await this.prisma.location.findMany({
+      const result = await this.prisma.extended.location.findMany({
         where,
         include: {
           warehouse: {
@@ -218,7 +218,7 @@ export class LocationService {
   }
 
   async findOne(id: string) {
-    const location = await this.prisma.location.findUnique({
+    const location = await this.prisma.extended.location.findUnique({
       where: { id },
       include: {
         warehouse: true,
@@ -227,9 +227,9 @@ export class LocationService {
             product: {
               select: {
                 id: true,
-                stokKodu: true,
-                stokAdi: true,
-                marka: true,
+                code: true,
+                name: true,
+                brand: true,
               },
             },
           },
@@ -240,7 +240,7 @@ export class LocationService {
           },
           orderBy: {
             product: {
-              stokKodu: 'asc',
+              code: 'asc',
             },
           },
         },
@@ -248,14 +248,14 @@ export class LocationService {
     });
 
     if (!location) {
-      throw new NotFoundException('Raf bulunamadı');
+      throw new NotFoundException('Shelf not found');
     }
 
     return location;
   }
 
   async findByCode(code: string) {
-    const location = await this.prisma.location.findUnique({
+    const location = await this.prisma.extended.location.findUnique({
       where: { code },
       include: {
         warehouse: true,
@@ -264,9 +264,9 @@ export class LocationService {
             product: {
               select: {
                 id: true,
-                stokKodu: true,
-                stokAdi: true,
-                marka: true,
+                code: true,
+                name: true,
+                brand: true,
               },
             },
           },
@@ -280,14 +280,14 @@ export class LocationService {
     });
 
     if (!location) {
-      throw new NotFoundException('Raf bulunamadı');
+      throw new NotFoundException('Shelf not found');
     }
 
     return location;
   }
 
   async findByBarcode(barcode: string) {
-    const location = await this.prisma.location.findUnique({
+    const location = await this.prisma.extended.location.findUnique({
       where: { barcode },
       include: {
         warehouse: true,
@@ -295,7 +295,7 @@ export class LocationService {
     });
 
     if (!location) {
-      throw new NotFoundException('Raf bulunamadı');
+      throw new NotFoundException('Shelf not found');
     }
 
     return location;
@@ -303,12 +303,12 @@ export class LocationService {
 
   async create(createDto: CreateLocationDto) {
     // Warehouse kontrolü
-    const warehouse = await this.prisma.warehouse.findUnique({
+    const warehouse = await this.prisma.extended.warehouse.findUnique({
       where: { id: createDto.warehouseId },
     });
 
     if (!warehouse) {
-      throw new NotFoundException('Depo bulunamadı');
+      throw new NotFoundException('Warehouse not found');
     }
 
     if (!warehouse.active) {
@@ -320,7 +320,7 @@ export class LocationService {
       this.extractLocationData(createDto);
 
     // Code benzersizliği kontrolü
-    const existingCode = await this.prisma.location.findUnique({
+    const existingCode = await this.prisma.extended.location.findUnique({
       where: { code },
     });
 
@@ -332,7 +332,7 @@ export class LocationService {
     const barcode = createDto.barcode || code;
 
     // Barcode benzersizliği kontrolü
-    const existingBarcode = await this.prisma.location.findUnique({
+    const existingBarcode = await this.prisma.extended.location.findUnique({
       where: { barcode },
     });
 
@@ -341,7 +341,7 @@ export class LocationService {
     }
 
     // Aynı warehouse'da aynı code kontrolü
-    const existingInWarehouse = await this.prisma.location.findFirst({
+    const existingInWarehouse = await this.prisma.extended.location.findFirst({
       where: {
         warehouseId: createDto.warehouseId,
         code,
@@ -352,7 +352,7 @@ export class LocationService {
       throw new BadRequestException('Bu depoda bu kodda bir raf zaten mevcut');
     }
 
-    return this.prisma.location.create({
+    return this.prisma.extended.location.create({
       data: {
         warehouseId: createDto.warehouseId,
         layer: layer || 0,
@@ -369,12 +369,12 @@ export class LocationService {
   }
 
   async update(id: string, updateDto: UpdateLocationDto) {
-    const location = await this.prisma.location.findUnique({
+    const location = await this.prisma.extended.location.findUnique({
       where: { id },
     });
 
     if (!location) {
-      throw new NotFoundException('Raf bulunamadı');
+      throw new NotFoundException('Shelf not found');
     }
 
     // Code veya bileşenler değiştiriliyorsa
@@ -391,7 +391,7 @@ export class LocationService {
 
       // Code değişiyorsa benzersizlik kontrolü
       if (code !== location.code) {
-        const existing = await this.prisma.location.findUnique({
+        const existing = await this.prisma.extended.location.findUnique({
           where: { code },
         });
 
@@ -404,7 +404,7 @@ export class LocationService {
       const barcode = updateDto.barcode || code;
 
       if (barcode !== location.barcode) {
-        const existingBarcode = await this.prisma.location.findUnique({
+        const existingBarcode = await this.prisma.extended.location.findUnique({
           where: { barcode },
         });
 
@@ -413,7 +413,7 @@ export class LocationService {
         }
       }
 
-      return this.prisma.location.update({
+      return this.prisma.extended.location.update({
         where: { id },
         data: {
           layer,
@@ -443,7 +443,7 @@ export class LocationService {
         updateDto.barcode !== undefined &&
         updateDto.barcode !== location.barcode
       ) {
-        const existingBarcode = await this.prisma.location.findUnique({
+        const existingBarcode = await this.prisma.extended.location.findUnique({
           where: { barcode: updateDto.barcode },
         });
 
@@ -454,7 +454,7 @@ export class LocationService {
         updateData.barcode = updateDto.barcode;
       }
 
-      return this.prisma.location.update({
+      return this.prisma.extended.location.update({
         where: { id },
         data: updateData,
       });
@@ -462,7 +462,7 @@ export class LocationService {
   }
 
   async remove(id: string) {
-    const location = await this.prisma.location.findUnique({
+    const location = await this.prisma.extended.location.findUnique({
       where: { id },
       include: {
         _count: {
@@ -475,22 +475,22 @@ export class LocationService {
     });
 
     if (!location) {
-      throw new NotFoundException('Raf bulunamadı');
+      throw new NotFoundException('Shelf not found');
     }
 
     if (location._count.productLocationStocks > 0) {
       throw new BadRequestException(
-        'Bu rafta stok kayıtları bulunuyor. Önce stok kayıtlarını temizleyin.',
+        'Bu rafta product kayıtları bulunuyor. Önce product kayıtlarını temizleyin.',
       );
     }
 
-    return this.prisma.location.delete({
+    return this.prisma.extended.location.delete({
       where: { id },
     });
   }
 
   async deleteAll() {
-    const result = await this.prisma.location.deleteMany({});
+    const result = await this.prisma.extended.location.deleteMany({});
     return {
       message: `${result.count} adet raf/koridor/sütun kaydı silindi`,
       count: result.count,
@@ -528,7 +528,7 @@ export class LocationService {
       const barcode = code;
 
       // Aynı code var mı kontrol et
-      const existing = await this.prisma.location.findUnique({
+      const existing = await this.prisma.extended.location.findUnique({
         where: { code },
       });
       if (!existing) {
@@ -541,7 +541,7 @@ export class LocationService {
     }
 
     if (locationsToCreate.length > 0) {
-      await this.prisma.location.createMany({ data: locationsToCreate });
+      await this.prisma.extended.location.createMany({ data: locationsToCreate });
     }
 
     return {
@@ -565,7 +565,7 @@ export class LocationService {
       const barcode = code;
 
       // Aynı code var mı kontrol et
-      const existing = await this.prisma.location.findUnique({
+      const existing = await this.prisma.extended.location.findUnique({
         where: { code },
       });
       if (!existing) {
@@ -584,7 +584,7 @@ export class LocationService {
     }
 
     if (locations.length > 0) {
-      await this.prisma.location.createMany({ data: locations });
+      await this.prisma.extended.location.createMany({ data: locations });
     }
 
     return {
@@ -617,7 +617,7 @@ export class LocationService {
       const barcode = code;
 
       // Aynı code var mı kontrol et
-      const existing = await this.prisma.location.findUnique({
+      const existing = await this.prisma.extended.location.findUnique({
         where: { code },
       });
       if (!existing) {
@@ -636,7 +636,7 @@ export class LocationService {
     }
 
     if (locations.length > 0) {
-      await this.prisma.location.createMany({ data: locations });
+      await this.prisma.extended.location.createMany({ data: locations });
     }
 
     return {

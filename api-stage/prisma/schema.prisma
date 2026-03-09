@@ -55,6 +55,9 @@ model Tenant {
   maasOdemeDetaylari     MaasOdemeDetay[]
   avanslar               Avans[]
   avansMahsuplasmalar    AvansMahsuplasma[]
+  units                  Unit[]
+  brands                 Brand[]
+  categories             Category[]
 
   @@index([subdomain])
   @@index([domain])
@@ -281,7 +284,6 @@ model User {
   teslimAlinanWarehouseTransfers WarehouseTransfer[]       @relation("WarehouseTransferTeslimAlan")
   updatedWarehouseTransfers      WarehouseTransfer[]       @relation("WarehouseTransferUpdatedBy")
   approvedWorkOrderLines         WorkOrderLine[]           @relation("ApprovedByUser")
-  inAppNotifications             InAppNotification[]
   createdAvanslar                Avans[]                   @relation("AvansCreatedBy")
   createdMaasOdemeler            MaasOdeme[]               @relation("MaasOdemeCreatedBy")
 
@@ -324,10 +326,11 @@ model Stok {
   satisFiyati                  Decimal                      @db.Decimal(10, 2)
   kdvOrani                     Int                          @default(20)
   kritikStokMiktari            Int                          @default(0)
-  kategori                     String?
-  anaKategori                  String?
-  altKategori                  String?
-  marka                        String?
+  brandId                      String?                       @map("brand_id")
+  brandText                    String?                       @map("brand_text")
+  mainCategoryId               String?                       @map("main_category_id")
+  altKategori                  String?                       @map("sub_category_id")
+  categoryText                 String?                       @map("category_text")
   model                        String?
   oem                          String?
   olcu                         String?
@@ -366,12 +369,16 @@ model Stok {
   warehouseCriticalStocks      WarehouseCriticalStock[]
   warehouseTransferItems       WarehouseTransferItem[]
   workOrderLines               WorkOrderLine[]
+  brand                        Brand?                       @relation(fields: [brandId], references: [id], onDelete: SetNull)
 
   @@unique([stokKodu, tenantId])
   @@unique([barkod, tenantId])
   @@index([tenantId])
   @@index([tenantId, stokKodu])
   @@index([tenantId, barkod])
+  @@index([tenantId, brandId])
+  @@index([brandText])
+  @@index([categoryText])
   @@map("stoklar")
 }
 
@@ -1345,6 +1352,7 @@ model StockMove {
   note            String?
   createdAt       DateTime      @default(now())
   createdBy       String?
+  tenantId        String?       @map("tenant_id")
   createdByUser   User?         @relation("StockMoveCreatedBy", fields: [createdBy], references: [id])
   fromLocation    Location?     @relation("FromLocation", fields: [fromLocationId], references: [id])
   fromWarehouse   Warehouse?    @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
@@ -1352,6 +1360,7 @@ model StockMove {
   toLocation      Location      @relation("ToLocation", fields: [toLocationId], references: [id])
   toWarehouse     Warehouse     @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
 
+  @@index([tenantId])
   @@index([productId])
   @@index([fromWarehouseId, fromLocationId])
   @@index([toWarehouseId, toLocationId])
@@ -2131,6 +2140,8 @@ model WorkOrder {
   grandTotal         Decimal                  @default(0) @db.Decimal(12, 2)
   createdAt          DateTime                 @default(now())
   updatedAt          DateTime                 @updatedAt
+  clientUpdatedAt    DateTime?                // PWA offline sync için
+
   diagnosticNotes    DiagnosticNote[]
   diagnoses          Diagnosis[]              // Yeni teşhis modeli
   managerApproval    ManagerApproval?
@@ -2696,6 +2707,64 @@ enum UserRole {
   SUPPLY      // Tedarik departmanı
 }
 
+model Unit {
+  id        String    @id @default(uuid())
+  name      String
+  code      String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tenantId  String?   @map("tenant_id")
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  products  Stok[]
+
+  @@index([tenantId])
+  @@map("units")
+}
+
+model Category {
+  id             String     @id @default(uuid())
+  name           String
+  code           String?
+  mainCategoryId String?    @map("main_category_id")
+  mainCategory   Category?  @relation("CategoryMain", fields: [mainCategoryId], references: [id], onDelete: SetNull)
+  subCategories  Category[] @relation("CategoryMain")
+  productsMain   Stok[]      @relation("ProductMainCategory")
+  productsSub    Stok[]      @relation("ProductSubCategory")
+  isActive       Boolean    @default(true)
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  tenantId       String?    @map("tenant_id")
+  tenant         Tenant?     @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([mainCategoryId])
+  @@index([name])
+  @@index([code])
+  @@index([isActive])
+  @@map("categories")
+}
+
+model Brand {
+  id        String    @id @default(uuid())
+  name      String
+  code      String?
+  isActive  Boolean   @default(true)
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  tenantId  String?   @map("tenant_id")
+  tenant    Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  products  Stok[]
+
+  @@index([tenantId])
+  @@index([name])
+  @@index([code])
+  @@index([isActive])
+  @@map("brands")
+}
+
 enum PriceCardType {
   SALE
   PURCHASE
@@ -3254,122 +3323,31 @@ model SatisElemani {
   @@map("satis_elemanlari")
 }
 
-// ============================================
-// SERVİS YÖNETİMİ - Bekleyen Araçlar Modülleri
-// ============================================
+// ============= EVENT-DRIVEN ARCHITECTURE (Faz 2) =============
 
-// Teşhis Modeli - Teknisyenlerin oluşturduğu teşhisler
-model Diagnosis {
-  id                      String            @id @default(uuid())
-  tenantId                String
-  workOrderId             String
-  category                String?           // Elektrik, Motor, Karoseri, Fren Sistemi, vb.
-  title                   String            @db.VarChar(200)
-  description             String            @db.Text
-  difficulty              DiagnosisLevel    @default(ORTA)
-  estimatedHours          Decimal?          @db.Decimal(5, 2)
-  status                  DiagnosisStatus   @default(DRAFT)
-  priority                DiagnosisPriority @default(ORTA)
-  requiresCustomerApproval Boolean          @default(false) // Ek iş varsa true
-  customerNotes           String?           @db.Text
-  internalNotes           String?           @db.Text
-  photos                  Json?             // [{url, caption, uploadedAt}]
-  audioNotes              Json?             // [{url, duration, uploadedAt}]
-  createdBy               String
-  approvedBy              String?           // İlgili departman onay veren kişi
-  rejectedBy              String?
-  approvedAt              DateTime?
-  rejectedAt              DateTime?
-  completedAt             DateTime?
-  createdAt               DateTime          @default(now())
-  updatedAt               DateTime          @updatedAt
-  
-  workOrder               WorkOrder         @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  
-  @@index([tenantId])
-  @@index([workOrderId])
-  @@index([status])
-  @@index([priority])
-  @@index([createdAt])
-  @@map("diagnoses")
+model OutboxEvent {
+  id             String             @id @default(cuid())
+  tenantId       String
+  eventType      String
+  aggregateId    String
+  aggregateType  String
+  payload        Json
+  status         OutboxEventStatus2 @default(PENDING)
+  idempotencyKey String             @unique
+  attempts       Int                @default(0)
+  errorMessage   String?
+  publishedAt    DateTime?
+  createdAt      DateTime           @default(now())
+
+  @@index([status, createdAt])
+  @@index([tenantId, aggregateId])
+  @@index([tenantId, eventType])
+  @@map("outbox_events")
 }
 
-enum DiagnosisStatus {
-  DRAFT               // Taslak
-  AWAITING_APPROVAL   // Müşteri onayı bekliyor (sadece ek iş varsa)
-  APPROVED            // Onaylandı
-  REJECTED            // Reddedildi
-  IN_PROGRESS         // İşlem yapılıyor
-  COMPLETED           // Tamamlandı
+enum OutboxEventStatus2 {
+  PENDING
+  PUBLISHED
+  FAILED
 }
 
-enum DiagnosisLevel {
-  BASIT
-  ORTA
-  KARMASIK
-}
-
-enum DiagnosisPriority {
-  DUSUK
-  ORTA
-  YUKSEK
-  ACIL
-}
-
-// Teknisyen Zaman Takibi - İkinci aşama için
-model TechnicianTimeTracking {
-  id              String     @id @default(uuid())
-  tenantId        String
-  workOrderId     String
-  diagnosisId     String?
-  technicianId    String
-  startedAt       DateTime
-  endedAt         DateTime?
-  duration        Int?       // Dakika cinsinden
-  taskType        String?    // DIAGNOSIS, REPAIR, WAITING, BREAK
-  notes           String?    @db.Text
-  createdAt       DateTime   @default(now())
-  
-  workOrder       WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
-  technician      Technician @relation(fields: [technicianId], references: [id])
-  
-  @@index([tenantId])
-  @@index([workOrderId])
-  @@index([technicianId])
-  @@index([startedAt])
-  @@map("technician_time_tracking")
-}
-
-// Program İçi Bildirim Modeli
-model InAppNotification {
-  id          String             @id @default(uuid())
-  tenantId    String
-  userId      String             // Alıcı
-  type        NotificationType
-  title       String             @db.VarChar(200)
-  message     String             @db.Text
-  actionUrl   String?            // Tıklandığında gidilecek sayfa
-  resourceId  String?            // İlgili kaynak (workOrderId, diagnosisId, vb.)
-  isRead      Boolean            @default(false)
-  createdAt   DateTime           @default(now())
-  readAt      DateTime?
-  
-  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
-  
-  @@index([tenantId, userId, isRead])
-  @@index([createdAt])
-  @@map("in_app_notifications")
-}
-
-enum NotificationType {
-  WORK_ORDER_ASSIGNED
-  WORK_ORDER_CLAIMED
-  CUSTOMER_APPROVAL_RECEIVED
-  CUSTOMER_APPROVAL_REJECTED
-  PARTS_APPROVED
-  PARTS_ARRIVED
-  DIAGNOSIS_COMPLETED
-  WORK_ORDER_STATUS_CHANGED
-  SUPPLY_REQUEST_CREATED
-  SUPPLY_REQUEST_APPROVED
-}

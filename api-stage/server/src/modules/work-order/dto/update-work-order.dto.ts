@@ -7,7 +7,7 @@ export class UpdateWorkOrderDto {
 
   @IsOptional()
   @IsUUID()
-  cariId?: string;
+  accountId?: string;
 
   @IsOptional()
   @IsUUID()

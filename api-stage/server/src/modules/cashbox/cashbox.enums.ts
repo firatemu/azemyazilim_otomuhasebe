@@ -1,0 +1,7 @@
+export enum CashboxType {
+    CASH = 'CASH',
+    POS = 'POS',
+    COMPANY_CREDIT_CARD = 'COMPANY_CREDIT_CARD',
+    BANK = 'BANK',
+    CHECK_PROMISSORY = 'CHECK_PROMISSORY'
+}

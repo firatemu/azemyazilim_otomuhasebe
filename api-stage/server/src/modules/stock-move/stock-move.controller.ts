@@ -7,21 +7,24 @@ import {
   Body,
   UseGuards,
 } from '@nestjs/common';
+import { ApiQuery, ApiTags } from '@nestjs/swagger';
 import { StockMoveService } from './stock-move.service';
 import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { PutAwayDto } from './dto/put-away.dto';
 import { BulkPutAwayDto } from './dto/bulk-put-away.dto';
 import { TransferDto } from './dto/transfer.dto';
 import { AssignLocationDto } from './dto/assign-location.dto';
-import { StockMoveType } from '@prisma/client';
+import { StockMoveType } from './dto/create-stock-move.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 
+@ApiTags('stock-move')
 @UseGuards(JwtAuthGuard)
 @Controller('stock-move')
 export class StockMoveController {
-  constructor(private readonly stockMoveService: StockMoveService) {}
+  constructor(private readonly stockMoveService: StockMoveService) { }
 
   @Get()
+  @ApiQuery({ name: 'moveType', enum: StockMoveType, required: false })
   findAll(
     @Query('productId') productId?: string,
     @Query('warehouseId') warehouseId?: string,

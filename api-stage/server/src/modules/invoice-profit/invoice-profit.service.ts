@@ -12,45 +12,44 @@ export class InvoiceProfitService {
   constructor(
     private prisma: PrismaService,
     private tenantResolver: TenantResolverService,
-  ) {}
+  ) { }
 
   /**
    * Ürünün güncel maliyetini StockCostHistory'den al
-   * @param stokId Stok ID
+   * @param productId Stok ID
    * @param tenantId Tenant ID (opsiyonel, tenant kontrolü için)
    * @param prisma Prisma client instance (opsiyonel, transaction için)
    */
   private async getCurrentCost(
-    stokId: string,
+    productId: string,
     tenantId?: string | null,
     prisma?: PrismaTransactionClient,
   ): Promise<number> {
     const db = prisma || this.prisma;
     const currentTenantId = tenantId ?? (await this.tenantResolver.resolveForQuery());
 
-    // Stok üzerinden tenant kontrolü yap
-    const stok = await db.stok.findUnique({
-      where: { id: stokId },
+    // Check tenant through product
+    const product = await db.product.findUnique({
+      where: { id: productId },
       select: { tenantId: true },
     });
 
-    if (!stok) {
-      console.warn(`Stok bulunamadı: ${stokId}`);
+    if (!product) {
+      console.warn(`Product not found: ${productId}`);
       return 0;
     }
 
-    // Tenant kontrolü: Eğer tenantId varsa ve stok'un tenantId'si farklıysa 0 döndür
-    if (currentTenantId && stok.tenantId && stok.tenantId !== currentTenantId) {
+    // Tenant check: If tenantId exists and product's tenantId is different, return 0
+    if (currentTenantId && product.tenantId && product.tenantId !== currentTenantId) {
       console.warn(
-        `Stok tenantId (${stok.tenantId}) mevcut tenantId (${currentTenantId}) ile eşleşmiyor: ${stokId}`,
+        `Product tenantId (${product.tenantId}) doesn't match current tenantId (${currentTenantId}): ${productId}`,
       );
       return 0;
     }
 
-    const latestCost = await db.stockCostHistory.findFirst({
+    const latestCost = await db.productCostHistory.findFirst({
       where: {
-        stokId,
-        // Stok üzerinden tenant kontrolü yapıldığı için burada ekstra kontrol gerekmez
+        productId: productId,
       },
       orderBy: { computedAt: 'desc' },
       select: { cost: true },
@@ -60,13 +59,13 @@ export class InvoiceProfitService {
   }
 
   /**
-   * Fatura için kar hesapla ve kaydet
-   * @param faturaId Fatura ID
+   * Invoice için kar hesapla ve kaydet
+   * @param invoiceId Invoice ID
    * @param userId User ID (opsiyonel)
    * @param prisma Prisma client instance (opsiyonel, transaction için)
    */
   async calculateAndSaveProfit(
-    faturaId: string,
+    invoiceId: string,
     userId?: string,
     prisma?: PrismaTransactionClient,
   ): Promise<void> {
@@ -74,13 +73,13 @@ export class InvoiceProfitService {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
     try {
-      // Faturayı kalemleriyle birlikte al
-      const fatura = await db.fatura.findUnique({
-        where: { id: faturaId },
+      // Get invoice with items
+      const invoice = await db.invoice.findUnique({
+        where: { id: invoiceId },
         include: {
-          kalemler: {
+          items: {
             include: {
-              stok: {
+              product: {
                 select: {
                   id: true,
                   tenantId: true,
@@ -91,135 +90,134 @@ export class InvoiceProfitService {
         },
       });
 
-      if (!fatura) {
-        throw new NotFoundException(`Fatura bulunamadı: ${faturaId}`);
+      if (!invoice) {
+        throw new NotFoundException(`Invoice not found: ${invoiceId}`);
       }
 
-      // Sadece SATIS faturaları için kar hesapla
-      if (fatura.faturaTipi !== 'SATIS') {
+      // Calculate profit for SALES invoices only
+      if (invoice.invoiceType !== 'SALE') {
         console.log(
-          `Fatura ${faturaId} SATIS tipinde değil (${fatura.faturaTipi}), profit hesaplama atlandı`,
+          `Invoice ${invoiceId} is not SALE type (${invoice.invoiceType}), profit calculation skipped`,
         );
         return;
       }
 
-      // Kalem yoksa profit kaydı oluşturma
-      if (!fatura.kalemler || fatura.kalemler.length === 0) {
-        console.warn(`Fatura ${faturaId} için kalem bulunamadı, profit hesaplama atlandı`);
+      // No items, skip profit calculation
+      if (!invoice.items || invoice.items.length === 0) {
+        console.warn(`No items found for invoice ${invoiceId}, profit calculation skipped`);
         return;
       }
 
-      // Mevcut kar kayıtlarını sil (yeniden hesaplama için)
-      // Önce kaç kayıt olduğunu kontrol et
+      // Delete existing profit records (for recalculation)
       const existingCount = await db.invoiceProfit.count({
-        where: { faturaId },
+        where: { invoiceId: invoiceId },
       });
-      
+
       if (existingCount > 0) {
-        console.log(`Fatura ${faturaId} için ${existingCount} mevcut profit kaydı siliniyor...`);
+        console.log(`Deleting ${existingCount} existing profit records for invoice ${invoiceId}...`);
         const deleteResult = await db.invoiceProfit.deleteMany({
-          where: { faturaId },
+          where: { invoiceId: invoiceId },
         });
-        console.log(`Fatura ${faturaId} için ${deleteResult.count} profit kaydı silindi`);
-        
-        // Silme işleminden sonra kontrol et
+        console.log(`Deleted ${deleteResult.count} profit records for invoice ${invoiceId}`);
+
+        // Re-check after deletion
         const remainingCount = await db.invoiceProfit.count({
-          where: { faturaId },
+          where: { invoiceId: invoiceId },
         });
         if (remainingCount > 0) {
-          console.warn(`Fatura ${faturaId} için ${remainingCount} kayıt hala mevcut, tekrar silme denemesi...`);
+          console.warn(`${remainingCount} records still exist for invoice ${invoiceId}, retrying delete...`);
           await db.invoiceProfit.deleteMany({
-            where: { faturaId },
+            where: { invoiceId: invoiceId },
           });
         }
       }
 
-      let toplamSatisTutari = new Decimal(0);
-      let toplamMaliyet = new Decimal(0);
+      let totalSalesAmount = new Decimal(0);
+      let totalCost = new Decimal(0);
       const profitRecords: Prisma.InvoiceProfitCreateManyInput[] = [];
-      const seenKalemIds = new Set<string>(); // Duplicate kalem kontrolü için
+      const seenItemIds = new Set<string>(); // For duplicate item check
 
-      // Her kalem için kar hesapla
-      for (const kalem of fatura.kalemler) {
-        // Duplicate kalem kontrolü - aynı kalem.id için birden fazla kayıt oluşturma
-        if (seenKalemIds.has(kalem.id)) {
+      // Calculate profit for each item
+      for (const item of invoice.items) {
+        // Duplicate item check - avoid multiple records for same item.id
+        if (seenItemIds.has(item.id)) {
           console.warn(
-            `Fatura ${faturaId} için duplicate kalem bulundu (kalem.id: ${kalem.id}), atlandı`,
+            `Duplicate item found for invoice ${invoiceId} (item.id: ${item.id}), skipped`,
           );
           continue;
         }
-        seenKalemIds.add(kalem.id);
+        seenItemIds.add(item.id);
 
-        // StokId yoksa bu kalemi atla
-        if (!kalem.stokId) {
+        // Skip if productId is missing
+        if (!item.productId) {
           console.warn(
-            `Fatura ${faturaId} kalem ${kalem.id} için stokId bulunamadı, atlandı`,
-          );
-          continue;
-        }
-
-        // Stok tenant kontrolü
-        const stokTenantId = kalem.stok?.tenantId;
-        if (tenantId && stokTenantId && stokTenantId !== tenantId) {
-          console.warn(
-            `Fatura ${faturaId} kalem ${kalem.id} için stok tenantId (${stokTenantId}) mevcut tenantId (${tenantId}) ile eşleşmiyor, atlandı`,
+            `productId not found for invoice ${invoiceId} item ${item.id}, skipped`,
           );
           continue;
         }
 
-        const miktar = kalem.miktar;
-        const tutarNet = Number(kalem.tutar || 0);
-        const kdvTutar = Number(kalem.kdvTutar || 0);
-        const toplamSatisKdvDahil = tutarNet + kdvTutar; // KDV dahil satış tutarı
-        const birimFiyatKdvDahil = miktar > 0 ? toplamSatisKdvDahil / miktar : 0;
-        const birimMaliyet = await this.getCurrentCost(
-          kalem.stokId,
+        // Product tenant check
+        const productTenantId = item.product?.tenantId;
+        if (tenantId && productTenantId && productTenantId !== tenantId) {
+          console.warn(
+            `Product tenantId (${productTenantId}) doesn't match current tenantId (${tenantId}) for invoice ${invoiceId} item ${item.id}, skipped`,
+          );
+          continue;
+        }
+
+        const quantity = item.quantity;
+        const netAmount = Number(item.amount || 0);
+        const vatAmount = Number(item.vatAmount || 0);
+        const totalSalesVatIncluded = netAmount + vatAmount; // Sales amount including VAT
+        const unitPriceVatIncluded = quantity > 0 ? totalSalesVatIncluded / quantity : 0;
+        const unitCost = await this.getCurrentCost(
+          item.productId,
           tenantId,
           db,
         );
 
-        const toplamSatis = new Decimal(toplamSatisKdvDahil);
-        const toplamMaliyetKalem = new Decimal(birimMaliyet * miktar);
-        const kar = toplamSatis.minus(toplamMaliyetKalem);
-        const karOrani =
-          toplamMaliyetKalem.gt(0)
-            ? kar.dividedBy(toplamMaliyetKalem).times(100)
+        const totalSales = new Decimal(totalSalesVatIncluded);
+        const totalCostItem = new Decimal(unitCost * quantity);
+        const profit = totalSales.minus(totalCostItem);
+        const profitRate =
+          totalCostItem.gt(0)
+            ? profit.dividedBy(totalCostItem).times(100)
             : new Decimal(0);
 
-        toplamSatisTutari = toplamSatisTutari.plus(toplamSatis);
-        toplamMaliyet = toplamMaliyet.plus(toplamMaliyetKalem);
+        totalSalesAmount = totalSalesAmount.plus(totalSales);
+        totalCost = totalCost.plus(totalCostItem);
 
-        // Kalem bazlı kar kaydı (KDV dahil fiyat üzerinden)
+        // Item-based profit record (based on price including VAT)
         profitRecords.push({
-          faturaId,
-          faturaKalemiId: kalem.id,
-          stokId: kalem.stokId,
+          invoiceId: invoiceId,
+          invoiceItemId: item.id,
+          productId: item.productId,
           tenantId: tenantId || null,
-          miktar,
-          birimFiyat: new Decimal(birimFiyatKdvDahil),
-          birimMaliyet: new Decimal(birimMaliyet),
-          toplamSatisTutari: toplamSatis,
-          toplamMaliyet: toplamMaliyetKalem,
-          kar,
-          karOrani,
+          quantity: quantity,
+          unitPrice: new Decimal(unitPriceVatIncluded),
+          unitCost: new Decimal(unitCost),
+          totalSalesAmount: totalSales,
+          totalCost: totalCostItem,
+          profit: profit,
+          profitRate: profitRate,
         });
       }
 
-      // Fatura bazlı toplam kar kaydı (faturaKalemiId = null)
-      const toplamKar = toplamSatisTutari.minus(toplamMaliyet);
-      const toplamKarOrani =
-        toplamMaliyet.gt(0)
-          ? toplamKar.dividedBy(toplamMaliyet).times(100)
+      // Invoice-based total profit record (invoiceItemId = null)
+      const totalProfit = totalSalesAmount.minus(totalCost);
+      const totalProfitRate =
+        totalCost.gt(0)
+          ? totalProfit.dividedBy(totalCost).times(100)
           : new Decimal(0);
 
-      // İlk kalemin stokId'sini al (toplam kaydı için referans)
-      const firstKalemStokId = fatura.kalemler.find((k) => k.stokId)?.stokId;
+      // Get first item productId (as reference for total record)
+      const firstItemProductId = invoice.items.find((k) => k.productId)?.productId;
 
-      if (!firstKalemStokId) {
+      if (!firstItemProductId) {
         console.warn(
-          `Fatura ${faturaId} için geçerli stokId bulunamadı, toplam kaydı oluşturulamadı`,
+          `No valid productId found for invoice ${invoiceId}, total record not created`,
         );
-        // Kalem bazlı kayıtlar varsa onları kaydet
+        // Save item-based records if they exist
         if (profitRecords.length > 0) {
           await db.invoiceProfit.createMany({
             data: profitRecords,
@@ -229,30 +227,30 @@ export class InvoiceProfitService {
       }
 
       profitRecords.push({
-        faturaId,
-        faturaKalemiId: null, // Toplam kaydı için null
-        stokId: firstKalemStokId, // İlk kalemin stokId'si (sadece referans için)
+        invoiceId: invoiceId,
+        invoiceItemId: null, // null for total record
+        productId: firstItemProductId, // first item productId (for reference only)
         tenantId: tenantId || null,
-        miktar: fatura.kalemler.reduce((sum, k) => sum + k.miktar, 0),
-        birimFiyat: new Decimal(0), // Toplam kaydı için 0
-        birimMaliyet: new Decimal(0), // Toplam kaydı için 0
-        toplamSatisTutari,
-        toplamMaliyet,
-        kar: toplamKar,
-        karOrani: toplamKarOrani,
+        quantity: invoice.items.reduce((sum, k) => sum + k.quantity, 0),
+        unitPrice: new Decimal(0), // 0 for total record
+        unitCost: new Decimal(0), // 0 for total record
+        totalSalesAmount: totalSalesAmount,
+        totalCost: totalCost,
+        profit: totalProfit,
+        profitRate: totalProfitRate,
       });
 
-      // Tüm kayıtları oluştur (eğer varsa)
+      // Create all records (if any)
       if (profitRecords.length > 0) {
-        // Duplicate kontrolü - faturaKalemiId bazlı
+        // Duplicate check - based on invoiceItemId
         const uniqueRecords = new Map<string, Prisma.InvoiceProfitCreateManyInput>();
         for (const record of profitRecords) {
-          const key = record.faturaKalemiId || 'total';
+          const key = record.invoiceItemId || 'total';
           if (!uniqueRecords.has(key)) {
             uniqueRecords.set(key, record);
           } else {
             console.warn(
-              `Fatura ${faturaId} için duplicate profit kaydı bulundu (faturaKalemiId: ${record.faturaKalemiId}), atlanıyor`,
+              `Duplicate profit record found for invoice ${invoiceId} (invoiceItemId: ${record.invoiceItemId}), skipped`,
             );
           }
         }
@@ -262,14 +260,14 @@ export class InvoiceProfitService {
           data: finalRecords,
         });
         console.log(
-          `Fatura ${faturaId} için ${finalRecords.length} profit kaydı oluşturuldu`,
+          `Created ${finalRecords.length} profit records for invoice ${invoiceId}`,
         );
       } else {
-        console.warn(`Fatura ${faturaId} için profit kaydı oluşturulamadı (kalem yok veya geçersiz)`);
+        console.warn(`Could not create profit record for invoice ${invoiceId} (no items or invalid)`);
       }
     } catch (error: any) {
       console.error(
-        `Fatura ${faturaId} için profit hesaplama hatası:`,
+        `Error calculating profit for invoice ${invoiceId}:`,
         error?.message || error,
         error?.stack,
       );
@@ -278,36 +276,36 @@ export class InvoiceProfitService {
   }
 
   /**
-   * Fatura karını yeniden hesapla (düzenleme durumunda)
+   * Recalculate invoice profit (in draft status)
    */
   async recalculateProfit(
-    faturaId: string,
+    invoiceId: string,
     userId?: string,
   ): Promise<void> {
-    await this.calculateAndSaveProfit(faturaId, userId);
+    await this.calculateAndSaveProfit(invoiceId, userId);
   }
 
   /**
-   * Fatura bazlı kar bilgisi
+   * Invoice bazlı kar bilgisi
    */
-  async getProfitByInvoice(faturaId: string) {
-    const fatura = await this.prisma.fatura.findUnique({
-      where: { id: faturaId },
+  async getProfitByInvoice(invoiceId: string) {
+    const invoice = await this.prisma.extended.invoice.findUnique({
+      where: { id: invoiceId },
       include: {
-        cari: {
+        account: {
           select: {
             id: true,
-            cariKodu: true,
-            unvan: true,
+            code: true,
+            title: true,
           },
         },
-        kalemler: {
+        items: {
           include: {
-            stok: {
+            product: {
               select: {
                 id: true,
-                stokKodu: true,
-                stokAdi: true,
+                code: true,
+                name: true,
               },
             },
           },
@@ -315,66 +313,66 @@ export class InvoiceProfitService {
       },
     });
 
-    if (!fatura) {
-      throw new NotFoundException(`Fatura bulunamadı: ${faturaId}`);
+    if (!invoice) {
+      throw new NotFoundException(`Invoice not found: ${invoiceId}`);
     }
 
-    // Fatura toplam kar kaydı (faturaKalemiId = null)
-    const toplamKar = await this.prisma.invoiceProfit.findFirst({
+    // Invoice total profit record (invoiceItemId = null)
+    const totalProfitRecord = await this.prisma.extended.invoiceProfit.findFirst({
       where: {
-        faturaId,
-        faturaKalemiId: null,
+        invoiceId: invoiceId,
+        invoiceItemId: null,
       },
     });
 
-    // Kalem bazlı kar kayıtları
-    const kalemKarKayitlari = await this.prisma.invoiceProfit.findMany({
+    // Item-based profit records
+    const itemProfitRecords = await this.prisma.extended.invoiceProfit.findMany({
       where: {
-        faturaId,
-        faturaKalemiId: { not: null },
+        invoiceId: invoiceId,
+        invoiceItemId: { not: null },
       },
       include: {
-        faturaKalemi: {
+        invoiceItem: {
           include: {
-            stok: {
+            product: {
               select: {
                 id: true,
-                stokKodu: true,
-                stokAdi: true,
+                code: true,
+                name: true,
               },
             },
           },
         },
       },
       orderBy: {
-        hesaplamaTarihi: 'asc',
+        computedAt: 'asc',
       },
     });
 
     return {
-      fatura: {
-        id: fatura.id,
-        faturaNo: fatura.faturaNo,
-        tarih: fatura.tarih,
-        cari: fatura.cari,
-        toplamSatisTutari: toplamKar
-          ? Number(toplamKar.toplamSatisTutari)
+      invoice: {
+        id: invoice.id,
+        invoiceNo: invoice.invoiceNo,
+        date: invoice.date,
+        account: invoice.account,
+        totalSalesAmount: totalProfitRecord
+          ? Number(totalProfitRecord.totalSalesAmount)
           : 0,
-        toplamMaliyet: toplamKar ? Number(toplamKar.toplamMaliyet) : 0,
-        toplamKar: toplamKar ? Number(toplamKar.kar) : 0,
-        karOrani: toplamKar ? Number(toplamKar.karOrani) : 0,
+        totalCost: totalProfitRecord ? Number(totalProfitRecord.totalCost) : 0,
+        totalProfit: totalProfitRecord ? Number(totalProfitRecord.profit) : 0,
+        profitRate: totalProfitRecord ? Number(totalProfitRecord.profitRate) : 0,
       },
-      kalemler: kalemKarKayitlari.map((kayit) => ({
-        id: kayit.id,
-        faturaKalemiId: kayit.faturaKalemiId,
-        stok: kayit.faturaKalemi?.stok,
-        miktar: kayit.miktar,
-        birimFiyat: Number(kayit.birimFiyat),
-        birimMaliyet: Number(kayit.birimMaliyet),
-        toplamSatisTutari: Number(kayit.toplamSatisTutari),
-        toplamMaliyet: Number(kayit.toplamMaliyet),
-        kar: Number(kayit.kar),
-        karOrani: Number(kayit.karOrani),
+      items: itemProfitRecords.map((record) => ({
+        id: record.id,
+        invoiceItemId: record.invoiceItemId,
+        product: record.invoiceItem?.product,
+        quantity: record.quantity,
+        unitPrice: Number(record.unitPrice),
+        unitCost: Number(record.unitCost),
+        totalSalesAmount: Number(record.totalSalesAmount),
+        totalCost: Number(record.totalCost),
+        profit: Number(record.profit),
+        profitRate: Number(record.profitRate),
       })),
     };
   }
@@ -383,7 +381,7 @@ export class InvoiceProfitService {
    * Ürün bazlı kar bilgisi
    */
   async getProfitByProduct(filters?: {
-    stokId?: string;
+    productId?: string;
     startDate?: Date;
     endDate?: Date;
     tenantId?: string;
@@ -391,196 +389,196 @@ export class InvoiceProfitService {
     const tenantId = filters?.tenantId ?? (await this.tenantResolver.resolveForQuery());
 
     const where: Prisma.InvoiceProfitWhereInput = {
-      faturaKalemiId: { not: null }, // Sadece kalem bazlı kayıtlar
-      ...(filters?.stokId && { stokId: filters.stokId }),
+      invoiceItemId: { not: null }, // Sadece kalem bazlı kayıtlar
+      ...(filters?.productId && { productId: filters.productId }),
       ...(filters?.startDate || filters?.endDate
         ? {
-            fatura: {
-              tarih: {
-                ...(filters?.startDate && { gte: filters.startDate }),
-                ...(filters?.endDate && { lte: filters.endDate }),
-              },
+          invoice: {
+            date: {
+              ...(filters?.startDate && { gte: filters.startDate }),
+              ...(filters?.endDate && { lte: filters.endDate }),
             },
-          }
+          },
+        }
         : {}),
     };
-    
+
     // TenantId varsa filtre ekle, yoksa ekleme (null tenantId'li kayıtlar da dahil)
     if (tenantId) {
       where.tenantId = tenantId;
     }
 
-    let profitRecords = await this.prisma.invoiceProfit.findMany({
+    let profitRecords = await this.prisma.extended.invoiceProfit.findMany({
       where,
       include: {
-        stok: {
+        product: {
           select: {
             id: true,
-            stokKodu: true,
-            stokAdi: true,
+            code: true,
+            name: true,
           },
         },
-        fatura: {
+        invoice: {
           select: {
             id: true,
-            faturaNo: true,
-            tarih: true,
-            cari: {
+            invoiceNo: true,
+            date: true,
+            account: {
               select: {
                 id: true,
-                unvan: true,
+                title: true,
               },
             },
           },
         },
       },
       orderBy: {
-        fatura: {
-          tarih: 'desc',
+        invoice: {
+          date: 'desc',
         },
       },
     });
 
-    // Eğer profit kaydı yoksa, SATIS faturaları için otomatik hesaplama yap
+    // If no profit records found, calculate automatically for SALE invoices
     if (profitRecords.length === 0) {
-      console.log('[getProfitByProduct] Profit kaydı bulunamadı, SATIS faturaları için otomatik hesaplama başlatılıyor...');
-      
-      // SATIS faturalarını bul
-      const faturaWhere: Prisma.FaturaWhereInput = {
-        faturaTipi: 'SATIS',
+      console.log('[getProfitByProduct] No profit records found, starting automatic calculation for SALE invoices...');
+
+      // Find SALE invoices
+      const invoiceWhere: Prisma.InvoiceWhereInput = {
+        invoiceType: 'SALE',
         ...(filters?.startDate || filters?.endDate
           ? {
-              tarih: {
-                ...(filters?.startDate && { gte: filters.startDate }),
-                ...(filters?.endDate && { lte: filters.endDate }),
-              },
-            }
+            date: {
+              ...(filters?.startDate && { gte: filters.startDate }),
+              ...(filters?.endDate && { lte: filters.endDate }),
+            },
+          }
           : {}),
       };
-      
+
       // TenantId varsa filtre ekle
       if (tenantId) {
-        faturaWhere.tenantId = tenantId;
+        invoiceWhere.tenantId = tenantId;
       }
 
-      const faturalar = await this.prisma.fatura.findMany({
-        where: faturaWhere,
+      const invoices = await this.prisma.extended.invoice.findMany({
+        where: invoiceWhere,
         select: {
           id: true,
         },
-        take: 100, // İlk 100 fatura için hesaplama yap (performans için)
+        take: 100, // Handle first 100 invoices (for performance)
       });
 
-      console.log(`[getProfitByProduct] ${faturalar.length} fatura için profit hesaplaması yapılıyor...`);
+      console.log(`[getProfitByProduct] Calculating profit for ${invoices.length} invoices...`);
 
-      // Toplu olarak profit hesapla
+      // Bulk calculate profit
       await Promise.allSettled(
-        faturalar.map((fatura) =>
-          this.calculateAndSaveProfit(fatura.id).catch((err) => {
-            console.error(`[getProfitByProduct] Profit hesaplama hatası (fatura ${fatura.id}):`, err);
+        invoices.map((invoice) =>
+          this.calculateAndSaveProfit(invoice.id).catch((err) => {
+            console.error(`[getProfitByProduct] Profit calculation error (invoice ${invoice.id}):`, err);
           })
         )
       );
 
       // Yeniden sorgula
-      profitRecords = await this.prisma.invoiceProfit.findMany({
+      profitRecords = await this.prisma.extended.invoiceProfit.findMany({
         where,
         include: {
-          stok: {
+          product: {
             select: {
               id: true,
-              stokKodu: true,
-              stokAdi: true,
+              code: true,
+              name: true,
             },
           },
-          fatura: {
+          invoice: {
             select: {
               id: true,
-              faturaNo: true,
-              tarih: true,
-              cari: {
+              invoiceNo: true,
+              date: true,
+              account: {
                 select: {
                   id: true,
-                  unvan: true,
+                  title: true,
                 },
               },
             },
           },
         },
         orderBy: {
-          fatura: {
-            tarih: 'desc',
+          invoice: {
+            date: 'desc',
           },
         },
       });
 
-      console.log(`[getProfitByProduct] ${profitRecords.length} profit kaydı bulundu`);
+      console.log(`[getProfitByProduct] ${profitRecords.length} profit records found`);
     }
 
-    // Ürün bazlı toplamlar
+    // Product-based totals
     const productMap = new Map<
       string,
       {
-        stok: { id: string; stokKodu: string; stokAdi: string };
-        toplamMiktar: number;
-        toplamSatisTutari: number;
-        toplamMaliyet: number;
-        toplamKar: number;
-        faturalar: Array<{
-          faturaId: string;
-          faturaNo: string;
-          tarih: Date;
-          cari: { id: string; unvan: string };
-          miktar: number;
-          satisTutari: number;
-          maliyet: number;
-          kar: number;
+        product: { id: string; code: string; name: string };
+        totalQuantity: number;
+        totalSalesAmount: number;
+        totalCost: number;
+        totalProfit: number;
+        invoices: Array<{
+          invoiceId: string;
+          invoiceNo: string;
+          date: Date;
+          account: { id: string; title: string };
+          quantity: number;
+          salesAmount: number;
+          cost: number;
+          profit: number;
         }>;
       }
     >();
 
     for (const record of profitRecords) {
-      // Stok null ise bu kaydı atla
-      if (!record.stok) {
+      // Skip if product is null
+      if (!record.product) {
         continue;
       }
 
-      const stokId = record.stokId;
-      if (!productMap.has(stokId)) {
-        productMap.set(stokId, {
-          stok: record.stok,
-          toplamMiktar: 0,
-          toplamSatisTutari: 0,
-          toplamMaliyet: 0,
-          toplamKar: 0,
-          faturalar: [],
+      const productId = record.productId;
+      if (!productMap.has(productId)) {
+        productMap.set(productId, {
+          product: record.product,
+          totalQuantity: 0,
+          totalSalesAmount: 0,
+          totalCost: 0,
+          totalProfit: 0,
+          invoices: [],
         });
       }
 
-      const product = productMap.get(stokId)!;
-      product.toplamMiktar += record.miktar;
-      product.toplamSatisTutari += Number(record.toplamSatisTutari);
-      product.toplamMaliyet += Number(record.toplamMaliyet);
-      product.toplamKar += Number(record.kar);
+      const productEntry = productMap.get(productId)!;
+      productEntry.totalQuantity += record.quantity;
+      productEntry.totalSalesAmount += Number(record.totalSalesAmount);
+      productEntry.totalCost += Number(record.totalCost);
+      productEntry.totalProfit += Number(record.profit);
 
-      product.faturalar.push({
-        faturaId: record.faturaId,
-        faturaNo: record.fatura.faturaNo,
-        tarih: record.fatura.tarih,
-        cari: record.fatura.cari,
-        miktar: record.miktar,
-        satisTutari: Number(record.toplamSatisTutari),
-        maliyet: Number(record.toplamMaliyet),
-        kar: Number(record.kar),
+      productEntry.invoices.push({
+        invoiceId: record.invoiceId,
+        invoiceNo: record.invoice.invoiceNo,
+        date: record.invoice.date,
+        account: record.invoice.account,
+        quantity: record.quantity,
+        salesAmount: Number(record.totalSalesAmount),
+        cost: Number(record.totalCost),
+        profit: Number(record.profit),
       });
     }
 
-    // Map'i array'e çevir ve kar oranını hesapla
+    // Convert Map to array and calculate profit rate
     const result = Array.from(productMap.values()).map((product) => ({
       ...product,
-      karOrani:
-        product.toplamMaliyet > 0
-          ? (product.toplamKar / product.toplamMaliyet) * 100
+      profitRate:
+        product.totalCost > 0
+          ? (product.totalProfit / product.totalCost) * 100
           : 0,
     }));
 
@@ -588,238 +586,234 @@ export class InvoiceProfitService {
   }
 
   /**
-   * Fatura bazlı karlılık listesi (master-detail için)
+   * Invoice bazlı karlılık listesi (master-detail için)
    */
   async getProfitList(filters?: {
     startDate?: Date;
     endDate?: Date;
-    cariId?: string;
-    durum?: string;
+    accountId?: string;
+    status?: string;
     tenantId?: string;
   }) {
     const tenantId = filters?.tenantId ?? (await this.tenantResolver.resolveForQuery());
 
-    const where: Prisma.FaturaWhereInput = {
-      faturaTipi: 'SATIS',
-      ...(filters?.cariId && { cariId: filters.cariId }),
-      ...(filters?.durum && { durum: filters.durum as any }),
+    const where: Prisma.InvoiceWhereInput = {
+      invoiceType: 'SALE',
+      ...(filters?.accountId && { accountId: filters.accountId }),
+      ...(filters?.status && { status: filters.status as any }),
       ...(filters?.startDate || filters?.endDate
         ? {
-            tarih: {
-              ...(filters?.startDate && { gte: filters.startDate }),
-              ...(filters?.endDate && { lte: filters.endDate }),
-            },
-          }
+          date: {
+            ...(filters?.startDate && { gte: filters.startDate }),
+            ...(filters?.endDate && { lte: filters.endDate }),
+          },
+        }
         : {}),
     };
-    
+
     // TenantId varsa filtre ekle, yoksa ekleme (null tenantId'li faturalar da dahil)
     if (tenantId) {
       where.tenantId = tenantId;
     }
 
-    const faturalar = await this.prisma.fatura.findMany({
+    const invoices = await this.prisma.extended.invoice.findMany({
       where,
       include: {
-        cari: {
+        account: {
           select: {
             id: true,
-            cariKodu: true,
-            unvan: true,
+            code: true,
+            title: true,
           },
         },
       },
       orderBy: [
-        { tarih: 'desc' },
+        { date: 'desc' },
         { createdAt: 'desc' },
       ],
     });
 
-    // Her fatura için toplam kar kaydını ayrı sorgu ile al
-    const faturaIds = faturalar.map((f) => f.id);
-    
+    // Get total profit record for each invoice with separate query
+    const invoiceIds = invoices.map((f) => f.id);
+
     // TenantId null ise filtre eklemeyelim, varsa filtreleyelim
     const profitWhere: Prisma.InvoiceProfitWhereInput = {
-      faturaId: { in: faturaIds },
-      faturaKalemiId: null, // Sadece toplam kayıtları
+      invoiceId: { in: invoiceIds },
+      invoiceItemId: null, // Sadece toplam kayıtları
     };
-    
+
     // TenantId varsa filtre ekle, yoksa ekleme (null tenantId'li kayıtlar da dahil)
     if (tenantId) {
       profitWhere.tenantId = tenantId;
     }
-    
-    const toplamKarKayitlari = await this.prisma.invoiceProfit.findMany({
+
+    const totalProfitRecords = await this.prisma.extended.invoiceProfit.findMany({
       where: profitWhere,
     });
 
-    const karMap = new Map(
-      toplamKarKayitlari.map((k) => [k.faturaId, k]),
+    const profitMap = new Map(
+      totalProfitRecords.map((k) => [k.invoiceId, k]),
     );
 
-    // Profit kaydı olmayan faturalar için otomatik hesaplama yap
-    const faturalarWithoutProfit = faturalar.filter((f) => !karMap.has(f.id));
-    
-    // Toplu olarak profit hesapla (async olarak, hata durumunda sessizce devam et)
-    if (faturalarWithoutProfit.length > 0) {
-      console.log(`[getProfitList] ${faturalarWithoutProfit.length} fatura için profit hesaplaması yapılıyor...`);
-      
+    // Calculate profit automatically for invoices without profit record
+    const invoicesWithoutProfit = invoices.filter((f) => !profitMap.has(f.id));
+
+    // Bulk calculate profit (async, continue silently on error)
+    if (invoicesWithoutProfit.length > 0) {
+      console.log(`[getProfitList] Calculating profit for ${invoicesWithoutProfit.length} invoices...`);
+
       await Promise.allSettled(
-        faturalarWithoutProfit.map((fatura) =>
-          this.calculateAndSaveProfit(fatura.id).catch((err) => {
-            console.error(`[getProfitList] Profit hesaplama hatası (fatura ${fatura.id}):`, err);
+        invoicesWithoutProfit.map((invoice) =>
+          this.calculateAndSaveProfit(invoice.id).catch((err) => {
+            console.error(`[getProfitList] Profit calculation error (invoice ${invoice.id}):`, err);
           })
         )
       );
 
-      // Yeniden sorgula (tenantId kontrolü ile)
-      const yeniProfitWhere: Prisma.InvoiceProfitWhereInput = {
-        faturaId: { in: faturaIds },
-        faturaKalemiId: null,
+      // Re-query (with tenantId check)
+      const newProfitWhere: Prisma.InvoiceProfitWhereInput = {
+        invoiceId: { in: invoiceIds },
+        invoiceItemId: null,
       };
-      
+
       if (tenantId) {
-        yeniProfitWhere.tenantId = tenantId;
+        newProfitWhere.tenantId = tenantId;
       }
-      
-      const yeniToplamKarKayitlari = await this.prisma.invoiceProfit.findMany({
-        where: yeniProfitWhere,
+
+      const newTotalProfitRecords = await this.prisma.extended.invoiceProfit.findMany({
+        where: newProfitWhere,
       });
 
-      yeniToplamKarKayitlari.forEach((k) => {
-        karMap.set(k.faturaId, k);
+      newTotalProfitRecords.forEach((k) => {
+        profitMap.set(k.invoiceId, k);
       });
-      
-      console.log(`[getProfitList] ${yeniToplamKarKayitlari.length} profit kaydı bulundu`);
+
+      console.log(`[getProfitList] ${newTotalProfitRecords.length} profit records found`);
     }
 
-    return faturalar.map((fatura) => {
-      const toplamKar = karMap.get(fatura.id);
-      
+    return invoices.map((invoice) => {
+      const totalProfit = profitMap.get(invoice.id);
+
       return {
-        fatura: {
-          id: fatura.id,
-          faturaNo: fatura.faturaNo,
-          tarih: fatura.tarih,
-          cari: fatura.cari,
-          durum: fatura.durum,
+        invoice: {
+          id: invoice.id,
+          invoiceNo: invoice.invoiceNo,
+          date: invoice.date,
+          account: invoice.account,
+          status: invoice.status,
         },
-        toplamSatisTutari: toplamKar
-          ? Number(toplamKar.toplamSatisTutari)
-          : Number(fatura.genelToplam || 0), // KDV dahil (fallback)
-        toplamMaliyet: toplamKar ? Number(toplamKar.toplamMaliyet) : 0,
-        toplamKar: toplamKar ? Number(toplamKar.kar) : 0,
-        karOrani: toplamKar ? Number(toplamKar.karOrani) : 0,
+        totalSalesAmount: totalProfit
+          ? Number(totalProfit.totalSalesAmount)
+          : Number(invoice.grandTotal || 0), // VAT included (fallback)
+        totalCost: totalProfit ? Number(totalProfit.totalCost) : 0,
+        totalProfit: totalProfit ? Number(totalProfit.profit) : 0,
+        profitRate: totalProfit ? Number(totalProfit.profitRate) : 0,
       };
     });
   }
 
-  /**
-   * Fatura detay kar bilgileri (master-detail için detay)
-   */
-  async getProfitDetailByInvoice(faturaId: string) {
-    // Önce profit kayıtlarını kontrol et
-    let kalemKarKayitlari = await this.prisma.invoiceProfit.findMany({
+  async getProfitDetailByInvoice(invoiceId: string) {
+    // First check profit records
+    let itemProfitRecords = await this.prisma.extended.invoiceProfit.findMany({
       where: {
-        faturaId,
-        faturaKalemiId: { not: null },
+        invoiceId: invoiceId,
+        invoiceItemId: { not: null },
       },
       include: {
-        faturaKalemi: {
+        invoiceItem: {
           include: {
-            stok: {
+            product: {
               select: {
                 id: true,
-                stokKodu: true,
-                stokAdi: true,
+                code: true,
+                name: true,
               },
             },
           },
         },
       },
       orderBy: {
-        hesaplamaTarihi: 'desc', // En yeni kayıtlar önce
+        computedAt: 'desc', // Latest records first
       },
     });
 
-    // Eğer profit kaydı yoksa, otomatik olarak hesapla
-    // Ancak önce geçerli kayıtları kontrol et
-    const hasValidRecords = kalemKarKayitlari.some(
-      (k) => k.faturaKalemiId !== null && k.faturaKalemi !== null,
+    // If no profit records found, calculate automatically
+    const hasValidRecords = itemProfitRecords.some(
+      (k) => k.invoiceItemId !== null && k.invoiceItem !== null,
     );
 
     if (!hasValidRecords) {
       try {
-        console.log(`[getProfitDetailByInvoice] Fatura ${faturaId} için geçerli profit kaydı yok, otomatik hesaplama başlatılıyor...`);
-        await this.calculateAndSaveProfit(faturaId);
-        // Yeniden sorgula
-        kalemKarKayitlari = await this.prisma.invoiceProfit.findMany({
+        console.log(`[getProfitDetailByInvoice] No valid profit record for invoice ${invoiceId}, starting automatic calculation...`);
+        await this.calculateAndSaveProfit(invoiceId);
+        // Re-query
+        itemProfitRecords = await this.prisma.extended.invoiceProfit.findMany({
           where: {
-            faturaId,
-            faturaKalemiId: { not: null },
+            invoiceId: invoiceId,
+            invoiceItemId: { not: null },
           },
           include: {
-            faturaKalemi: {
+            invoiceItem: {
               include: {
-                stok: {
+                product: {
                   select: {
                     id: true,
-                    stokKodu: true,
-                    stokAdi: true,
+                    code: true,
+                    name: true,
                   },
                 },
               },
             },
           },
           orderBy: {
-            hesaplamaTarihi: 'desc',
+            computedAt: 'desc',
           },
         });
-        console.log(`[getProfitDetailByInvoice] Fatura ${faturaId} için ${kalemKarKayitlari.length} profit kaydı bulundu`);
+        console.log(`[getProfitDetailByInvoice] Found ${itemProfitRecords.length} profit records for invoice ${invoiceId}`);
       } catch (error) {
-        console.error(`Profit hesaplama hatası (fatura ${faturaId}):`, error);
-        // Hata durumunda boş array döndür
+        console.error(`Profit calculation error (invoice ${invoiceId}):`, error);
+        // Return empty array on error
         return [];
       }
     }
 
-    // Duplicate kayıtları filtrele - her faturaKalemiId için sadece bir kayıt olmalı
-    // Eğer duplicate varsa, en yeni kaydı al (güvenlik için)
-    const uniqueKalemMap = new Map<string, typeof kalemKarKayitlari[0]>();
-    
-    for (const kayit of kalemKarKayitlari) {
-      // faturaKalemiId null olan kayıtları atla (bunlar toplam kayıtları)
-      if (!kayit.faturaKalemiId) {
+    // Filter duplicate records - each invoiceItemId should have only one record
+    // If duplicates exist, take the latest one (for safety)
+    const uniqueItemMap = new Map<string, typeof itemProfitRecords[0]>();
+
+    for (const record of itemProfitRecords) {
+      // Skip null invoiceItemId (total records)
+      if (!record.invoiceItemId) {
         continue;
       }
-      
-      // Eğer bu faturaKalemiId için kayıt yoksa veya mevcut kayıt daha eskiyse, güncelle
-      const existing = uniqueKalemMap.get(kayit.faturaKalemiId);
-      if (!existing || kayit.hesaplamaTarihi > existing.hesaplamaTarihi) {
-        uniqueKalemMap.set(kayit.faturaKalemiId, kayit);
-      } else if (existing && kayit.hesaplamaTarihi <= existing.hesaplamaTarihi) {
-        // Duplicate kayıt bulundu - bu olmamalı, logla
-        console.warn(`[getProfitDetailByInvoice] Duplicate kayıt bulundu (faturaKalemiId: ${kayit.faturaKalemiId}, id: ${kayit.id}), atlanıyor`);
+
+      // If no record for this invoiceItemId or existing is older, update
+      const existing = uniqueItemMap.get(record.invoiceItemId);
+      if (!existing || record.computedAt > existing.computedAt) {
+        uniqueItemMap.set(record.invoiceItemId, record);
+      } else if (existing && record.computedAt <= existing.computedAt) {
+        // Duplicate record found
+        console.warn(`[getProfitDetailByInvoice] Duplicate record found (invoiceItemId: ${record.invoiceItemId}, id: ${record.id}), skipped`);
       }
     }
 
-    // Map'ten array'e çevir ve faturaKalemi null olan kayıtları filtrele
-    return Array.from(uniqueKalemMap.values())
-      .filter((kayit) => kayit.faturaKalemi !== null)
+    // Convert from Map to array and filter null invoiceItem
+    return Array.from(uniqueItemMap.values())
+      .filter((record) => record.invoiceItem !== null)
       .sort((a, b) => {
-        // Hesaplama tarihine göre sırala (eski kayıtlar önce)
-        return a.hesaplamaTarihi.getTime() - b.hesaplamaTarihi.getTime();
+        // Sort by calculation date (older records first)
+        return a.computedAt.getTime() - b.computedAt.getTime();
       })
-      .map((kayit) => ({
-        id: kayit.id,
-        stok: kayit.faturaKalemi?.stok || null,
-        miktar: kayit.miktar,
-        birimFiyat: Number(kayit.birimFiyat),
-        birimMaliyet: Number(kayit.birimMaliyet),
-        toplamSatisTutari: Number(kayit.toplamSatisTutari),
-        toplamMaliyet: Number(kayit.toplamMaliyet),
-        kar: Number(kayit.kar),
-        karOrani: Number(kayit.karOrani),
+      .map((record) => ({
+        id: record.id,
+        product: record.invoiceItem?.product || null,
+        quantity: record.quantity,
+        unitPrice: Number(record.unitPrice),
+        unitCost: Number(record.unitCost),
+        totalSalesAmount: Number(record.totalSalesAmount),
+        totalCost: Number(record.totalCost),
+        profit: Number(record.profit),
+        profitRate: Number(record.profitRate),
       }));
   }
 }

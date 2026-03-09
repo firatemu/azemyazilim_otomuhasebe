@@ -15,7 +15,7 @@ export class VehicleExpensesService {
         const tenantId = await this.tenantResolver.resolveForCreate();
 
         // Check if vehicle exists and belongs to tenant
-        const vehicle = await this.prisma.extended.companyVehicle.findFirst({
+        const vehicle = await this.prisma.extended.extended.companyVehicle.findFirst({
             where: { id: createDto.vehicleId, tenantId },
         });
 
@@ -23,9 +23,12 @@ export class VehicleExpensesService {
             throw new NotFoundException(`Arac id ${createDto.vehicleId} ile bulunamadi`);
         }
 
-        return this.prisma.extended.vehicleExpense.create({
+        const { date, ...rest } = createDto;
+
+        return this.prisma.extended.extended.vehicleExpense.create({
             data: {
-                ...createDto,
+                ...rest,
+                date: date ? new Date(date) : new Date(),
                 tenantId,
             },
         });
@@ -33,31 +36,31 @@ export class VehicleExpensesService {
 
     async findAll() {
         const tenantId = await this.tenantResolver.resolveForQuery();
-        return this.prisma.extended.vehicleExpense.findMany({
-            where: { tenantId },
+        return this.prisma.extended.extended.vehicleExpense.findMany({
+            where: { tenantId, deletedAt: null },
             include: {
                 vehicle: true,
             },
             orderBy: {
-                tarih: 'desc',
+                date: 'desc',
             },
         });
     }
 
     async findByVehicle(vehicleId: string) {
         const tenantId = await this.tenantResolver.resolveForQuery();
-        return this.prisma.extended.vehicleExpense.findMany({
-            where: { vehicleId, tenantId },
+        return this.prisma.extended.extended.vehicleExpense.findMany({
+            where: { vehicleId, tenantId, deletedAt: null },
             orderBy: {
-                tarih: 'desc',
+                date: 'desc',
             },
         });
     }
 
     async findOne(id: string) {
         const tenantId = await this.tenantResolver.resolveForQuery();
-        const expense = await this.prisma.extended.vehicleExpense.findFirst({
-            where: { id, tenantId },
+        const expense = await this.prisma.extended.extended.vehicleExpense.findFirst({
+            where: { id, tenantId, deletedAt: null },
             include: {
                 vehicle: true,
             },
@@ -73,17 +76,23 @@ export class VehicleExpensesService {
     async update(id: string, updateDto: UpdateVehicleExpenseDto) {
         await this.findOne(id); // Ensure it exists and belongs to tenant
 
-        return this.prisma.extended.vehicleExpense.update({
+        const { date, ...rest } = updateDto;
+
+        return this.prisma.extended.extended.vehicleExpense.update({
             where: { id },
-            data: updateDto,
+            data: {
+                ...rest,
+                date: date ? new Date(date) : undefined,
+            },
         });
     }
 
     async remove(id: string) {
         await this.findOne(id);
 
-        return this.prisma.extended.vehicleExpense.delete({
+        return this.prisma.extended.extended.vehicleExpense.update({
             where: { id },
+            data: { deletedAt: new Date() }
         });
     }
 }

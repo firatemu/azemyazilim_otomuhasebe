@@ -13,12 +13,13 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/guards/roles.guard';
 import { GetCurrentUser } from '../../common/decorators/get-current-user.decorator';
-import { PartRequestStatus, UserRole } from '@prisma/client';
+import { PartRequestStatus } from './dto/create-part-request.dto';
+import { UserRole } from '../../common/enums/user-role.enum';
 
 @UseGuards(JwtAuthGuard)
 @Controller('part-request')
 export class PartRequestController {
-  constructor(private readonly partRequestService: PartRequestService) {}
+  constructor(private readonly partRequestService: PartRequestService) { }
 
   @Post()
   create(

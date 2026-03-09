@@ -3,7 +3,7 @@ import { IsOptional, IsString, IsDateString } from 'class-validator';
 export class GetProfitQueryDto {
   @IsOptional()
   @IsString()
-  stokId?: string;
+  productId?: string;
 
   @IsOptional()
   @IsDateString()
@@ -15,9 +15,9 @@ export class GetProfitQueryDto {
 
   @IsOptional()
   @IsString()
-  cariId?: string;
+  accountId?: string;
 
   @IsOptional()
   @IsString()
-  durum?: string;
+  status?: string;
 }

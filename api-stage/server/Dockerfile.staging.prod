@@ -1,39 +1,37 @@
-# Dockerfile.staging.prod
 FROM node:20-alpine AS base
 
-# Install dependencies only when needed
 FROM base AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app/server
-COPY server/package*.json ./
-RUN npm install --legacy-peer-deps
 
-# Build the source code
+COPY server/package.json server/pnpm-lock.yaml* ./
+RUN corepack enable && pnpm i
+
 FROM base AS builder
 WORKDIR /app/server
 COPY --from=deps /app/server/node_modules ./node_modules
 COPY server/ .
-# Provide a dummy DATABASE_URL for prisma generate during build
-ENV DATABASE_URL="postgresql://postgres:postgres@localhost:5432/postgres"
-RUN node node_modules/prisma/build/index.js generate --schema=./prisma/schema.prisma
-RUN node node_modules/@nestjs/cli/bin/nest.js build
 
-# Production image, copy all the files and run next
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" npx prisma generate
+RUN npm run build
+
 FROM base AS runner
 WORKDIR /app/server
 
 ENV NODE_ENV=production
+ENV PORT=3000
 
-# Copy built code and prisma schema
-COPY --from=builder /app/server/package*.json ./
-COPY --from=builder /app/server/prisma ./prisma
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nestjs
+
 COPY --from=builder /app/server/dist ./dist
-
-# Install production dependencies only
-# We copy node_modules from builder because it already has the generated prisma client
-# but then we prune it to keep only production dependencies
 COPY --from=builder /app/server/node_modules ./node_modules
-RUN npm prune --omit=dev --legacy-peer-deps
+COPY --from=builder /app/server/package.json ./package.json
+COPY --from=builder /app/server/prisma ./prisma
+
+RUN mkdir -p /app/server/uploads && chown -R nestjs:nodejs /app/server/uploads
+
+USER nestjs
 
 EXPOSE 3000
 

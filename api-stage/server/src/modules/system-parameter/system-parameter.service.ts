@@ -18,7 +18,7 @@ export class SystemParameterService {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
     if (!tenantId) {
-      const parameter = await this.prisma.systemParameter.findFirst({
+      const parameter = await this.prisma.extended.systemParameter.findFirst({
         where: {
           key,
           tenantId: null,
@@ -32,7 +32,7 @@ export class SystemParameterService {
       return parameter.value;
     }
 
-    const parameter = await this.prisma.systemParameter.findUnique({
+    const parameter = await this.prisma.extended.systemParameter.findUnique({
       where: {
         tenantId_key: {
           tenantId,
@@ -43,7 +43,7 @@ export class SystemParameterService {
 
     if (!parameter) {
       // Fallback to global parameter
-      const globalParameter = await this.prisma.systemParameter.findFirst({
+      const globalParameter = await this.prisma.extended.systemParameter.findFirst({
         where: {
           key,
           tenantId: null,
@@ -76,7 +76,7 @@ export class SystemParameterService {
 
     // tenantId null ise findFirst kullan, yoksa unique constraint kullan
     if (!tenantId) {
-      const existing = await this.prisma.systemParameter.findFirst({
+      const existing = await this.prisma.extended.systemParameter.findFirst({
         where: {
           key,
           tenantId: null,
@@ -84,7 +84,7 @@ export class SystemParameterService {
       });
 
       if (existing) {
-        await this.prisma.systemParameter.update({
+        await this.prisma.extended.systemParameter.update({
           where: {
             id: existing.id,
           },
@@ -95,7 +95,7 @@ export class SystemParameterService {
           },
         });
       } else {
-        await this.prisma.systemParameter.create({
+        await this.prisma.extended.systemParameter.create({
           data: {
             key,
             value,
@@ -108,7 +108,7 @@ export class SystemParameterService {
     }
 
     // tenantId varsa normal upsert kullan
-    await this.prisma.systemParameter.upsert({
+    await this.prisma.extended.systemParameter.upsert({
       where: {
         tenantId_key: {
           tenantId,
@@ -138,7 +138,7 @@ export class SystemParameterService {
 
     // tenantId null ise tenantId null olan parametreleri getir
     if (!tenantId) {
-      const parameters = await this.prisma.systemParameter.findMany({
+      const parameters = await this.prisma.extended.systemParameter.findMany({
         where: {
           tenantId: null,
         },
@@ -160,7 +160,7 @@ export class SystemParameterService {
     }
 
     // tenantId varsa tenant-scoped parametreleri getir
-    const parameters = await this.prisma.systemParameter.findMany({
+    const parameters = await this.prisma.extended.systemParameter.findMany({
       where: {
         tenantId,
       },
@@ -189,7 +189,7 @@ export class SystemParameterService {
 
     // tenantId null ise tenantId null olan parametreleri getir
     if (!tenantId) {
-      const parameters = await this.prisma.systemParameter.findMany({
+      const parameters = await this.prisma.extended.systemParameter.findMany({
         where: {
           tenantId: null,
           category,
@@ -211,7 +211,7 @@ export class SystemParameterService {
     }
 
     // tenantId varsa tenant-scoped parametreleri getir
-    const parameters = await this.prisma.systemParameter.findMany({
+    const parameters = await this.prisma.extended.systemParameter.findMany({
       where: {
         tenantId,
         category,
@@ -238,7 +238,7 @@ export class SystemParameterService {
   async create(createParameterDto: CreateParameterDto): Promise<any> {
     const tenantId = await this.tenantResolver.resolveForQuery();
 
-    const parameter = await this.prisma.systemParameter.create({
+    const parameter = await this.prisma.extended.systemParameter.create({
       data: {
         ...(tenantId && { tenantId }),
         key: createParameterDto.key,
@@ -267,7 +267,7 @@ export class SystemParameterService {
 
     // tenantId null ise findFirst kullan, yoksa unique constraint kullan
     if (!tenantId) {
-      const existing = await this.prisma.systemParameter.findFirst({
+      const existing = await this.prisma.extended.systemParameter.findFirst({
         where: {
           key,
           tenantId: null,
@@ -275,7 +275,7 @@ export class SystemParameterService {
       });
 
       if (existing) {
-        const updated = await this.prisma.systemParameter.update({
+        const updated = await this.prisma.extended.systemParameter.update({
           where: {
             id: existing.id,
           },
@@ -296,7 +296,7 @@ export class SystemParameterService {
           updatedAt: updated.updatedAt,
         };
       } else {
-        const created = await this.prisma.systemParameter.create({
+        const created = await this.prisma.extended.systemParameter.create({
           data: {
             key,
             value: updateParameterDto.value ?? false,
@@ -318,7 +318,7 @@ export class SystemParameterService {
     }
 
     // tenantId varsa normal upsert kullan
-    const updated = await this.prisma.systemParameter.upsert({
+    const updated = await this.prisma.extended.systemParameter.upsert({
       where: {
         tenantId_key: {
           tenantId,
@@ -358,7 +358,7 @@ export class SystemParameterService {
 
     // tenantId null ise findFirst kullan, yoksa unique constraint kullan
     if (!tenantId) {
-      const parameter = await this.prisma.systemParameter.findFirst({
+      const parameter = await this.prisma.extended.systemParameter.findFirst({
         where: {
           key,
           tenantId: null,
@@ -366,10 +366,10 @@ export class SystemParameterService {
       });
 
       if (!parameter) {
-        throw new NotFoundException(`Parametre bulunamadı: ${key}`);
+        throw new NotFoundException(`Parameter not found: ${key}`);
       }
 
-      await this.prisma.systemParameter.delete({
+      await this.prisma.extended.systemParameter.delete({
         where: {
           id: parameter.id,
         },
@@ -378,7 +378,7 @@ export class SystemParameterService {
     }
 
     // tenantId varsa normal findUnique kullan
-    const parameter = await this.prisma.systemParameter.findUnique({
+    const parameter = await this.prisma.extended.systemParameter.findUnique({
       where: {
         tenantId_key: {
           tenantId,
@@ -388,10 +388,10 @@ export class SystemParameterService {
     });
 
     if (!parameter) {
-      throw new NotFoundException(`Parametre bulunamadı: ${key}`);
+      throw new NotFoundException(`Parameter not found: ${key}`);
     }
 
-    await this.prisma.systemParameter.delete({
+    await this.prisma.extended.systemParameter.delete({
       where: {
         id: parameter.id,
       },

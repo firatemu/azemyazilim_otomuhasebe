@@ -6,7 +6,8 @@ import {
   IsNumber,
   Min,
 } from 'class-validator';
-import { WorkOrderItemType } from '@prisma/client';
+
+export enum WorkOrderItemType { LABOR = 'LABOR', PART = 'PART' }
 
 export class CreateWorkOrderItemDto {
   @IsNotEmpty()
@@ -23,7 +24,7 @@ export class CreateWorkOrderItemDto {
 
   @IsOptional()
   @IsString()
-  stokId?: string;
+  productId?: string;
 
   @IsNumber()
   @Min(1)

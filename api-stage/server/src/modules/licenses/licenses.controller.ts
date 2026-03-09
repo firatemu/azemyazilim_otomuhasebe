@@ -29,7 +29,7 @@ export class LicensesController {
   ) {}
 
   /**
-   * Tenant'ın lisans durumunu getir
+   * Tenant'ın lisans statusunu getir
    */
   @Get('status')
   async getLicenseStatus(@GetCurrentUser('tenantId') tenantId: string) {
@@ -130,7 +130,7 @@ export class LicensesController {
   ) {
     const quantity = parseInt(dto.quantity);
     if (isNaN(quantity) || quantity <= 0) {
-      throw new Error('Geçersiz miktar');
+      throw new Error('Geçersiz quantity');
     }
     return await this.licensesService.purchaseAdditionalUsers(tenantId, quantity);
   }
@@ -145,7 +145,7 @@ export class LicensesController {
   ) {
     const quantity = parseInt(dto.quantity);
     if (isNaN(quantity) || quantity <= 0) {
-      throw new Error('Geçersiz miktar');
+      throw new Error('Geçersiz quantity');
     }
     return await this.licensesService.purchaseModuleLicense(
       tenantId,

@@ -13,7 +13,7 @@ export class CreateWorkOrderDto {
 
   @IsNotEmpty()
   @IsString()
-  cariId: string;
+  accountId: string;
 
   @IsOptional()
   @IsString()

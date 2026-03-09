@@ -20,7 +20,7 @@ export class InvitationService {
     invitedBy: string,
   ): Promise<{ invitation: any; message: string }> {
     // Kullanıcı zaten tenant'a üye mi kontrol et
-    const existingUser = await this.prisma.user.findFirst({
+    const existingUser = await this.prisma.extended.user.findFirst({
       where: {
         email,
         tenantId,
@@ -32,7 +32,7 @@ export class InvitationService {
     }
 
     // Aktif davet var mı kontrol et
-    const existingInvitation = await this.prisma.invitation.findFirst({
+    const existingInvitation = await this.prisma.extended.invitation.findFirst({
       where: {
         email,
         tenantId,
@@ -53,7 +53,7 @@ export class InvitationService {
     expiresAt.setDate(expiresAt.getDate() + 7); // 7 gün geçerli
 
     // Davet oluştur
-    const invitation = await this.prisma.invitation.create({
+    const invitation = await this.prisma.extended.invitation.create({
       data: {
         email,
         tenantId,
@@ -100,7 +100,7 @@ export class InvitationService {
     firstName?: string,
     lastName?: string,
   ): Promise<{ user: any; message: string }> {
-    const invitation = await this.prisma.invitation.findUnique({
+    const invitation = await this.prisma.extended.invitation.findUnique({
       where: { token },
       include: {
         tenant: true,
@@ -116,7 +116,7 @@ export class InvitationService {
     }
 
     if (invitation.expiresAt < new Date()) {
-      await this.prisma.invitation.update({
+      await this.prisma.extended.invitation.update({
         where: { id: invitation.id },
         data: { status: InvitationStatus.EXPIRED },
       });
@@ -124,7 +124,7 @@ export class InvitationService {
     }
 
     // Kullanıcı zaten var mı kontrol et
-    let user = await this.prisma.user.findFirst({
+    let user = await this.prisma.extended.user.findFirst({
       where: {
         email: invitation.email,
         tenantId: invitation.tenantId
@@ -134,7 +134,7 @@ export class InvitationService {
     if (user) {
       // Kullanıcı zaten varsa, tenant'a ekle
       if (user.tenantId !== invitation.tenantId) {
-        await this.prisma.user.update({
+        await this.prisma.extended.user.update({
           where: { id: user.id },
           data: { tenantId: invitation.tenantId },
         });
@@ -146,7 +146,7 @@ export class InvitationService {
         ? `${firstName} ${lastName}`
         : username;
 
-      user = await this.prisma.user.create({
+      user = await this.prisma.extended.user.create({
         data: {
           email: invitation.email,
           username,
@@ -161,7 +161,7 @@ export class InvitationService {
     }
 
     // Daveti kabul edildi olarak işaretle
-    await this.prisma.invitation.update({
+    await this.prisma.extended.invitation.update({
       where: { id: invitation.id },
       data: {
         status: InvitationStatus.ACCEPTED,
@@ -180,7 +180,7 @@ export class InvitationService {
    * Daveti iptal et
    */
   async cancelInvitation(invitationId: string): Promise<void> {
-    await this.prisma.invitation.update({
+    await this.prisma.extended.invitation.update({
       where: { id: invitationId },
       data: { status: InvitationStatus.CANCELLED },
     });
@@ -190,7 +190,7 @@ export class InvitationService {
    * Tenant'ın davetlerini listele
    */
   async getTenantInvitations(tenantId: string) {
-    return await this.prisma.invitation.findMany({
+    return await this.prisma.extended.invitation.findMany({
       where: { tenantId },
       orderBy: { createdAt: 'desc' },
     });

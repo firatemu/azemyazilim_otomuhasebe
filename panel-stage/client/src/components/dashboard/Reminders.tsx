@@ -112,19 +112,19 @@ export default function Reminders() {
 
             // Fetch Personel
             const gun = new Date().getDate();
-            const personelRes = await axios.get('/personel', { params: { aktif: true } });
+            const personelRes = await axios.get('/employee', { params: { aktif: true } });
             const personelData = Array.isArray(personelRes.data) ? personelRes.data : (personelRes.data?.data || []);
 
             let personelOdemeleri = [];
             if (filtre === 'bugun') {
                 personelOdemeleri = personelData.filter((p: any) => {
-                    if (!p.maasGunu) return false;
-                    return p.maasGunu === gun;
+                    if (!p.salaryDay) return false;
+                    return p.salaryDay === gun;
                 });
             }
 
             // Fetch Invoices
-            const faturaRes = await axios.get('/fatura', { params: { limit: 100 } });
+            const faturaRes = await axios.get('/invoice', { params: { limit: 100 } });
             const faturaData = Array.isArray(faturaRes.data) ? faturaRes.data : (faturaRes.data?.data || []);
             const vadesiGecenFaturalar = faturaData.filter((f: any) =>
                 f.vade && new Date(f.vade) < new Date() && Number(f.odenecekTutar) > 0
@@ -133,22 +133,32 @@ export default function Reminders() {
             // Fetch Credit Cards
             const ccBitis = new Date();
             ccBitis.setDate(ccBitis.getDate() + 15);
-            const ccRes = await axios.get('/banka/kredi-karti/yaklasan', {
-                params: { baslangic: baslangicStr, bitis: ccBitis.toISOString() }
+            const ccRes = await axios.get('/bank/credit-cards/upcoming', {
+                params: { start: baslangicStr, end: ccBitis.toISOString() }
             });
             const krediKartiTarihleri = Array.isArray(ccRes.data) ? ccRes.data : [];
 
             // Fetch Installments
-            const krediRes = await axios.get('/banka/taksitler/yaklasan', {
-                params: { baslangic: baslangicStr, bitis: bitisStr }
-            });
-            const krediTaksitleri = Array.isArray(krediRes.data) ? krediRes.data : [];
+            let krediTaksitleri: any[] = [];
+            try {
+                const krediRes = await axios.get('/bank/installments/upcoming', {
+                    params: { start: baslangicStr, end: bitisStr }
+                });
+                krediTaksitleri = Array.isArray(krediRes.data) ? krediRes.data : [];
+            } catch (krediError) {
+                console.warn('Kredi taksitleri yüklenirken hata:', krediError);
+            }
 
             // Fetch Checks
-            const cekRes = await axios.get('/cek-senet/yaklasan', {
-                params: { baslangic: baslangicStr, bitis: bitisStr }
-            });
-            const cekSenetler = Array.isArray(cekRes.data) ? cekRes.data : [];
+            let cekSenetler: any[] = [];
+            try {
+                const cekRes = await axios.get('/checks-promissory-notes/upcoming', {
+                    params: { startDate: baslangicStr, endDate: bitisStr }
+                });
+                cekSenetler = Array.isArray(cekRes.data) ? cekRes.data : [];
+            } catch (cekError) {
+                console.warn('Çek/Senet endpoint\'i çalışmıyor, atlanıyor:', cekError);
+            }
 
             setHatirlaticilar({
                 personelOdemeleri,
@@ -258,8 +268,8 @@ export default function Reminders() {
                                 renderItem={(item: any) => (
                                     <ListItem key={item.id} disablePadding sx={{ mb: 1 }}>
                                         <ListItemText
-                                            primary={`💰 ${item.ad} ${item.soyad}`}
-                                            secondary={`Maaş: ₺${item.maas}`}
+                                            primary={`💰 ${item.firstName} ${item.lastName}`}
+                                            secondary={`Maaş: ₺${item.salary}`}
                                             primaryTypographyProps={{ fontSize: '0.875rem', fontWeight: 600 }}
                                             secondaryTypographyProps={{ fontSize: '0.75rem' }}
                                         />
@@ -314,7 +324,7 @@ export default function Reminders() {
                                 count={hatirlaticilar.cekSenetler.length}
                                 color="var(--chart-5)"
                                 items={hatirlaticilar.cekSenetler}
-                                link="/cek-senet"
+                                link="/checks-promissory-notes"
                                 renderItem={(item: any) => (
                                     <ListItem key={item.id} disablePadding sx={{ mb: 1 }}>
                                         <ListItemText

@@ -33,7 +33,7 @@ export default function NewCariDialog({ open, onClose, onSuccess, showSnackbar }
     useEffect(() => {
         const fetchSatisElemanlari = async () => {
             try {
-                const response = await axios.get('/satis-elemani');
+                const response = await axios.get('/sales-agent');
                 setSatisElemanlari(response.data || []);
             } catch (error) {
                 console.error('Satış elemanları yüklenirken hata:', error);
@@ -151,7 +151,7 @@ export default function NewCariDialog({ open, onClose, onSuccess, showSnackbar }
             setLoading(true);
             const dataToSend = prepareDataToSend(formData);
 
-            await axios.post('/cari', dataToSend);
+            await axios.post('/account', dataToSend);
             showSnackbar('Cari başarıyla eklendi', 'success');
             onSuccess();
             onClose();

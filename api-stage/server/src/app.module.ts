@@ -16,7 +16,7 @@ import { DeletionProtectionModule } from './common/services/deletion-protection.
 import { SecurityModule } from './common/services/security.module';
 import { TenantSecurityExceptionFilter } from './common/filters/tenant-security-exception.filter';
 import { AnalyticsModule } from './modules/analytics/analytics.module';
-import { AracModule } from './modules/arac/arac.module';
+import { VehicleBrandModule } from './modules/vehicle-brand/vehicle-brand.module';
 import { CustomerVehicleModule } from './modules/customer-vehicle/customer-vehicle.module';
 import { WorkOrderModule } from './modules/work-order/work-order.module';
 import { TechniciansModule } from './modules/technicians/technicians.module';
@@ -25,56 +25,59 @@ import { PartRequestModule } from './modules/part-request/part-request.module';
 import { ServiceInvoiceModule } from './modules/service-invoice/service-invoice.module';
 import { JournalEntryModule } from './modules/journal-entry/journal-entry.module';
 import { AuthModule } from './modules/auth/auth.module';
-import { BankaHavaleModule } from './modules/banka-havale/banka-havale.module';
-import { BankaHesapModule } from './modules/banka-hesap/banka-hesap.module';
-import { BankaModule } from './modules/banka/banka.module';
-import { BasitSiparisModule } from './modules/basit-siparis/basit-siparis.module';
-import { CariHareketModule } from './modules/cari-hareket/cari-hareket.module';
-import { CariModule } from './modules/cari/cari.module';
-import { SatisElemaniModule } from './modules/satis-elemani/satis-elemani.module';
+import { BankTransferModule } from './modules/bank-transfer/bank-transfer.module';
+import { BankAccountModule } from './modules/bank-account/bank-account.module';
+import { BankModule } from './modules/bank/bank.module';
+import { SimpleOrderModule } from './modules/simple-order/simple-order.module';
+import { AccountMovementModule } from './modules/account-movement/account-movement.module';
+import { AccountModule } from './modules/account/account.module';
+import { SalesAgentModule } from './modules/sales-agent/sales-agent.module';
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+
 
 import { CodeTemplateModule } from './modules/code-template/code-template.module';
 import { CostingModule } from './modules/costing/costing.module';
-import { DepoModule } from './modules/depo/depo.module';
-import { FaturaModule } from './modules/fatura/fatura.module';
+import { InvoiceModule } from './modules/invoice/invoice.module';
+import { PriceListModule } from './modules/price-list/price-list.module';
 import { InvoiceProfitModule } from './modules/invoice-profit/invoice-profit.module';
-import { FirmaKrediKartiModule } from './modules/firma-kredi-karti/firma-kredi-karti.module';
-import { KasaModule } from './modules/kasa/kasa.module';
-import { KategoriModule } from './modules/kategori/kategori.module';
+import { CompanyCreditCardModule } from './modules/company-credit-card/company-credit-card.module';
+import { CashboxModule } from './modules/cashbox/cashbox.module';
+import { CategoryModule } from './modules/category/category.module';
 import { LicensesModule } from './modules/licenses/licenses.module';
 import { LocationModule } from './modules/location/location.module';
-import { MarkaModule } from './modules/marka/marka.module';
-import { MasrafModule } from './modules/masraf/masraf.module';
+import { BrandModule } from './modules/brand/brand.module';
+import { ExpenseModule } from './modules/expense/expense.module';
 import { PaymentsModule } from './modules/payments/payments.module';
-import { PersonelModule } from './modules/personel/personel.module';
-import { MaasPlanModule } from './modules/maas-plan/maas-plan.module';
-import { MaasOdemeModule } from './modules/maas-odeme/maas-odeme.module';
-import { AvansModule } from './modules/avans/avans.module';
+import { EmployeeModule } from './modules/employee/employee.module';
+import { SalaryPlanModule } from './modules/salary-plan/salary-plan.module';
+import { SalaryPaymentModule } from './modules/salary-payment/salary-payment.module';
+import { AdvanceModule } from './modules/advance/advance.module';
+import { UnitSetModule } from './modules/unit-set/unit-set.module';
 import { PlansModule } from './modules/plans/plans.module';
 import { PriceCardModule } from './modules/price-card/price-card.module';
 import { ProductBarcodeModule } from './modules/product-barcode/product-barcode.module';
 import { PurchaseOrdersModule } from './modules/purchase-orders/purchase-orders.module';
-import { RaporlamaModule } from './modules/raporlama/raporlama.module';
-import { SatinAlmaSiparisiModule } from './modules/satin-alma-siparisi/satin-alma-siparisi.module';
-import { SayimModule } from './modules/sayim/sayim.module';
-import { SiparisModule } from './modules/siparis/siparis.module';
-import { SatisIrsaliyesiModule } from './modules/satis-irsaliyesi/satis-irsaliyesi.module';
-import { SatınAlmaIrsaliyesiModule } from './modules/satin-alma-irsaliyesi/satin-alma-irsaliyesi.module';
+import { ReportingModule } from './modules/reporting/reporting.module';
+import { InventoryCountModule } from './modules/inventory-count/inventory-count.module';
+import { OrderModule } from './modules/order/order.module';
+import { SalesWaybillModule } from './modules/sales-waybill/sales-waybill.module';
+import { PurchaseWaybillModule } from './modules/purchase-waybill/purchase-waybill.module';
 import { StockMoveModule } from './modules/stock-move/stock-move.module';
-import { StokHareketModule } from './modules/stok-hareket/stok-hareket.module';
-import { StokModule } from './modules/stok/stok.module';
+import { ProductMovementModule } from './modules/product-movement/product-movement.module';
+import { ProductModule } from './modules/product/product.module';
 import { SubscriptionsModule } from './modules/subscriptions/subscriptions.module';
 import { SystemParameterModule } from './modules/system-parameter/system-parameter.module';
-import { TahsilatModule } from './modules/tahsilat/tahsilat.module';
-import { TeklifModule } from './modules/teklif/teklif.module';
+import { CollectionModule } from './modules/collection/collection.module';
+// import { QuoteModule } from './modules/quote/quote.module';
 import { TenantsModule } from './modules/tenants/tenants.module';
 import { UsersModule } from './modules/users/users.module';
 import { WarehouseModule } from './modules/warehouse/warehouse.module';
 import { PostalCodeModule } from './modules/postal-code/postal-code.module';
-import { HizliModule } from './modules/hizli/hizli.module';
+import { QuickInvoiceModule } from './modules/quick-invoice/quick-invoice.module';
 import { WarehouseCriticalStockModule } from './modules/warehouse-critical-stock/warehouse-critical-stock.module';
 import { WarehouseTransferModule } from './modules/warehouse-transfer/warehouse-transfer.module';
-import { CekSenetModule } from './modules/cek-senet/cek-senet.module';
+import { CheckBillModule } from './modules/check-bill/check-bill.module';
+import { PosModule } from './modules/pos/pos.module';
 import { PermissionsModule } from './modules/permissions/permissions.module';
 import { RolesModule } from './modules/roles/roles.module';
 import { StorageModule } from './modules/storage/storage.module';
@@ -82,6 +85,8 @@ import { AdminModule } from './modules/admin/admin.module';
 import { QueueModule } from './common/modules/queue.module';
 import { CompanyVehiclesModule } from './modules/company-vehicles/company-vehicles.module';
 import { VehicleExpensesModule } from './modules/vehicle-expenses/vehicle-expenses.module';
+import { RlsModule } from './modules/rls/rls.module';
+
 @Module({
   imports: [
     RolesModule,
@@ -104,38 +109,40 @@ import { VehicleExpensesModule } from './modules/vehicle-expenses/vehicle-expens
     LicenseModule,
     JwtModule.register({}),
     AuthModule,
-    SatisElemaniModule,
+    SalesAgentModule,
     TenantsModule,
     SubscriptionsModule,
     PaymentsModule,
     PlansModule,
     AnalyticsModule,
     UsersModule,
+    DashboardModule,
     LicensesModule,
-    StokModule,
-    StokHareketModule,
-    CariModule,
-    CariHareketModule,
-    FaturaModule,
-    SiparisModule,
-    SatisIrsaliyesiModule,
-    SatınAlmaIrsaliyesiModule,
-    TeklifModule,
-    SayimModule,
-    SystemParameterModule,
-    TahsilatModule,
-    KasaModule,
-    BankaHesapModule,
-    BankaModule,
-    FirmaKrediKartiModule,
-    DepoModule,
-    MasrafModule,
-    BankaHavaleModule,
 
-    PersonelModule,
-    MaasPlanModule,
-    MaasOdemeModule,
-    AvansModule,
+    ProductModule,
+    ProductMovementModule,
+    AccountModule,
+    AccountMovementModule,
+    InvoiceModule,
+    OrderModule,
+    SalesWaybillModule,
+    PurchaseWaybillModule,
+    // QuoteModule,
+    InventoryCountModule,
+    SystemParameterModule,
+    CollectionModule,
+    CashboxModule,
+    BankAccountModule,
+    BankModule,
+    CompanyCreditCardModule,
+    ExpenseModule,
+    BankTransferModule,
+
+    EmployeeModule,
+    SalaryPlanModule,
+    // SalaryPaymentModule, // Temporarily disabled due to multiple errors
+    AdvanceModule,
+    UnitSetModule,
     WarehouseModule,
     WarehouseCriticalStockModule,
     PostalCodeModule,
@@ -146,10 +153,10 @@ import { VehicleExpensesModule } from './modules/vehicle-expenses/vehicle-expens
     PriceCardModule,
     CostingModule,
     InvoiceProfitModule,
-    RaporlamaModule,
-    MarkaModule,
-    KategoriModule,
-    AracModule,
+    ReportingModule,
+    BrandModule,
+    CategoryModule,
+    VehicleBrandModule,
     CustomerVehicleModule,
     WorkOrderModule,
     TechniciansModule,
@@ -158,18 +165,18 @@ import { VehicleExpensesModule } from './modules/vehicle-expenses/vehicle-expens
     ServiceInvoiceModule,
     JournalEntryModule,
     PurchaseOrdersModule,
-    BasitSiparisModule,
-    SatinAlmaSiparisiModule,
-    HizliModule,
+    SimpleOrderModule,
+    QuickInvoiceModule,
     // Service Module - REMOVED
     WarehouseTransferModule,
-    CekSenetModule,
-    StorageModule,
+    CheckBillModule,
+    PosModule,
     StorageModule,
     AdminModule,
     QueueModule,
     CompanyVehiclesModule,
     VehicleExpensesModule,
+    RlsModule,
   ],
   controllers: [AppController],
   providers: [

@@ -2,22 +2,82 @@
   "mcpServers": {
     "filesystem": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-filesystem", "/var/www/panel-stage/client"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-filesystem",
+        "/var/www/panel-stage/client"
+      ],
       "env": {}
     },
     "github": {
       "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-github"
+      ],
       "env": {
         "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
       }
     },
     "playwright": {
       "command": "npx",
-      "args": ["-y", "puppeteer-mcp-server"],
+      "args": [
+        "-y",
+        "puppeteer-mcp-server"
+      ],
       "env": {
         "E2E_BASE_URL": "${E2E_BASE_URL}"
       }
+    },
+    "postgres": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@henkey/postgres-mcp-server",
+        "--connection-string",
+        "postgresql://postgres:IKYYJ1R8fUZ3PItqxf6qel12VNbLYiOe@localhost:5432/otomuhasebe_stage"
+      ],
+      "env": {}
+    },
+    "docker": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "docker-mcp",
+        "--config",
+        "{}"
+      ],
+      "env": {}
+    },
+    "memory": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-memory"
+      ],
+      "env": {}
+    },
+    "puppeteer": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-puppeteer"
+      ],
+      "env": {}
+    },
+    "openapi": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@smithery/cli@latest",
+        "run",
+        "openapi-mcp",
+        "--config",
+        "{\"openapiUrl\": \"http://localhost:3000/api-json\"}"
+      ],
+      "env": {}
     }
   }
 }

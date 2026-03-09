@@ -25,7 +25,7 @@ export class CreateInvoiceItemDto {
 
   @IsNumber()
   @Min(0)
-  kdvOrani: number;
+  vatRate: number;
 
   @IsString()
   @IsOptional()
@@ -39,7 +39,7 @@ export class CreateInvoiceFromOrderDto {
 
   @IsDateString()
   @IsOptional()
-  tarih?: string;
+  date?: string;
 
   @IsDateString()
   @IsOptional()
@@ -48,14 +48,14 @@ export class CreateInvoiceFromOrderDto {
   @IsNumber()
   @IsOptional()
   @Min(0)
-  iskonto?: number;
+  discount?: number;
 
   @IsString()
   @IsOptional()
-  aciklama?: string;
+  notes?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateInvoiceItemDto)
-  kalemler: CreateInvoiceItemDto[];
+  items: CreateInvoiceItemDto[];
 }

@@ -1,5 +1,6 @@
 import { IsEnum, IsOptional, IsString, IsDateString } from 'class-validator';
-import { OrderStatus } from '@prisma/client';
+
+export enum OrderStatus { PENDING = 'PENDING', PARTIAL = 'PARTIAL', COMPLETED = 'COMPLETED', CANCELLED = 'CANCELLED' }
 
 export class PurchaseOrderFilterDto {
   @IsEnum(OrderStatus)

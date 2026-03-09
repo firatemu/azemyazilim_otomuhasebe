@@ -16,9 +16,9 @@ import { GetProfitQueryDto } from './dto/get-profit-query.dto';
 export class InvoiceProfitController {
   constructor(private readonly invoiceProfitService: InvoiceProfitService) {}
 
-  @Get('by-invoice/:faturaId')
-  async getProfitByInvoice(@Param('faturaId') faturaId: string) {
-    return this.invoiceProfitService.getProfitByInvoice(faturaId);
+  @Get('by-invoice/:invoiceId')
+  async getProfitByInvoice(@Param('invoiceId') invoiceId: string) {
+    return this.invoiceProfitService.getProfitByInvoice(invoiceId);
   }
 
   @Get('list')
@@ -26,32 +26,32 @@ export class InvoiceProfitController {
     return this.invoiceProfitService.getProfitList({
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
-      cariId: query.cariId,
-      durum: query.durum,
+      accountId: query.accountId,
+      status: query.status,
     });
   }
 
   @Get('by-product')
   async getProfitByProduct(@Query() query: GetProfitQueryDto) {
     return this.invoiceProfitService.getProfitByProduct({
-      stokId: query.stokId,
+      productId: query.productId,
       startDate: query.startDate ? new Date(query.startDate) : undefined,
       endDate: query.endDate ? new Date(query.endDate) : undefined,
     });
   }
 
-  @Get('detail/:faturaId')
-  async getProfitDetail(@Param('faturaId') faturaId: string) {
-    return this.invoiceProfitService.getProfitDetailByInvoice(faturaId);
+  @Get('detail/:invoiceId')
+  async getProfitDetail(@Param('invoiceId') invoiceId: string) {
+    return this.invoiceProfitService.getProfitDetailByInvoice(invoiceId);
   }
 
-  @Post('recalculate/:faturaId')
+  @Post('recalculate/:invoiceId')
   async recalculateProfit(
-    @Param('faturaId') faturaId: string,
+    @Param('invoiceId') invoiceId: string,
     @Request() req: any,
   ) {
     await this.invoiceProfitService.recalculateProfit(
-      faturaId,
+      invoiceId,
       req.user?.id,
     );
     return { message: 'Kar hesaplaması başarıyla güncellendi' };

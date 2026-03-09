@@ -10,7 +10,7 @@ export class LicenseService {
    * Kullanıcının ana paket lisansına sahip olup olmadığını kontrol eder
    */
   async hasBasePlanLicense(userId: string): Promise<boolean> {
-    const license = await this.prisma.userLicense.findFirst({
+    const license = await this.prisma.extended.userLicense.findFirst({
       where: {
         userId,
         licenseType: LicenseType.BASE_PLAN,
@@ -25,7 +25,7 @@ export class LicenseService {
    * Kullanıcının belirli bir modül lisansına sahip olup olmadığını kontrol eder
    */
   async hasModuleLicense(userId: string, moduleSlug: string): Promise<boolean> {
-    const module = await this.prisma.module.findUnique({
+    const module = await this.prisma.extended.module.findUnique({
       where: { slug: moduleSlug },
     });
 
@@ -33,7 +33,7 @@ export class LicenseService {
       return false;
     }
 
-    const license = await this.prisma.userLicense.findFirst({
+    const license = await this.prisma.extended.userLicense.findFirst({
       where: {
         userId,
         licenseType: LicenseType.MODULE,
@@ -49,7 +49,7 @@ export class LicenseService {
    * Tenant'ın toplam kullanıcı limitini hesaplar (ana paket + ek kullanıcılar)
    */
   async getTotalUserLimit(tenantId: string): Promise<number> {
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { tenantId },
       include: { plan: true },
     });
@@ -68,7 +68,7 @@ export class LicenseService {
    * Tenant'ta aktif lisanslı kullanıcı sayısını hesaplar
    */
   async getActiveLicensedUserCount(tenantId: string): Promise<number> {
-    return await this.prisma.userLicense.count({
+    return await this.prisma.extended.userLicense.count({
       where: {
         user: {
           tenantId,
@@ -93,7 +93,7 @@ export class LicenseService {
    * Modül için satın alınan lisans sayısını döndürür
    */
   async getModuleLicenseCount(tenantId: string, moduleSlug: string): Promise<number> {
-    const module = await this.prisma.module.findUnique({
+    const module = await this.prisma.extended.module.findUnique({
       where: { slug: moduleSlug },
     });
 
@@ -101,7 +101,7 @@ export class LicenseService {
       return 0;
     }
 
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { tenantId },
       include: {
         moduleLicenses: {
@@ -121,7 +121,7 @@ export class LicenseService {
    * Modül için atanmış lisans sayısını döndürür
    */
   async getAssignedModuleLicenseCount(tenantId: string, moduleSlug: string): Promise<number> {
-    const module = await this.prisma.module.findUnique({
+    const module = await this.prisma.extended.module.findUnique({
       where: { slug: moduleSlug },
     });
 
@@ -129,7 +129,7 @@ export class LicenseService {
       return 0;
     }
 
-    return await this.prisma.userLicense.count({
+    return await this.prisma.extended.userLicense.count({
       where: {
         user: {
           tenantId,
@@ -159,7 +159,7 @@ export class LicenseService {
     assignedBy: string,
   ): Promise<void> {
     // Zaten lisansı var mı kontrol et
-    const existing = await this.prisma.userLicense.findFirst({
+    const existing = await this.prisma.extended.userLicense.findFirst({
       where: {
         userId,
         licenseType: LicenseType.BASE_PLAN,
@@ -171,7 +171,7 @@ export class LicenseService {
       throw new BadRequestException('Kullanıcının zaten ana paket lisansı var');
     }
 
-    await this.prisma.userLicense.create({
+    await this.prisma.extended.userLicense.create({
       data: {
         userId,
         licenseType: LicenseType.BASE_PLAN,
@@ -188,7 +188,7 @@ export class LicenseService {
     moduleSlug: string,
     assignedBy: string,
   ): Promise<void> {
-    const module = await this.prisma.module.findUnique({
+    const module = await this.prisma.extended.module.findUnique({
       where: { slug: moduleSlug },
     });
 
@@ -196,7 +196,7 @@ export class LicenseService {
       throw new BadRequestException(`Modül bulunamadı: ${moduleSlug}`);
     }
 
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
     });
 
@@ -211,7 +211,7 @@ export class LicenseService {
     }
 
     // Zaten lisansı var mı kontrol et
-    const existing = await this.prisma.userLicense.findFirst({
+    const existing = await this.prisma.extended.userLicense.findFirst({
       where: {
         userId,
         licenseType: LicenseType.MODULE,
@@ -224,7 +224,7 @@ export class LicenseService {
       throw new BadRequestException('Kullanıcının zaten bu modül lisansı var');
     }
 
-    await this.prisma.userLicense.create({
+    await this.prisma.extended.userLicense.create({
       data: {
         userId,
         licenseType: LicenseType.MODULE,
@@ -241,7 +241,7 @@ export class LicenseService {
     licenseId: string,
     revokedBy: string,
   ): Promise<void> {
-    const license = await this.prisma.userLicense.findUnique({
+    const license = await this.prisma.extended.userLicense.findUnique({
       where: { id: licenseId },
     });
 
@@ -253,7 +253,7 @@ export class LicenseService {
       throw new BadRequestException('Lisans zaten iptal edilmiş');
     }
 
-    await this.prisma.userLicense.update({
+    await this.prisma.extended.userLicense.update({
       where: { id: licenseId },
       data: {
         revokedAt: new Date(),
@@ -266,7 +266,7 @@ export class LicenseService {
    * Kullanıcının tüm aktif lisanslarını döndürür
    */
   async getUserLicenses(userId: string) {
-    return await this.prisma.userLicense.findMany({
+    return await this.prisma.extended.userLicense.findMany({
       where: {
         userId,
         revokedAt: null,

@@ -10,7 +10,7 @@ import {
 export class CreateCustomerVehicleDto {
   @IsNotEmpty()
   @IsString()
-  cariId: string;
+  accountId: string;
 
   @IsNotEmpty()
   @IsString()
@@ -73,7 +73,7 @@ export class CreateCustomerVehicleDto {
 
   @IsOptional()
   @IsString()
-  aciklama?: string;
+  notes?: string;
 
   @IsOptional()
   @IsString()

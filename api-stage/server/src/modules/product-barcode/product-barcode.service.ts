@@ -11,46 +11,57 @@ export class ProductBarcodeService {
   constructor(private prisma: PrismaService) {}
 
   async findByProduct(productId: string) {
-    return this.prisma.productBarcode.findMany({
+    return this.prisma.extended.productBarcode.findMany({
       where: { productId },
       orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
     });
   }
 
   async findByBarcode(barcode: string) {
-    const productBarcode = await this.prisma.productBarcode.findUnique({
+    const productBarcode = await this.prisma.extended.productBarcode.findUnique({
       where: { barcode },
       include: {
         product: {
           select: {
             id: true,
-            stokKodu: true,
-            stokAdi: true,
-            marka: true,
+            code: true,
+            name: true,
+            brand: true,
           },
         },
       },
     });
 
     if (!productBarcode) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException('Product not found');
     }
 
-    return productBarcode;
+    return {
+      ...productBarcode,
+      product: (productBarcode as any).product
+        ? {
+            ...(productBarcode as any).product,
+            // Backward-compatible aliases
+            code: (productBarcode as any).product.code,
+            name: (productBarcode as any).product.name,
+            marka: (productBarcode as any).product.brand,
+          }
+        : null,
+    };
   }
 
   async create(createDto: CreateProductBarcodeDto) {
     // Ürün kontrolü
-    const product = await this.prisma.stok.findUnique({
+    const product = await this.prisma.extended.product.findUnique({
       where: { id: createDto.productId },
     });
 
     if (!product) {
-      throw new NotFoundException('Ürün bulunamadı');
+      throw new NotFoundException('Product not found');
     }
 
     // Barkod benzersizliği kontrolü
-    const existing = await this.prisma.productBarcode.findUnique({
+    const existing = await this.prisma.extended.productBarcode.findUnique({
       where: { barcode: createDto.barcode },
     });
 
@@ -60,7 +71,7 @@ export class ProductBarcodeService {
 
     // Eğer birincil barkod olarak işaretleniyorsa, diğer birincil barkodları kaldır
     if (createDto.isPrimary) {
-      await this.prisma.productBarcode.updateMany({
+      await this.prisma.extended.productBarcode.updateMany({
         where: {
           productId: createDto.productId,
           isPrimary: true,
@@ -71,7 +82,7 @@ export class ProductBarcodeService {
       });
     }
 
-    return this.prisma.productBarcode.create({
+    return this.prisma.extended.productBarcode.create({
       data: {
         productId: createDto.productId,
         barcode: createDto.barcode,
@@ -82,30 +93,30 @@ export class ProductBarcodeService {
   }
 
   async remove(id: string) {
-    const productBarcode = await this.prisma.productBarcode.findUnique({
+    const productBarcode = await this.prisma.extended.productBarcode.findUnique({
       where: { id },
     });
 
     if (!productBarcode) {
-      throw new NotFoundException('Barkod bulunamadı');
+      throw new NotFoundException('Barcode not found');
     }
 
-    return this.prisma.productBarcode.delete({
+    return this.prisma.extended.productBarcode.delete({
       where: { id },
     });
   }
 
   async setPrimary(id: string) {
-    const productBarcode = await this.prisma.productBarcode.findUnique({
+    const productBarcode = await this.prisma.extended.productBarcode.findUnique({
       where: { id },
     });
 
     if (!productBarcode) {
-      throw new NotFoundException('Barkod bulunamadı');
+      throw new NotFoundException('Barcode not found');
     }
 
     // Diğer birincil barkodları kaldır
-    await this.prisma.productBarcode.updateMany({
+    await this.prisma.extended.productBarcode.updateMany({
       where: {
         productId: productBarcode.productId,
         isPrimary: true,
@@ -116,7 +127,7 @@ export class ProductBarcodeService {
     });
 
     // Bu barkodu birincil yap
-    return this.prisma.productBarcode.update({
+    return this.prisma.extended.productBarcode.update({
       where: { id },
       data: {
         isPrimary: true,

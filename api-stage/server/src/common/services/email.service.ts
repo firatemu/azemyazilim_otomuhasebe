@@ -68,7 +68,7 @@ export class EmailService {
         <p>Artık Oto Muhasebe sistemini kullanmaya başlayabilirsiniz. Sistemimiz ile:</p>
         <ul style="padding-left: 20px;">
             <li>Stok yönetimi yapabilirsiniz</li>
-            <li>Fatura ve sipariş takibi yapabilirsiniz</li>
+            <li>Invoice ve sipariş takibi yapabilirsiniz</li>
             <li>Cari hesap yönetimi yapabilirsiniz</li>
             <li>Detaylı raporlar alabilirsiniz</li>
         </ul>
@@ -103,7 +103,7 @@ E-posta Adresiniz: ${to}
 
 Artık Oto Muhasebe sistemini kullanmaya başlayabilirsiniz. Sistemimiz ile:
 - Stok yönetimi yapabilirsiniz
-- Fatura ve sipariş takibi yapabilirsiniz
+- Invoice ve sipariş takibi yapabilirsiniz
 - Cari hesap yönetimi yapabilirsiniz
 - Detaylı raporlar alabilirsiniz
 
@@ -240,9 +240,9 @@ Bu otomatik bir e-postadır. Lütfen bu e-postaya yanıt vermeyiniz.
     const itemsHtml = items.map(item => `
       <tr style="border-bottom: 1px solid #eee;">
         <td style="padding: 10px;">${item.cekNo || item.seriNo}</td>
-        <td style="padding: 10px;">${item.cari?.unvan}</td>
+        <td style="padding: 10px;">${item.account?.unvan}</td>
         <td style="padding: 10px;">${new Date(item.vade).toLocaleDateString('tr-TR')}</td>
-        <td style="padding: 10px; text-align: right;">₺${Number(item.kalanTutar).toLocaleString('tr-TR')}</td>
+        <td style="padding: 10px; text-align: right;">₺${Number(item.remainingAmount).toLocaleString('tr-TR')}</td>
       </tr>
     `).join('');
 

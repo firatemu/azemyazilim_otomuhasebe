@@ -1,0 +1,64 @@
+{
+    "name": "Otomuhasebe — Atölye Modu",
+    "short_name": "Atölye",
+    "description": "Otomuhasebe Servis Atölyesi — Offline-First PWA",
+    "start_url": "/servis/is-emirleri",
+    "scope": "/servis",
+    "display": "standalone",
+    "theme_color": "#1565c0",
+    "background_color": "#0d1117",
+    "orientation": "portrait-primary",
+    "lang": "tr-TR",
+    "dir": "ltr",
+    "categories": [
+        "business",
+        "productivity"
+    ],
+    "icons": [
+        {
+            "src": "/icons/icon-72x72.png",
+            "sizes": "72x72",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-96x96.png",
+            "sizes": "96x96",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-128x128.png",
+            "sizes": "128x128",
+            "type": "image/png",
+            "purpose": "any"
+        },
+        {
+            "src": "/icons/icon-192x192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/icon-512x512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "screenshots": [],
+    "shortcuts": [
+        {
+            "name": "İş Emirleri",
+            "short_name": "İş Emirleri",
+            "description": "Aktif iş emirlerini görüntüle",
+            "url": "/servis/is-emirleri",
+            "icons": [
+                {
+                    "src": "/icons/icon-96x96.png",
+                    "sizes": "96x96"
+                }
+            ]
+        }
+    ]
+}

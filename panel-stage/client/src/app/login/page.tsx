@@ -44,7 +44,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [mounted, setMounted] = useState(false);
   const router = useRouter();
-  const { setAuth } = useAuthStore();
+  const { setAuth } = (useAuthStore as any)();
 
   // Prevent hydration mismatch from browser extensions
   useEffect(() => {
@@ -64,6 +64,14 @@ export default function LoginPage() {
 
       const { user, accessToken, refreshToken } = response.data;
       setAuth(user, accessToken, refreshToken);
+
+      // Set cookies via API Route instead of Server Action to avoid 404/EAI errors
+      await fetch('/api/auth/cookies', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessToken, refreshToken, tenantId: user.tenantId }),
+      });
+
       router.push('/dashboard');
     } catch (err: any) {
       const status = err.response?.status;

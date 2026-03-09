@@ -16,8 +16,40 @@ import {
 import {
   Close,
   Search,
+  Receipt,
+  People,
+  Inventory,
+  ShoppingCart,
+  PointOfSale,
+  Add,
+  Description,
+  Assignment,
+  Payment,
+  AccountBalance,
+  AccountBalanceWallet,
+  CreditCard,
+  LocalShipping,
+  Warehouse,
+  Assessment,
+  TrendingUp,
+  TrendingDown,
+  CalendarMonth,
+  Settings,
+  Build,
+  Badge,
+  Event,
+  Notifications,
+  Email,
+  AttachMoney,
+  DirectionsCar,
+  SwapHoriz,
+  Help,
+  Star,
+  Home,
+  Work,
+  Phone,
+  LocationOn,
 } from '@mui/icons-material';
-import * as Icons from '@mui/icons-material';
 
 interface IconPickerProps {
   open: boolean;
@@ -54,14 +86,57 @@ const commonIcons = [
   'AttachMoney',
   'DirectionsCar',
   'SwapHoriz',
+  'Star',
+  'Home',
+  'Work',
+  'Phone',
+  'LocationOn',
+  'Help',
 ];
+
+const IconMap: Record<string, any> = {
+  Receipt,
+  People,
+  Inventory,
+  ShoppingCart,
+  PointOfSale,
+  Add,
+  Description,
+  Assignment,
+  Payment,
+  AccountBalance,
+  AccountBalanceWallet,
+  CreditCard,
+  LocalShipping,
+  Warehouse,
+  Assessment,
+  TrendingUp,
+  TrendingDown,
+  CalendarMonth,
+  Settings,
+  Build,
+  Badge,
+  Event,
+  Notifications,
+  Email,
+  AttachMoney,
+  DirectionsCar,
+  SwapHoriz,
+  Star,
+  Home,
+  Work,
+  Phone,
+  LocationOn,
+  Help,
+  Close,
+  Search,
+};
 
 export default function IconPicker({ open, onClose, onSelect, selectedIcon }: IconPickerProps) {
   const [searchTerm, setSearchTerm] = useState('');
 
-  const filteredIcons = Object.keys(Icons).filter((iconName) =>
-    iconName.toLowerCase().includes(searchTerm.toLowerCase()) &&
-    typeof (Icons as any)[iconName] === 'function'
+  const filteredIcons = commonIcons.filter((iconName) =>
+    iconName.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const handleIconClick = (iconName: string) => {
@@ -70,13 +145,13 @@ export default function IconPicker({ open, onClose, onSelect, selectedIcon }: Ic
   };
 
   const IconComponent = (iconName: string) => {
-    const Icon = (Icons as any)[iconName];
-    return Icon ? <Icon /> : null;
+    const Icon = IconMap[iconName];
+    return Icon ? <Icon /> : <Help />;
   };
 
   return (
     <Dialog open={open} onClose={onClose} maxWidth="md" fullWidth>
-      <DialogTitle component="div" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }} component="div">
+      <DialogTitle component="div" sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6" fontWeight={600}>
           İkon Seçin
         </Typography>
@@ -109,7 +184,7 @@ export default function IconPicker({ open, onClose, onSelect, selectedIcon }: Ic
                 {commonIcons.map((iconName) => {
                   const isSelected = selectedIcon === iconName;
                   return (
-                    <Grid xs={4} sm={3} md={2} key={iconName}>
+                    <Grid size={{ xs: 4, sm: 3, md: 2 }} key={iconName}>
                       <Box
                         onClick={() => handleIconClick(iconName)}
                         sx={{
@@ -150,7 +225,7 @@ export default function IconPicker({ open, onClose, onSelect, selectedIcon }: Ic
               {filteredIcons.slice(0, 50).map((iconName) => {
                 const isSelected = selectedIcon === iconName;
                 return (
-                  <Grid xs={4} sm={3} md={2} key={iconName}>
+                  <Grid size={{ xs: 4, sm: 3, md: 2 }} key={iconName}>
                     <Box
                       onClick={() => handleIconClick(iconName)}
                       sx={{

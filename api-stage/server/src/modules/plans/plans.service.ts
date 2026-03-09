@@ -16,7 +16,7 @@ export class PlansService {
         price: 0,
         maxCompanies: 1,
         maxInvoices: 100,
-        features: ['1 Şirket', '100 Fatura/ay', 'Temel raporlar', 'Email destek'],
+        features: ['1 Şirket', '100 Invoice/ay', 'Temel raporlar', 'Email destek'],
       },
       {
         id: 'BASIC',
@@ -24,7 +24,7 @@ export class PlansService {
         price: 299,
         maxCompanies: 1,
         maxInvoices: 100,
-        features: ['1 Şirket', '100 Fatura/ay', 'Temel raporlar', 'Email destek'],
+        features: ['1 Şirket', '100 Invoice/ay', 'Temel raporlar', 'Email destek'],
       },
       {
         id: 'PROFESSIONAL',
@@ -47,7 +47,7 @@ export class PlansService {
 
   async getPlanLimits(planSlug: string) {
     // Database'den plan bilgisini al
-    const plan = await this.prisma.plan.findUnique({
+    const plan = await this.prisma.extended.plan.findUnique({
       where: { slug: planSlug },
     });
 

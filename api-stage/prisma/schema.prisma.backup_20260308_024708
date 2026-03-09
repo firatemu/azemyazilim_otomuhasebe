@@ -1,0 +1,3452 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model Tenant {
+  id                     String                       @id @default(cuid())
+  uuid                   String                       @unique @default(uuid())
+  name                   String
+  subdomain              String?                      @unique
+  domain                 String?                      @unique
+  status                 TenantStatus                 @default(TRIAL)
+  createdAt              DateTime                     @default(now())
+  updatedAt              DateTime                     @updatedAt
+  auditLogs              AuditLog[]
+  bankaHavaleler         BankaHavale[]
+  basitSiparisler        BasitSiparis[]
+  cariler                Cari[]
+  cekSenetler            CekSenet[]
+  invoices               Fatura[]
+  invitations            Invitation[]
+  invoiceProfits         InvoiceProfit[]
+  kasalar                Kasa[]
+  masraflar              Masraf[]
+  personeller            Personel[]
+  purchaseOrders         PurchaseOrder[]
+  satınAlmaIrsaliyeleri SatınAlmaIrsaliyesi[]       @relation("SatınAlmaIrsaliyesiTenant")
+  satinAlmaSiparisleri   SatınAlmaSiparisi[]
+  satisIrsaliyeleri      SatisIrsaliyesi[]            @relation("SatisIrsaliyesiTenant")
+  sayimlar               Sayim[]
+  siparisler             Siparis[]
+  stoklar                Stok[]
+  subscription           Subscription?
+  systemParameters       SystemParameter[]
+  tahsilatlar            Tahsilat[]
+  technicians            Technician[]
+  teklifler              Teklif[]
+  settings               TenantSettings?
+  users                  User[]
+  maintenanceReminders   VehicleMaintenanceReminder[]
+  vehicles               Vehicle[]
+  warehouseTransfers     WarehouseTransfer[]
+  warehouses             Warehouse[]
+  workOrders             WorkOrder[]
+  randevular             Randevu[]
+  bankalar               Banka[]
+  bordrolar              Bordro[]
+  satisElemanlari        SatisElemani[]
+  maasPlanlari           MaasPlani[]
+  maasOdemeler           MaasOdeme[]
+  maasOdemeDetaylari     MaasOdemeDetay[]
+  avanslar               Avans[]
+  avansMahsuplasmalar    AvansMahsuplasma[]
+
+  @@index([subdomain])
+  @@index([domain])
+  @@index([status])
+  @@index([createdAt])
+  @@map("tenants")
+}
+
+model TenantSettings {
+  id           String   @id @default(cuid())
+  tenantId     String   @unique
+  companyName  String?
+  taxNumber    String?
+  address      String?
+  logoUrl      String?
+  features     Json?
+  limits       Json?
+  timezone     String   @default("Europe/Istanbul")
+  locale       String   @default("tr-TR")
+  currency     String   @default("TRY")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  city         String?
+  companyType  String?  @default("COMPANY")
+  country      String?
+  district     String?
+  email        String?
+  firstName    String?
+  lastName     String?
+  mersisNo     String?
+  neighborhood String?
+  phone        String?
+  postalCode   String?
+  taxOffice    String?
+  tcNo         String?
+  website      String?
+  tenant       Tenant   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@map("tenant_settings")
+}
+
+model Plan {
+  id            String         @id @default(cuid())
+  name          String
+  slug          String         @unique
+  description   String?
+  price         Decimal        @db.Decimal(10, 2)
+  currency      String         @default("TRY")
+  billingPeriod BillingPeriod  @default(MONTHLY)
+  trialDays     Int            @default(0)
+  baseUserLimit Int            @default(1)
+  features      Json?
+  limits        Json?
+  isActive      Boolean        @default(true)
+  isPopular     Boolean        @default(false)
+  isBasePlan    Boolean        @default(true)
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  subscriptions Subscription[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@index([isBasePlan])
+  @@map("plans")
+}
+
+model Subscription {
+  id                    String             @id @default(cuid())
+  tenantId              String             @unique
+  planId                String
+  status                SubscriptionStatus @default(TRIAL)
+  startDate             DateTime           @default(now())
+  endDate               DateTime
+  trialEndsAt           DateTime?
+  canceledAt            DateTime?
+  nextBillingDate       DateTime?
+  lastBillingDate       DateTime?
+  autoRenew             Boolean            @default(true)
+  iyzicoSubscriptionRef String?            @unique
+  additionalUsers       Int                @default(0)
+  createdAt             DateTime           @default(now())
+  updatedAt             DateTime           @updatedAt
+  moduleLicenses        ModuleLicense[]
+  payments              Payment[]
+  plan                  Plan               @relation(fields: [planId], references: [id])
+  tenant                Tenant             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([planId])
+  @@index([status])
+  @@index([endDate])
+  @@index([nextBillingDate])
+  @@map("subscriptions")
+}
+
+model Payment {
+  id              String        @id @default(cuid())
+  subscriptionId  String
+  amount          Decimal       @db.Decimal(10, 2)
+  currency        String        @default("TRY")
+  status          PaymentStatus @default(PENDING)
+  iyzicoPaymentId String?       @unique
+  iyzicoToken     String?       @unique
+  conversationId  String?       @unique
+  invoiceNumber   String?
+  invoiceUrl      String?
+  paidAt          DateTime?
+  failedAt        DateTime?
+  refundedAt      DateTime?
+  errorCode       String?
+  errorMessage    String?
+  paymentMethod   String?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  subscription    Subscription  @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([status])
+  @@index([iyzicoPaymentId])
+  @@index([conversationId])
+  @@index([createdAt])
+  @@map("payments")
+}
+
+model AuditLog {
+  id         String   @id @default(cuid())
+  userId     String?
+  tenantId   String?
+  action     String
+  resource   String?
+  resourceId String?
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime @default(now())
+  tenant     Tenant?  @relation(fields: [tenantId], references: [id])
+
+  @@index([userId])
+  @@index([tenantId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
+
+model User {
+  id                             String                    @id @default(uuid())
+  uuid                           String                    @unique @default(uuid())
+  email                          String
+  username                       String
+  password                       String
+  firstName                      String?
+  lastName                       String?
+  fullName                       String
+  phone                          String?
+  avatarUrl                      String?
+  role                           UserRole                  @default(USER)
+  status                         UserStatus                @default(ACTIVE)
+  isActive                       Boolean                   @default(true)
+  refreshToken                   String?
+  tokenVersion                   Int                       @default(0)
+  tenantId                       String?
+  emailVerified                  Boolean                   @default(false)
+  lastLoginAt                    DateTime?
+  createdAt                      DateTime                  @default(now())
+  updatedAt                      DateTime                  @updatedAt
+  bankaHavaleLogs                BankaHavaleLog[]
+  createdBankaHavaleler          BankaHavale[]             @relation("BankaHavaleCreatedBy")
+  deletedBankaHavaleler          BankaHavale[]             @relation("BankaHavaleDeletedBy")
+  updatedBankaHavaleler          BankaHavale[]             @relation("BankaHavaleUpdatedBy")
+  cekSenetLogs                   CekSenetLog[]
+  createdCekSenetler             CekSenet[]                @relation("CekSenetCreatedBy")
+  deletedCekSenetler             CekSenet[]                @relation("CekSenetDeletedBy")
+  updatedCekSenetler             CekSenet[]                @relation("CekSenetUpdatedBy")
+  deletedBankaHavaleRecords      DeletedBankaHavale[]      @relation("DeletedBankaHavaleDeletedBy")
+  deletedCekSenetRecords         DeletedCekSenet[]         @relation("DeletedCekSenetDeletedBy")
+  faturaLogs                     FaturaLog[]
+  createdFaturalar               Fatura[]                  @relation("FaturaCreatedBy")
+  deletedFaturalar               Fatura[]                  @relation("FaturaDeletedBy")
+  updatedFaturalar               Fatura[]                  @relation("FaturaUpdatedBy")
+  createdKasaHareketler          KasaHareket[]             @relation("KasaHareketCreatedBy")
+  createdKasalar                 Kasa[]                    @relation("KasaCreatedBy")
+  updatedKasalar                 Kasa[]                    @relation("KasaUpdatedBy")
+  createdPersonelOdemeler        PersonelOdeme[]           @relation("PersonelOdemeCreatedBy")
+  createdPersoneller             Personel[]                @relation("PersonelCreatedBy")
+  updatedPersoneller             Personel[]                @relation("PersonelUpdatedBy")
+  createdPriceCards              PriceCard[]               @relation("PriceCardCreatedBy")
+  updatedPriceCards              PriceCard[]               @relation("PriceCardUpdatedBy")
+  createdSatınAlmaIrsaliyeleri  SatınAlmaIrsaliyesi[]    @relation("SatınAlmaIrsaliyesiCreatedBy")
+  deletedSatınAlmaIrsaliyeleri  SatınAlmaIrsaliyesi[]    @relation("SatınAlmaIrsaliyesiDeletedBy")
+  updatedSatınAlmaIrsaliyeleri  SatınAlmaIrsaliyesi[]    @relation("SatınAlmaIrsaliyesiUpdatedBy")
+  satınAlmaIrsaliyesiLogs       SatınAlmaIrsaliyesiLog[] @relation("SatınAlmaIrsaliyesiLogUser")
+  satinAlmaSiparisLogs           SatınAlmaSiparisLog[]    @relation("SatınAlmaSiparisLogUser")
+  createdSatinAlmaSiparisler     SatınAlmaSiparisi[]      @relation("SatınAlmaSiparisiCreatedBy")
+  deletedSatinAlmaSiparisler     SatınAlmaSiparisi[]      @relation("SatınAlmaSiparisiDeletedBy")
+  updatedSatinAlmaSiparisler     SatınAlmaSiparisi[]      @relation("SatınAlmaSiparisiUpdatedBy")
+  createdSatisIrsaliyeleri       SatisIrsaliyesi[]         @relation("SatisIrsaliyesiCreatedBy")
+  deletedSatisIrsaliyeleri       SatisIrsaliyesi[]         @relation("SatisIrsaliyesiDeletedBy")
+  updatedSatisIrsaliyeleri       SatisIrsaliyesi[]         @relation("SatisIrsaliyesiUpdatedBy")
+  satisIrsaliyesiLogs            SatisIrsaliyesiLog[]      @relation("SatisIrsaliyesiLogUser")
+  createdSayimlar                Sayim[]                   @relation("SayimCreatedBy")
+  onayladigiSayimlar             Sayim[]                   @relation("SayimOnaylayan")
+  updatedSayimlar                Sayim[]                   @relation("SayimUpdatedBy")
+  sessions                       Session[]
+  siparisHazirliklar             SiparisHazirlik[]         @relation("SiparisHazirlikCreatedBy")
+  siparisLogs                    SiparisLog[]
+  createdSiparisler              Siparis[]                 @relation("SiparisCreatedBy")
+  deletedSiparisler              Siparis[]                 @relation("SiparisDeletedBy")
+  updatedSiparisler              Siparis[]                 @relation("SiparisUpdatedBy")
+  stockMoves                     StockMove[]               @relation("StockMoveCreatedBy")
+  createdTahsilatlar             Tahsilat[]                @relation("TahsilatCreatedBy")
+  deletedTahsilatlar             Tahsilat[]                @relation("TahsilatDeletedBy")
+  teklifLogs                     TeklifLog[]               @relation("TeklifLogUser")
+  createdTeklifler               Teklif[]                  @relation("TeklifCreatedBy")
+  deletedTeklifler               Teklif[]                  @relation("TeklifDeletedBy")
+  updatedTeklifler               Teklif[]                  @relation("TeklifUpdatedBy")
+  licenses                       UserLicense[]
+  tenant                         Tenant?                   @relation(fields: [tenantId], references: [id])
+  warehouseTransferLogs          WarehouseTransferLog[]
+  createdWarehouseTransfers      WarehouseTransfer[]       @relation("WarehouseTransferCreatedBy")
+  deletedWarehouseTransfers      WarehouseTransfer[]       @relation("WarehouseTransferDeletedBy")
+  createdBordrolar               Bordro[]                  @relation("BordroCreatedBy")
+  hazirlananWarehouseTransfers   WarehouseTransfer[]       @relation("WarehouseTransferHazirlayan")
+  onaylananWarehouseTransfers    WarehouseTransfer[]       @relation("WarehouseTransferOnaylayan")
+  teslimAlinanWarehouseTransfers WarehouseTransfer[]       @relation("WarehouseTransferTeslimAlan")
+  updatedWarehouseTransfers      WarehouseTransfer[]       @relation("WarehouseTransferUpdatedBy")
+  approvedWorkOrderLines         WorkOrderLine[]           @relation("ApprovedByUser")
+  inAppNotifications             InAppNotification[]
+  createdAvanslar                Avans[]                   @relation("AvansCreatedBy")
+  createdMaasOdemeler            MaasOdeme[]               @relation("MaasOdemeCreatedBy")
+
+  @@unique([email, tenantId])
+  @@index([tenantId])
+  @@index([email])
+  @@index([username])
+  @@index([status])
+  @@index([role])
+  @@map("users")
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  userId       String
+  token        String   @unique
+  refreshToken String?  @unique
+  ipAddress    String?
+  userAgent    String?
+  expiresAt    DateTime
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+  @@index([refreshToken])
+  @@index([expiresAt])
+  @@map("sessions")
+}
+
+model Stok {
+  id                           String                       @id @default(uuid())
+  stokKodu                     String
+  tenantId                     String?
+  stokAdi                      String
+  aciklama                     String?
+  birim                        String
+  alisFiyati                   Decimal                      @db.Decimal(10, 2)
+  satisFiyati                  Decimal                      @db.Decimal(10, 2)
+  kdvOrani                     Int                          @default(20)
+  kritikStokMiktari            Int                          @default(0)
+  kategori                     String?
+  anaKategori                  String?
+  altKategori                  String?
+  marka                        String?
+  model                        String?
+  oem                          String?
+  olcu                         String?
+  raf                          String?
+  barkod                       String?
+  tedarikciKodu                String?
+  esdegerGrupId                String?
+  aracMarka                    String?
+  aracModel                    String?
+  aracMotorHacmi               String?
+  aracYakitTipi                String?
+  createdAt                    DateTime                     @default(now())
+  updatedAt                    DateTime                     @updatedAt
+  basitSiparisler              BasitSiparis[]               @relation("BasitSiparisStok")
+  faturaKalemleri              FaturaKalemi[]
+  invoiceProfits               InvoiceProfit[]
+  priceCards                   PriceCard[]
+  productBarcodes              ProductBarcode[]
+  productLocationStocks        ProductLocationStock[]
+  purchaseOrderItems           PurchaseOrderItem[]          @relation("PurchaseOrderItemStok")
+  satinAlmaIrsaliyesiKalemleri SatınAlmaIrsaliyesiKalemi[] @relation("SatınAlmaIrsaliyesiKalemiStok")
+  satinAlmaSiparisKalemleri    SatınAlmaSiparisKalemi[]    @relation("SatınAlmaSiparisKalemiStok")
+  satisIrsaliyesiKalemleri     SatisIrsaliyesiKalemi[]      @relation("SatisIrsaliyesiKalemiStok")
+  sayimKalemleri               SayimKalemi[]
+  siparisKalemleri             SiparisKalemi[]
+  solutionPackageParts         SolutionPackagePart[]
+  costHistory                  StockCostHistory[]
+  stockMoves                   StockMove[]
+  esdegers                     StokEsdeger[]                @relation("Stok1")
+  esdegers2                    StokEsdeger[]                @relation("Stok2")
+  stokHareketleri              StokHareket[]
+  esdegerGrup                  EsdegerGrup?                 @relation(fields: [esdegerGrupId], references: [id])
+  tenant                       Tenant?                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teklifKalemleri              TeklifKalemi[]
+  urunRaflar                   UrunRaf[]
+  warehouseCriticalStocks      WarehouseCriticalStock[]
+  warehouseTransferItems       WarehouseTransferItem[]
+  workOrderLines               WorkOrderLine[]
+
+  @@unique([stokKodu, tenantId])
+  @@unique([barkod, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, stokKodu])
+  @@index([tenantId, barkod])
+  @@map("stoklar")
+}
+
+model PriceCard {
+  id            String        @id @default(uuid())
+  stokId        String        @map("stok_id")
+  type          PriceCardType
+  price         Decimal       @db.Decimal(12, 2)
+  currency      String        @default("TRY")
+  effectiveFrom DateTime?     @map("effective_from")
+  effectiveTo   DateTime?     @map("effective_to")
+  note          String?
+  createdBy     String?       @map("created_by")
+  updatedBy     String?       @map("updated_by")
+  createdAt     DateTime      @default(now()) @map("created_at")
+  updatedAt     DateTime      @updatedAt @map("updated_at")
+  createdByUser User?         @relation("PriceCardCreatedBy", fields: [createdBy], references: [id])
+  stok          Stok          @relation(fields: [stokId], references: [id], onDelete: Cascade)
+  updatedByUser User?         @relation("PriceCardUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@index([stokId, type, createdAt])
+  @@map("price_cards")
+}
+
+model StockCostHistory {
+  id          String   @id @default(uuid())
+  stokId      String   @map("stok_id")
+  cost        Decimal  @db.Decimal(12, 4)
+  method      String   @default("WEIGHTED_AVERAGE")
+  computedAt  DateTime @default(now()) @map("computed_at")
+  marka       String?
+  anaKategori String?
+  altKategori String?
+  note        String?
+  stok        Stok     @relation(fields: [stokId], references: [id], onDelete: Cascade)
+
+  @@index([stokId, computedAt])
+  @@map("stock_cost_history")
+}
+
+model EsdegerGrup {
+  id        String   @id @default(uuid())
+  grupAdi   String?
+  aciklama  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  urunler   Stok[]
+
+  @@map("esdeger_gruplar")
+}
+
+model StokEsdeger {
+  id        String   @id @default(uuid())
+  stok1Id   String
+  stok2Id   String
+  createdAt DateTime @default(now())
+  stok1     Stok     @relation("Stok1", fields: [stok1Id], references: [id], onDelete: Cascade)
+  stok2     Stok     @relation("Stok2", fields: [stok2Id], references: [id], onDelete: Cascade)
+
+  @@unique([stok1Id, stok2Id])
+  @@map("stok_esdegers")
+}
+
+model StokHareket {
+  id          String      @id @default(uuid())
+  stokId      String
+  hareketTipi HareketTipi
+  miktar      Int
+  birimFiyat  Decimal     @db.Decimal(10, 2)
+  aciklama    String?
+  createdAt   DateTime    @default(now())
+  warehouseId String?
+  stok        Stok        @relation(fields: [stokId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse?  @relation(fields: [warehouseId], references: [id])
+
+  @@map("stok_hareketleri")
+}
+
+model Cari {
+  id                        String                   @id @default(uuid())
+  cariKodu                  String
+  tenantId                  String?
+  unvan                     String
+  tip                       CariTip
+  sirketTipi                SirketTipi?              @default(KURUMSAL)
+  vergiNo                   String?
+  vergiDairesi              String?
+  tcKimlikNo                String?
+  isimSoyisim               String?
+  telefon                   String?
+  email                     String?
+  ulke                      String?                  @default("Türkiye")
+  il                        String?
+  ilce                      String?
+  adres                     String?
+  yetkili                   String?
+  bakiye                    Decimal                  @default(0) @db.Decimal(12, 2)
+  vadeSuresi                Int?
+  aktif                     Boolean                  @default(true)
+  createdAt                 DateTime                 @default(now())
+  updatedAt                 DateTime                 @updatedAt
+  bankaHavaleler            BankaHavale[]
+  bankaHesapHareketler      BankaHesapHareket[]
+  bordrolar                 Bordro[]
+  basitSiparisler           BasitSiparis[]           @relation("BasitSiparisCari")
+  cariHareketler            CariHareket[]
+  tenant                    Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cekSenetler               CekSenet[]
+  faturalar                 Fatura[]
+  firmaKrediKartiHareketler FirmaKrediKartiHareket[]
+  kasaHareketler            KasaHareket[]
+  purchaseOrders            PurchaseOrder[]          @relation("PurchaseOrderSupplier")
+  satınAlmaIrsaliyeleri    SatınAlmaIrsaliyesi[]   @relation("SatınAlmaIrsaliyesiCari")
+  satinAlmaSiparisleri      SatınAlmaSiparisi[]     @relation("SatınAlmaSiparisiCari")
+  satisIrsaliyeleri         SatisIrsaliyesi[]        @relation("SatisIrsaliyesiCari")
+  siparisler                Siparis[]
+  tahsilatlar               Tahsilat[]
+  teklifler                 Teklif[]
+  vehicles                  Vehicle[]
+  workOrders                WorkOrder[]              @relation("WorkOrderCustomer")
+  randevular                Randevu[]                @relation("RandevuCustomer")
+  satisElemaniId            String?
+  satisElemani              SatisElemani?            @relation(fields: [satisElemaniId], references: [id])
+
+  @@unique([cariKodu, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, cariKodu])
+  @@map("cariler")
+}
+
+model CariHareket {
+  id        String     @id @default(uuid())
+  cariId    String
+  tip       BorcAlacak
+  tutar     Decimal    @db.Decimal(12, 2)
+  bakiye    Decimal    @db.Decimal(12, 2)
+  belgeTipi BelgeTipi?
+  belgeNo   String?
+  tarih     DateTime   @default(now())
+  aciklama  String
+  createdAt DateTime   @default(now())
+  updatedAt DateTime   @updatedAt
+  cari      Cari       @relation(fields: [cariId], references: [id], onDelete: Cascade)
+
+  @@index([cariId, tarih])
+  @@map("cari_hareketler")
+}
+
+model Kasa {
+  id                 String            @id @default(uuid())
+  kasaKodu           String
+  tenantId           String?
+  kasaAdi            String
+  kasaTipi           KasaTipi
+  bakiye             Decimal           @default(0) @db.Decimal(15, 2)
+  aktif              Boolean           @default(true)
+  createdBy          String?
+  updatedBy          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  bankaHavaleler     BankaHavale[]
+  cekSenetTahsilat   CekSenet[]
+  firmaKrediKartlari FirmaKrediKarti[]
+  hareketler         KasaHareket[]
+  createdByUser      User?             @relation("KasaCreatedBy", fields: [createdBy], references: [id])
+  tenant             Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser      User?             @relation("KasaUpdatedBy", fields: [updatedBy], references: [id])
+  personelOdemeler   PersonelOdeme[]
+  tahsilatlar        Tahsilat[]
+  avanslar           Avans[]
+  maasOdemeDetaylari MaasOdemeDetay[]
+
+  @@unique([kasaKodu, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, kasaKodu])
+  @@index([kasaTipi])
+  @@index([aktif])
+  @@map("kasalar")
+}
+
+// Banka - Ana banka tanımı
+model Banka {
+  id        String        @id @default(uuid())
+  tenantId  String?
+  ad        String
+  sube      String?
+  sehir     String?
+  yetkili   String?
+  telefon   String?
+  logo      String?
+  durum     Boolean       @default(true)
+  createdAt DateTime      @default(now())
+  updatedAt DateTime      @updatedAt
+  hesaplar  BankaHesabi[]
+  tenant    Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("bankalar")
+}
+
+// Banka Hesabı - Bankaya ait hesaplar
+model BankaHesabi {
+  id                 String              @id @default(uuid())
+  bankaId            String
+  hesapKodu          String              @unique
+  hesapAdi           String?
+  hesapNo            String?
+  iban               String?
+  hesapTipi          BankaHesapTipi
+  bakiye             Decimal             @default(0) @db.Decimal(15, 2)
+  aktif              Boolean             @default(true)
+  // POS hesapları için
+  komisyonOrani      Decimal?            @db.Decimal(5, 2)
+  // Kredi hesapları için
+  krediLimiti        Decimal?            @db.Decimal(15, 2)
+  kullanilanLimit    Decimal?            @db.Decimal(15, 2)
+  // Firma kredi kartları için
+  kartLimiti         Decimal?            @db.Decimal(15, 2)
+  hesapKesimGunu     Int?
+  sonOdemeGunu       Int?
+  terminalNo         String?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+  hareketler         BankaHesapHareket[]
+  banka              Banka               @relation(fields: [bankaId], references: [id], onDelete: Cascade)
+  tahsilatlar        Tahsilat[]
+  maasOdemeDetaylari MaasOdemeDetay[]
+  krediler           BankaKredi[]
+
+  @@index([bankaId])
+  @@index([hesapTipi])
+  @@map("banka_hesaplari")
+}
+
+// Banka Hesap Hareketleri - Tüm hesap hareketleri
+model BankaHesapHareket {
+  id             String               @id @default(uuid())
+  hesapId        String
+  hareketTipi    BankaHareketTipi
+  hareketAltTipi BankaHareketAltTipi?
+  tutar          Decimal              @db.Decimal(15, 2)
+  komisyonOrani  Decimal?             @db.Decimal(5, 2)
+  komisyonTutar  Decimal?             @db.Decimal(15, 2)
+  netTutar       Decimal?             @db.Decimal(15, 2)
+  bakiye         Decimal              @db.Decimal(15, 2)
+  aciklama       String?
+  referansNo     String?
+  cariId         String?
+  tarih          DateTime             @default(now())
+  createdAt      DateTime             @default(now())
+  cari           Cari?                @relation(fields: [cariId], references: [id])
+  hesap          BankaHesabi          @relation(fields: [hesapId], references: [id], onDelete: Cascade)
+
+  @@index([hesapId, tarih])
+  @@index([hareketTipi])
+  @@map("banka_hesap_hareketler")
+}
+
+model BankaKredi {
+  id              String           @id @default(uuid())
+  bankaHesapId    String
+  tutar           Decimal          @db.Decimal(15, 2) // Ana para
+  toplamGeriOdeme Decimal          @db.Decimal(15, 2)
+  taksitSayisi    Int
+  baslangicTarihi DateTime
+  aciklama        String?
+  durum           KrediDurum       @default(AKTIF)
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  hesap           BankaHesabi      @relation(fields: [bankaHesapId], references: [id], onDelete: Cascade)
+  planlar         BankaKrediPlan[]
+
+  @@index([bankaHesapId])
+  @@map("banka_krediler")
+}
+
+model BankaKrediPlan {
+  id         String         @id @default(uuid())
+  krediId    String
+  taksitNo   Int
+  vadeTarihi DateTime
+  tutar      Decimal        @db.Decimal(15, 2)
+  odenen     Decimal        @default(0) @db.Decimal(15, 2)
+  durum      KrediPlanDurum @default(BEKLIYOR)
+  kredi      BankaKredi     @relation(fields: [krediId], references: [id], onDelete: Cascade)
+
+  @@index([krediId])
+  @@map("banka_kredi_planlari")
+}
+
+enum KrediDurum {
+  AKTIF
+  KAPANDI
+  IPTAL
+}
+
+enum KrediPlanDurum {
+  BEKLIYOR
+  ODENDI
+  GECIKMEDE
+  KISMI_ODENDI
+}
+
+model FirmaKrediKarti {
+  id               String                       @id @default(uuid())
+  kasaId           String
+  kartKodu         String                       @unique
+  kartAdi          String
+  bankaAdi         String
+  kartTipi         String?
+  sonDortHane      String?
+  limit            Decimal?                     @db.Decimal(15, 2)
+  bakiye           Decimal                      @default(0) @db.Decimal(15, 2)
+  aktif            Boolean                      @default(true)
+  createdAt        DateTime                     @default(now())
+  updatedAt        DateTime                     @updatedAt
+  hesapKesimTarihi DateTime?
+  sonOdemeTarihi   DateTime?
+  hareketler       FirmaKrediKartiHareket[]
+  hatirlaticilar   FirmaKrediKartiHatirlatici[]
+  kasa             Kasa                         @relation(fields: [kasaId], references: [id], onDelete: Cascade)
+  tahsilatlar      Tahsilat[]
+
+  @@index([kasaId])
+  @@map("firma_kredi_kartlari")
+}
+
+model FirmaKrediKartiHareket {
+  id         String          @id @default(uuid())
+  kartId     String
+  tutar      Decimal         @db.Decimal(15, 2)
+  bakiye     Decimal         @db.Decimal(15, 2)
+  aciklama   String?
+  cariId     String?
+  referansNo String?
+  tarih      DateTime        @default(now())
+  createdAt  DateTime        @default(now())
+  cari       Cari?           @relation(fields: [cariId], references: [id])
+  kart       FirmaKrediKarti @relation(fields: [kartId], references: [id], onDelete: Cascade)
+
+  @@index([kartId, tarih])
+  @@map("firma_kredi_karti_hareketler")
+}
+
+model KasaHareket {
+  id             String          @id @default(uuid())
+  kasaId         String
+  hareketTipi    KasaHareketTipi
+  tutar          Decimal         @db.Decimal(15, 2)
+  komisyonTutari Decimal?        @db.Decimal(15, 2)
+  bsmvTutari     Decimal?        @db.Decimal(15, 2)
+  netTutar       Decimal?        @db.Decimal(15, 2)
+  bakiye         Decimal         @db.Decimal(15, 2)
+  belgeTipi      String?
+  belgeNo        String?
+  cariId         String?
+  aciklama       String?
+  tarih          DateTime        @default(now())
+  transferEdildi Boolean         @default(false)
+  transferTarihi DateTime?
+  createdBy      String?
+  createdAt      DateTime        @default(now())
+  cari           Cari?           @relation(fields: [cariId], references: [id])
+  createdByUser  User?           @relation("KasaHareketCreatedBy", fields: [createdBy], references: [id])
+  kasa           Kasa            @relation(fields: [kasaId], references: [id])
+
+  @@index([kasaId, tarih])
+  @@index([cariId])
+  @@index([transferEdildi])
+  @@map("kasa_hareketler")
+}
+
+model Fatura {
+  id                  String                @id @default(uuid())
+  faturaNo            String
+  faturaTipi          FaturaTipi
+  tenantId            String?
+  cariId              String
+  tarih               DateTime              @default(now())
+  vade                DateTime?
+  iskonto             Decimal               @default(0) @db.Decimal(10, 2)
+  toplamTutar         Decimal               @db.Decimal(12, 2)
+  kdvTutar            Decimal               @db.Decimal(12, 2)
+  genelToplam         Decimal               @db.Decimal(12, 2)
+  aciklama            String?
+  durum               FaturaDurum           @default(ACIK)
+  odenecekTutar       Decimal?              @db.Decimal(12, 2)
+  odenenTutar         Decimal               @default(0) @db.Decimal(12, 2)
+  siparisNo           String?
+  purchaseOrderId     String?               @unique
+  satinAlmaSiparisiId String?               @unique
+  deliveryNoteId      String?
+  satinAlmaIrsaliyeId String?               @unique
+  efaturaStatus       EFaturaStatus?        @default(PENDING)
+  efaturaEttn         String?               @unique
+  createdBy           String?
+  updatedBy           String?
+  deletedAt           DateTime?
+  deletedBy           String?
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
+  efaturaXml          EFaturaXML?
+  kalemler            FaturaKalemi[]
+  logs                FaturaLog[]
+  faturaTahsilatlar   FaturaTahsilat[]
+  cari                Cari                  @relation(fields: [cariId], references: [id])
+  createdByUser       User?                 @relation("FaturaCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser       User?                 @relation("FaturaDeletedBy", fields: [deletedBy], references: [id])
+  irsaliye            SatisIrsaliyesi?      @relation("SatisIrsaliyesiFatura", fields: [deliveryNoteId], references: [id])
+  purchaseOrder       PurchaseOrder?        @relation("PurchaseOrderFatura", fields: [purchaseOrderId], references: [id])
+  satinAlmaIrsaliye   SatınAlmaIrsaliyesi? @relation("SatınAlmaIrsaliyesiFatura", fields: [satinAlmaIrsaliyeId], references: [id])
+  satinAlmaSiparisi   SatınAlmaSiparisi?   @relation("SatınAlmaSiparisiFatura", fields: [satinAlmaSiparisiId], references: [id])
+  tenant              Tenant?               @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser       User?                 @relation("FaturaUpdatedBy", fields: [updatedBy], references: [id])
+  invoiceProfits      InvoiceProfit[]
+  tahsilatlar         Tahsilat[]
+  workOrder           WorkOrder?            @relation("WorkOrderInvoice")
+  satisElemaniId      String?
+  satisElemani        SatisElemani?         @relation(fields: [satisElemaniId], references: [id])
+  warehouseId         String?
+  warehouse           Warehouse?            @relation("FaturaWarehouse", fields: [warehouseId], references: [id])
+
+  @@unique([faturaNo, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, faturaTipi])
+  @@index([tenantId, durum])
+  @@index([tenantId, tarih])
+  @@index([cariId])
+  @@index([durum])
+  @@index([deliveryNoteId])
+  @@map("faturalar")
+}
+
+model FaturaLog {
+  id         String    @id @default(uuid())
+  faturaId   String
+  userId     String?
+  actionType LogAction
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  fatura     Fatura    @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  user       User?     @relation(fields: [userId], references: [id])
+
+  @@index([faturaId])
+  @@index([userId])
+  @@map("fatura_logs")
+}
+
+model FaturaKalemi {
+  id                  String             @id @default(uuid())
+  faturaId            String
+  stokId              String
+  miktar              Int
+  birimFiyat          Decimal            @db.Decimal(10, 2)
+  kdvOrani            Int
+  kdvTutar            Decimal            @db.Decimal(10, 2)
+  tutar               Decimal            @db.Decimal(10, 2)
+  raf                 String?
+  purchaseOrderItemId String?
+  createdAt           DateTime           @default(now())
+  fatura              Fatura             @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  purchaseOrderItem   PurchaseOrderItem? @relation("PurchaseOrderItemFaturaKalemi", fields: [purchaseOrderItemId], references: [id])
+  stok                Stok               @relation(fields: [stokId], references: [id])
+  invoiceProfits      InvoiceProfit[]
+
+  @@map("fatura_kalemleri")
+}
+
+model Tahsilat {
+  id                String           @id @default(uuid())
+  tenantId          String?
+  cariId            String
+  faturaId          String?
+  tip               TahsilatTip
+  tutar             Decimal          @db.Decimal(12, 2)
+  tarih             DateTime         @default(now())
+  odemeTipi         OdemeTipi
+  kasaId            String?
+  bankaHesapId      String?
+  firmaKrediKartiId String?
+  aciklama          String?
+  createdBy         String?
+  deletedAt         DateTime?
+  deletedBy         String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  faturalar         FaturaTahsilat[]
+  bankaHesap        BankaHesabi?     @relation(fields: [bankaHesapId], references: [id])
+  cari              Cari             @relation(fields: [cariId], references: [id])
+  createdByUser     User?            @relation("TahsilatCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser     User?            @relation("TahsilatDeletedBy", fields: [deletedBy], references: [id])
+  fatura            Fatura?          @relation(fields: [faturaId], references: [id])
+  firmaKrediKarti   FirmaKrediKarti? @relation(fields: [firmaKrediKartiId], references: [id])
+  kasa              Kasa?            @relation(fields: [kasaId], references: [id])
+  tenant            Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  satisElemaniId    String?
+  workOrderId       String?
+  satisElemani      SatisElemani?    @relation(fields: [satisElemaniId], references: [id])
+  workOrder         WorkOrder?       @relation(fields: [workOrderId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, deletedAt])
+  @@index([tenantId, tarih])
+  @@index([workOrderId])
+  @@map("tahsilatlar")
+}
+
+model FaturaTahsilat {
+  id         String   @id @default(uuid())
+  faturaId   String
+  tahsilatId String
+  tutar      Decimal  @db.Decimal(12, 2)
+  createdAt  DateTime @default(now())
+  fatura     Fatura   @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  tahsilat   Tahsilat @relation(fields: [tahsilatId], references: [id], onDelete: Cascade)
+
+  @@unique([faturaId, tahsilatId])
+  @@map("fatura_tahsilatlar")
+}
+
+model EFaturaXML {
+  id        String   @id @default(uuid())
+  faturaId  String   @unique
+  xmlData   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  fatura    Fatura   @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+
+  @@map("efatura_xml")
+}
+
+model Siparis {
+  id                 String            @id @default(uuid())
+  siparisNo          String
+  tenantId           String?
+  siparisTipi        SiparisTipi
+  cariId             String
+  tarih              DateTime          @default(now())
+  vade               DateTime?
+  iskonto            Decimal           @default(0) @db.Decimal(10, 2)
+  toplamTutar        Decimal           @db.Decimal(12, 2)
+  kdvTutar           Decimal           @db.Decimal(12, 2)
+  genelToplam        Decimal           @db.Decimal(12, 2)
+  aciklama           String?
+  durum              SiparisDurum      @default(BEKLEMEDE)
+  faturaNo           String?
+  deliveryNoteId     String?           @unique
+  createdBy          String?
+  updatedBy          String?
+  deletedAt          DateTime?
+  deletedBy          String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+  kaynakIrsaliyeleri SatisIrsaliyesi[] @relation("IrsaliyeKaynakSiparis")
+  hazirlananlar      SiparisHazirlik[]
+  kalemler           SiparisKalemi[]
+  logs               SiparisLog[]
+  cari               Cari              @relation(fields: [cariId], references: [id])
+  createdByUser      User?             @relation("SiparisCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser      User?             @relation("SiparisDeletedBy", fields: [deletedBy], references: [id])
+  irsaliye           SatisIrsaliyesi?  @relation("SiparisIrsaliye", fields: [deliveryNoteId], references: [id])
+  tenant             Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser      User?             @relation("SiparisUpdatedBy", fields: [updatedBy], references: [id])
+  teklifler          Teklif[]          @relation("TeklifSiparis")
+
+  @@unique([siparisNo, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, siparisNo])
+  @@index([deliveryNoteId])
+  @@map("siparisler")
+}
+
+model SiparisKalemi {
+  id               String            @id @default(uuid())
+  siparisId        String
+  stokId           String
+  miktar           Int
+  sevkEdilenMiktar Int               @default(0)
+  birimFiyat       Decimal           @db.Decimal(10, 2)
+  kdvOrani         Int
+  kdvTutar         Decimal           @db.Decimal(10, 2)
+  tutar            Decimal           @db.Decimal(10, 2)
+  createdAt        DateTime          @default(now())
+  hazirlananlar    SiparisHazirlik[]
+  siparis          Siparis           @relation(fields: [siparisId], references: [id], onDelete: Cascade)
+  stok             Stok              @relation(fields: [stokId], references: [id])
+
+  @@map("siparis_kalemleri")
+}
+
+model SiparisLog {
+  id         String    @id @default(uuid())
+  siparisId  String
+  userId     String?
+  actionType LogAction
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  siparis    Siparis   @relation(fields: [siparisId], references: [id], onDelete: Cascade)
+  user       User?     @relation(fields: [userId], references: [id])
+
+  @@index([siparisId])
+  @@index([userId])
+  @@map("siparis_logs")
+}
+
+model SiparisHazirlik {
+  id              String        @id @default(uuid())
+  siparisId       String
+  siparisKalemiId String
+  locationId      String
+  miktar          Int
+  hazirlayan      String?
+  createdAt       DateTime      @default(now())
+  hazirlayici     User?         @relation("SiparisHazirlikCreatedBy", fields: [hazirlayan], references: [id])
+  location        Location      @relation(fields: [locationId], references: [id])
+  siparis         Siparis       @relation(fields: [siparisId], references: [id], onDelete: Cascade)
+  siparisKalemi   SiparisKalemi @relation(fields: [siparisKalemiId], references: [id], onDelete: Cascade)
+
+  @@index([siparisId])
+  @@index([siparisKalemiId])
+  @@index([locationId])
+  @@map("siparis_hazirliklar")
+}
+
+model SatisIrsaliyesi {
+  id                      String                  @id @default(uuid())
+  irsaliyeNo              String
+  irsaliyeTarihi          DateTime                @default(now())
+  tenantId                String?
+  cariId                  String
+  depoId                  String?
+  kaynakTip               IrsaliyeKaynakTip
+  kaynakId                String?
+  durum                   IrsaliyeDurum           @default(FATURALANMADI)
+  toplamTutar             Decimal                 @db.Decimal(12, 2)
+  kdvTutar                Decimal                 @db.Decimal(12, 2)
+  genelToplam             Decimal                 @db.Decimal(12, 2)
+  iskonto                 Decimal                 @default(0) @db.Decimal(10, 2)
+  aciklama                String?
+  createdBy               String?
+  updatedBy               String?
+  deletedAt               DateTime?
+  deletedBy               String?
+  createdAt               DateTime                @default(now())
+  updatedAt               DateTime                @updatedAt
+  faturalar               Fatura[]                @relation("SatisIrsaliyesiFatura")
+  cari                    Cari                    @relation("SatisIrsaliyesiCari", fields: [cariId], references: [id])
+  createdByUser           User?                   @relation("SatisIrsaliyesiCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser           User?                   @relation("SatisIrsaliyesiDeletedBy", fields: [deletedBy], references: [id])
+  depo                    Warehouse?              @relation("SatisIrsaliyesiDepo", fields: [depoId], references: [id])
+  kaynakSiparis           Siparis?                @relation("IrsaliyeKaynakSiparis", fields: [kaynakId], references: [id])
+  tenant                  Tenant?                 @relation("SatisIrsaliyesiTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser           User?                   @relation("SatisIrsaliyesiUpdatedBy", fields: [updatedBy], references: [id])
+  kalemler                SatisIrsaliyesiKalemi[]
+  logs                    SatisIrsaliyesiLog[]
+  siparisFromDeliveryNote Siparis?                @relation("SiparisIrsaliye")
+
+  @@unique([irsaliyeNo, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, irsaliyeNo])
+  @@index([tenantId, durum])
+  @@index([tenantId, irsaliyeTarihi])
+  @@index([cariId])
+  @@index([durum])
+  @@index([kaynakId])
+  @@map("satis_irsaliyeleri")
+}
+
+model SatisIrsaliyesiKalemi {
+  id         String          @id @default(uuid())
+  irsaliyeId String
+  stokId     String
+  miktar     Int
+  birimFiyat Decimal         @db.Decimal(10, 2)
+  kdvOrani   Int
+  kdvTutar   Decimal         @db.Decimal(10, 2)
+  tutar      Decimal         @db.Decimal(10, 2)
+  createdAt  DateTime        @default(now())
+  irsaliye   SatisIrsaliyesi @relation(fields: [irsaliyeId], references: [id], onDelete: Cascade)
+  stok       Stok            @relation("SatisIrsaliyesiKalemiStok", fields: [stokId], references: [id])
+
+  @@index([irsaliyeId])
+  @@index([stokId])
+  @@map("satis_irsaliyesi_kalemleri")
+}
+
+model SatisIrsaliyesiLog {
+  id         String          @id @default(uuid())
+  irsaliyeId String
+  userId     String?
+  actionType LogAction
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime        @default(now())
+  irsaliye   SatisIrsaliyesi @relation(fields: [irsaliyeId], references: [id], onDelete: Cascade)
+  user       User?           @relation("SatisIrsaliyesiLogUser", fields: [userId], references: [id])
+
+  @@index([irsaliyeId])
+  @@index([userId])
+  @@map("satis_irsaliyesi_logs")
+}
+
+model Teklif {
+  id               String         @id @default(uuid())
+  teklifNo         String
+  tenantId         String?
+  teklifTipi       TeklifTipi
+  cariId           String
+  tarih            DateTime       @default(now())
+  gecerlilikTarihi DateTime?
+  iskonto          Decimal        @default(0) @db.Decimal(10, 2)
+  toplamTutar      Decimal        @db.Decimal(12, 2)
+  kdvTutar         Decimal        @db.Decimal(12, 2)
+  genelToplam      Decimal        @db.Decimal(12, 2)
+  aciklama         String?
+  durum            TeklifDurum    @default(TEKLIF)
+  siparisId        String?
+  createdBy        String?
+  updatedBy        String?
+  deletedAt        DateTime?
+  deletedBy        String?
+  createdAt        DateTime       @default(now())
+  updatedAt        DateTime       @updatedAt
+  kalemler         TeklifKalemi[]
+  logs             TeklifLog[]
+  cari             Cari           @relation(fields: [cariId], references: [id])
+  createdByUser    User?          @relation("TeklifCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser    User?          @relation("TeklifDeletedBy", fields: [deletedBy], references: [id])
+  siparis          Siparis?       @relation("TeklifSiparis", fields: [siparisId], references: [id])
+  tenant           Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser    User?          @relation("TeklifUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([teklifNo, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, teklifNo])
+  @@map("teklifler")
+}
+
+model TeklifKalemi {
+  id           String   @id @default(uuid())
+  teklifId     String
+  stokId       String
+  miktar       Int
+  birimFiyat   Decimal  @db.Decimal(10, 2)
+  kdvOrani     Int
+  kdvTutar     Decimal  @db.Decimal(10, 2)
+  tutar        Decimal  @db.Decimal(10, 2)
+  iskontoOran  Decimal? @db.Decimal(5, 2)
+  iskontoTutar Decimal? @db.Decimal(10, 2)
+  createdAt    DateTime @default(now())
+  stok         Stok     @relation(fields: [stokId], references: [id])
+  teklif       Teklif   @relation(fields: [teklifId], references: [id], onDelete: Cascade)
+
+  @@map("teklif_kalemleri")
+}
+
+model TeklifLog {
+  id         String    @id @default(uuid())
+  teklifId   String
+  userId     String?
+  actionType LogAction
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  teklif     Teklif    @relation(fields: [teklifId], references: [id], onDelete: Cascade)
+  user       User?     @relation("TeklifLogUser", fields: [userId], references: [id])
+
+  @@index([teklifId])
+  @@index([userId])
+  @@map("teklif_logs")
+}
+
+model Sayim {
+  id            String        @id @default(uuid())
+  sayimNo       String
+  tenantId      String?
+  sayimTipi     SayimTipi
+  tarih         DateTime      @default(now())
+  durum         SayimDurum    @default(TASLAK)
+  aciklama      String?
+  createdBy     String?
+  updatedBy     String?
+  onaylayanId   String?
+  onayTarihi    DateTime?
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
+  kalemler      SayimKalemi[]
+  createdByUser User?         @relation("SayimCreatedBy", fields: [createdBy], references: [id])
+  onaylayan     User?         @relation("SayimOnaylayan", fields: [onaylayanId], references: [id])
+  tenant        Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser User?         @relation("SayimUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([sayimNo, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, sayimNo])
+  @@map("sayimlar")
+}
+
+model SayimKalemi {
+  id            String    @id @default(uuid())
+  sayimId       String
+  stokId        String
+  locationId    String?
+  sistemMiktari Int
+  sayilanMiktar Int
+  farkMiktari   Int
+  createdAt     DateTime  @default(now())
+  location      Location? @relation(fields: [locationId], references: [id])
+  sayim         Sayim     @relation(fields: [sayimId], references: [id], onDelete: Cascade)
+  stok          Stok      @relation(fields: [stokId], references: [id])
+
+  @@index([sayimId])
+  @@index([stokId])
+  @@index([locationId])
+  @@map("sayim_kalemleri")
+}
+
+model Depo {
+  id        String   @id @default(uuid())
+  depoAdi   String   @unique
+  adres     String?
+  yetkili   String?
+  telefon   String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  raflar    Raf[]
+
+  @@map("depolar")
+}
+
+model Raf {
+  id        String    @id @default(uuid())
+  depoId    String
+  rafKodu   String
+  aciklama  String?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+  depo      Depo      @relation(fields: [depoId], references: [id], onDelete: Cascade)
+  urunler   UrunRaf[]
+
+  @@unique([depoId, rafKodu])
+  @@map("raflar")
+}
+
+model UrunRaf {
+  id        String   @id @default(uuid())
+  stokId    String
+  rafId     String
+  miktar    Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  raf       Raf      @relation(fields: [rafId], references: [id], onDelete: Cascade)
+  stok      Stok     @relation(fields: [stokId], references: [id], onDelete: Cascade)
+
+  @@unique([stokId, rafId])
+  @@map("urun_raflar")
+}
+
+model Warehouse {
+  id                      String                   @id @default(uuid())
+  code                    String
+  tenantId                String?
+  name                    String
+  active                  Boolean                  @default(true)
+  address                 String?
+  phone                   String?
+  manager                 String?
+  createdAt               DateTime                 @default(now())
+  updatedAt               DateTime                 @updatedAt
+  isDefault               Boolean                  @default(false)
+  locations               Location[]
+  productLocationStocks   ProductLocationStock[]
+  satınAlmaIrsaliyeleri  SatınAlmaIrsaliyesi[]   @relation("SatınAlmaIrsaliyesiDepo")
+  satisIrsaliyeleri       SatisIrsaliyesi[]        @relation("SatisIrsaliyesiDepo")
+  stockMoves              StockMove[]              @relation("FromWarehouse")
+  stockMoves2             StockMove[]              @relation("ToWarehouse")
+  stok_hareketleri        StokHareket[]
+  warehouseCriticalStocks WarehouseCriticalStock[]
+  faturaWarehouses        Fatura[]                 @relation("FaturaWarehouse")
+  fromWarehouseTransfers  WarehouseTransfer[]      @relation("WarehouseTransferFrom")
+  toWarehouseTransfers    WarehouseTransfer[]      @relation("WarehouseTransferTo")
+  tenant                  Tenant?                  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([code, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, code])
+  @@map("warehouses")
+}
+
+model Location {
+  id                         String                  @id @default(uuid())
+  warehouseId                String
+  layer                      Int
+  corridor                   String
+  side                       Int
+  section                    Int
+  level                      Int
+  code                       String                  @unique
+  barcode                    String                  @unique
+  name                       String?
+  active                     Boolean                 @default(true)
+  createdAt                  DateTime                @default(now())
+  updatedAt                  DateTime                @updatedAt
+  warehouse                  Warehouse               @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+  productLocationStocks      ProductLocationStock[]
+  sayimKalemleri             SayimKalemi[]
+  siparisHazirliklar         SiparisHazirlik[]
+  stockMoves                 StockMove[]             @relation("FromLocation")
+  stockMoves2                StockMove[]             @relation("ToLocation")
+  fromWarehouseTransferItems WarehouseTransferItem[] @relation("WarehouseTransferItemFrom")
+  toWarehouseTransferItems   WarehouseTransferItem[] @relation("WarehouseTransferItemTo")
+
+  @@unique([warehouseId, code])
+  @@index([warehouseId])
+  @@index([code])
+  @@index([barcode])
+  @@map("locations")
+}
+
+model ProductBarcode {
+  id        String   @id @default(uuid())
+  productId String
+  barcode   String   @unique
+  symbology String
+  isPrimary Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  product   Stok     @relation(fields: [productId], references: [id], onDelete: Cascade)
+
+  @@index([productId])
+  @@index([barcode])
+  @@map("product_barcodes")
+}
+
+model ProductLocationStock {
+  id          String    @id @default(uuid())
+  warehouseId String
+  locationId  String
+  productId   String
+  qtyOnHand   Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  location    Location  @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  product     Stok      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, locationId, productId])
+  @@index([warehouseId])
+  @@index([locationId])
+  @@index([productId])
+  @@map("product_location_stocks")
+}
+
+model StockMove {
+  id              String        @id @default(uuid())
+  productId       String
+  fromWarehouseId String?
+  fromLocationId  String?
+  toWarehouseId   String
+  toLocationId    String
+  qty             Int
+  moveType        StockMoveType
+  refType         String?
+  refId           String?
+  note            String?
+  createdAt       DateTime      @default(now())
+  createdBy       String?
+  createdByUser   User?         @relation("StockMoveCreatedBy", fields: [createdBy], references: [id])
+  fromLocation    Location?     @relation("FromLocation", fields: [fromLocationId], references: [id])
+  fromWarehouse   Warehouse?    @relation("FromWarehouse", fields: [fromWarehouseId], references: [id])
+  product         Stok          @relation(fields: [productId], references: [id], onDelete: Cascade)
+  toLocation      Location      @relation("ToLocation", fields: [toLocationId], references: [id])
+  toWarehouse     Warehouse     @relation("ToWarehouse", fields: [toWarehouseId], references: [id])
+
+  @@index([productId])
+  @@index([fromWarehouseId, fromLocationId])
+  @@index([toWarehouseId, toLocationId])
+  @@index([moveType])
+  @@index([createdAt])
+  @@index([refType, refId])
+  @@map("stock_moves")
+}
+
+model MasrafKategori {
+  id          String   @id @default(uuid())
+  kategoriAdi String   @unique
+  aciklama    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  masraflar   Masraf[]
+
+  @@map("masraf_kategoriler")
+}
+
+model Masraf {
+  id         String         @id @default(uuid())
+  tenantId   String?
+  kategoriId String
+  aciklama   String?
+  tutar      Decimal        @db.Decimal(10, 2)
+  tarih      DateTime       @default(now())
+  odemeTipi  OdemeTipi
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+  kategori   MasrafKategori @relation(fields: [kategoriId], references: [id])
+  tenant     Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, tarih])
+  @@map("masraflar")
+}
+
+model BankaHavale {
+  id            String           @id @default(uuid())
+  tenantId      String?
+  hareketTipi   HavaleTipi
+  bankaHesabiId String?
+  cariId        String
+  tutar         Decimal          @db.Decimal(15, 2)
+  tarih         DateTime         @default(now())
+  aciklama      String?
+  referansNo    String?
+  gonderen      String?
+  alici         String?
+  createdBy     String?
+  updatedBy     String?
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdAt     DateTime         @default(now())
+  updatedAt     DateTime         @updatedAt
+  logs          BankaHavaleLog[]
+  bankaHesabi   Kasa?            @relation(fields: [bankaHesabiId], references: [id])
+  cari          Cari             @relation(fields: [cariId], references: [id])
+  createdByUser User?            @relation("BankaHavaleCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser User?            @relation("BankaHavaleDeletedBy", fields: [deletedBy], references: [id])
+  tenant        Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser User?            @relation("BankaHavaleUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, tarih])
+  @@index([bankaHesabiId])
+  @@index([cariId])
+  @@index([tarih])
+  @@index([hareketTipi])
+  @@map("banka_havaleler")
+}
+
+model DeletedBankaHavale {
+  id                String     @id @default(uuid())
+  originalId        String
+  hareketTipi       HavaleTipi
+  bankaHesabiId     String
+  bankaHesabiAdi    String
+  cariId            String
+  cariUnvan         String
+  tutar             Decimal    @db.Decimal(15, 2)
+  tarih             DateTime
+  aciklama          String?
+  referansNo        String?
+  gonderen          String?
+  alici             String?
+  originalCreatedBy String?
+  originalUpdatedBy String?
+  originalCreatedAt DateTime
+  originalUpdatedAt DateTime
+  deletedBy         String?
+  deletedAt         DateTime   @default(now())
+  deleteReason      String?
+  deletedByUser     User?      @relation("DeletedBankaHavaleDeletedBy", fields: [deletedBy], references: [id])
+
+  @@index([originalId])
+  @@index([deletedAt])
+  @@index([bankaHesabiId])
+  @@index([cariId])
+  @@map("deleted_banka_havaleler")
+}
+
+model BankaHavaleLog {
+  id            String      @id @default(uuid())
+  bankaHavaleId String
+  userId        String?
+  actionType    LogAction
+  changes       String?
+  ipAddress     String?
+  userAgent     String?
+  createdAt     DateTime    @default(now())
+  bankaHavale   BankaHavale @relation(fields: [bankaHavaleId], references: [id], onDelete: Cascade)
+  user          User?       @relation(fields: [userId], references: [id])
+
+  @@index([bankaHavaleId])
+  @@index([userId])
+  @@map("banka_havale_logs")
+}
+
+enum BordroTipi {
+  GIRIS_BORDROSU
+  CIKIS_BORDROSU
+}
+
+model Bordro {
+  id          String     @id @default(uuid())
+  bordroNo    String
+  tip         BordroTipi
+  tarih       DateTime   @default(now())
+  cariId      String?
+  aciklama    String?
+  tenantId    String?
+  createdById String?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+
+  cari        Cari?      @relation(fields: [cariId], references: [id])
+  createdBy   User?      @relation("BordroCreatedBy", fields: [createdById], references: [id])
+  tenant      Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  cekSenetler CekSenet[] @relation("CekSenetSonBordro")
+
+  @@map("bordrolar")
+}
+
+model CekSenet {
+  id            String         @id @default(uuid())
+  tenantId      String?
+  tip           CekSenetTip
+  portfoyTip    PortfoyTip
+  cariId        String
+  tutar         Decimal        @db.Decimal(15, 2)
+  vade          DateTime
+  banka         String?
+  sube          String?
+  hesapNo       String?
+  cekNo         String?
+  seriNo        String?
+  durum         CekSenetDurum?
+  tahsilTarihi  DateTime?
+  tahsilKasaId  String?
+  ciroEdildi    Boolean        @default(false)
+  ciroTarihi    DateTime?
+  ciroEdilen    String?
+  aciklama      String?
+  createdBy     String?
+  updatedBy     String?
+  deletedAt     DateTime?
+  deletedBy     String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  logs          CekSenetLog[]
+  cari          Cari           @relation(fields: [cariId], references: [id])
+  createdByUser User?          @relation("CekSenetCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser User?          @relation("CekSenetDeletedBy", fields: [deletedBy], references: [id])
+  tahsilKasa    Kasa?          @relation(fields: [tahsilKasaId], references: [id])
+  tenant        Tenant?        @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser User?          @relation("CekSenetUpdatedBy", fields: [updatedBy], references: [id])
+  sonBordroId   String?
+  sonBordro     Bordro?        @relation("CekSenetSonBordro", fields: [sonBordroId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, vade])
+  @@index([cariId])
+  @@index([vade])
+  @@index([durum])
+  @@index([tip])
+  @@index([portfoyTip])
+  @@map("cek_senetler")
+}
+
+model DeletedCekSenet {
+  id                String        @id @default(uuid())
+  originalId        String
+  tip               CekSenetTip
+  portfoyTip        PortfoyTip
+  cariId            String
+  cariUnvan         String
+  tutar             Decimal       @db.Decimal(15, 2)
+  vade              DateTime
+  banka             String?
+  sube              String?
+  hesapNo           String?
+  cekNo             String?
+  seriNo            String?
+  durum             CekSenetDurum
+  tahsilTarihi      DateTime?
+  tahsilKasaId      String?
+  ciroEdildi        Boolean
+  ciroTarihi        DateTime?
+  ciroEdilen        String?
+  aciklama          String?
+  originalCreatedBy String?
+  originalUpdatedBy String?
+  originalCreatedAt DateTime
+  originalUpdatedAt DateTime
+  deletedBy         String?
+  deletedAt         DateTime      @default(now())
+  deleteReason      String?
+  deletedByUser     User?         @relation("DeletedCekSenetDeletedBy", fields: [deletedBy], references: [id])
+
+  @@index([originalId])
+  @@index([deletedAt])
+  @@index([cariId])
+  @@map("deleted_cek_senetler")
+}
+
+model CekSenetLog {
+  id         String    @id @default(uuid())
+  cekSenetId String
+  userId     String?
+  actionType LogAction
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime  @default(now())
+  cekSenet   CekSenet  @relation(fields: [cekSenetId], references: [id], onDelete: Cascade)
+  user       User?     @relation(fields: [userId], references: [id])
+
+  @@index([cekSenetId])
+  @@index([userId])
+  @@map("cek_senet_logs")
+}
+
+model Personel {
+  id               String          @id @default(uuid())
+  personelKodu     String
+  tenantId         String?
+  tcKimlikNo       String?
+  ad               String
+  soyad            String
+  dogumTarihi      DateTime?
+  cinsiyet         Cinsiyet?
+  medeniDurum      MedeniDurum?
+  telefon          String?
+  email            String?
+  adres            String?
+  il               String?
+  ilce             String?
+  pozisyon         String?
+  departman        String?
+  iseBaslamaTarihi DateTime?
+  istenCikisTarihi DateTime?
+  aktif            Boolean         @default(true)
+  maas             Decimal?        @db.Decimal(10, 2)
+  maasGunu         Int?
+  sgkNo            String?
+  ibanNo           String?
+  bakiye           Decimal         @default(0) @db.Decimal(10, 2)
+  aciklama         String?
+  createdBy        String?
+  updatedBy        String?
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+  odemeler         PersonelOdeme[]
+  prim             Decimal?        @db.Decimal(10, 2) // Aylık prim tutarı
+  maasPlanlari     MaasPlani[]
+  maasOdemeler     MaasOdeme[]
+  avanslar         Avans[]
+  createdByUser    User?           @relation("PersonelCreatedBy", fields: [createdBy], references: [id])
+  tenant           Tenant?         @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser    User?           @relation("PersonelUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([personelKodu, tenantId])
+  @@unique([tcKimlikNo, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, personelKodu])
+  @@index([aktif])
+  @@index([departman])
+  @@map("personeller")
+}
+
+model PersonelOdeme {
+  id            String           @id @default(uuid())
+  personelId    String
+  tip           PersonelOdemeTip
+  tutar         Decimal          @db.Decimal(10, 2)
+  tarih         DateTime         @default(now())
+  donem         String?
+  aciklama      String?
+  kasaId        String?
+  createdBy     String?
+  createdAt     DateTime         @default(now())
+  createdByUser User?            @relation("PersonelOdemeCreatedBy", fields: [createdBy], references: [id])
+  kasa          Kasa?            @relation(fields: [kasaId], references: [id])
+  personel      Personel         @relation(fields: [personelId], references: [id], onDelete: Cascade)
+
+  @@index([personelId])
+  @@index([tarih])
+  @@index([tip])
+  @@map("personel_odemeler")
+}
+
+model CodeTemplate {
+  id           String     @id @default(uuid())
+  module       ModuleType @unique
+  name         String
+  prefix       String
+  digitCount   Int        @default(3)
+  currentValue Int        @default(0)
+  includeYear  Boolean    @default(false)
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  @@map("code_templates")
+}
+
+model Arac {
+  id         String   @id @default(uuid())
+  marka      String
+  model      String
+  motorHacmi String
+  yakitTipi  String
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([marka, model, motorHacmi, yakitTipi])
+  @@index([marka])
+  @@index([model])
+  @@index([yakitTipi])
+  @@map("araclar")
+}
+
+model PurchaseOrder {
+  id                   String              @id @default(uuid())
+  orderNumber          String
+  tenantId             String?
+  supplierId           String              @map("supplier_id")
+  orderDate            DateTime            @default(now()) @map("order_date")
+  expectedDeliveryDate DateTime?           @map("expected_delivery_date")
+  status               OrderStatus         @default(PENDING)
+  totalAmount          Decimal             @map("total_amount") @db.Decimal(12, 2)
+  notes                String?
+  createdAt            DateTime            @default(now()) @map("created_at")
+  updatedAt            DateTime            @updatedAt @map("updated_at")
+  invoices             Fatura?             @relation("PurchaseOrderFatura")
+  items                PurchaseOrderItem[]
+  supplier             Cari                @relation("PurchaseOrderSupplier", fields: [supplierId], references: [id])
+  tenant               Tenant?             @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([orderNumber, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, orderNumber])
+  @@index([supplierId])
+  @@index([status])
+  @@index([orderDate])
+  @@map("purchase_orders")
+}
+
+model PurchaseOrderItem {
+  id               String          @id @default(uuid())
+  purchaseOrderId  String          @map("purchase_order_id")
+  productId        String          @map("product_id")
+  orderedQuantity  Int             @map("ordered_quantity")
+  receivedQuantity Int             @default(0) @map("received_quantity")
+  unitPrice        Decimal         @map("unit_price") @db.Decimal(10, 2)
+  status           OrderItemStatus @default(PENDING)
+  createdAt        DateTime        @default(now()) @map("created_at")
+  invoiceItems     FaturaKalemi[]  @relation("PurchaseOrderItemFaturaKalemi")
+  product          Stok            @relation("PurchaseOrderItemStok", fields: [productId], references: [id])
+  purchaseOrder    PurchaseOrder   @relation(fields: [purchaseOrderId], references: [id], onDelete: Cascade)
+
+  @@index([purchaseOrderId])
+  @@index([productId])
+  @@map("purchase_order_items")
+}
+
+model BasitSiparis {
+  id                  String            @id @default(uuid())
+  tenantId            String?
+  firmaId             String
+  urunId              String
+  miktar              Int
+  durum               BasitSiparisDurum @default(ONAY_BEKLIYOR)
+  createdAt           DateTime          @default(now())
+  updatedAt           DateTime          @updatedAt
+  tedarikEdilenMiktar Int               @default(0)
+  firma               Cari              @relation("BasitSiparisCari", fields: [firmaId], references: [id])
+  tenant              Tenant?           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  urun                Stok              @relation("BasitSiparisStok", fields: [urunId], references: [id])
+
+  @@index([tenantId])
+  @@index([tenantId, firmaId])
+  @@index([tenantId, urunId])
+  @@index([firmaId])
+  @@index([urunId])
+  @@index([durum])
+  @@index([createdAt])
+  @@map("basit_siparisler")
+}
+
+model SatınAlmaSiparisi {
+  id                 String                    @id @default(uuid())
+  siparisNo          String
+  tenantId           String?
+  cariId             String
+  tarih              DateTime                  @default(now())
+  vade               DateTime?
+  iskonto            Decimal                   @default(0) @db.Decimal(10, 2)
+  toplamTutar        Decimal                   @db.Decimal(12, 2)
+  kdvTutar           Decimal                   @db.Decimal(12, 2)
+  genelToplam        Decimal                   @db.Decimal(12, 2)
+  aciklama           String?
+  durum              SatınAlmaSiparisDurum    @default(BEKLEMEDE)
+  faturaNo           String?
+  createdBy          String?
+  updatedBy          String?
+  deletedAt          DateTime?
+  deletedBy          String?
+  createdAt          DateTime                  @default(now())
+  updatedAt          DateTime                  @updatedAt
+  deliveryNoteId     String?                   @unique
+  fatura             Fatura?                   @relation("SatınAlmaSiparisiFatura")
+  kaynakIrsaliyeleri SatınAlmaIrsaliyesi[]    @relation("IrsaliyeKaynakSatınAlmaSiparis")
+  kalemler           SatınAlmaSiparisKalemi[]
+  logs               SatınAlmaSiparisLog[]
+  cari               Cari                      @relation("SatınAlmaSiparisiCari", fields: [cariId], references: [id])
+  createdByUser      User?                     @relation("SatınAlmaSiparisiCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser      User?                     @relation("SatınAlmaSiparisiDeletedBy", fields: [deletedBy], references: [id])
+  irsaliye           SatınAlmaIrsaliyesi?     @relation("SatınAlmaSiparisIrsaliye", fields: [deliveryNoteId], references: [id])
+  tenant             Tenant?                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser      User?                     @relation("SatınAlmaSiparisiUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([siparisNo, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, siparisNo])
+  @@index([cariId])
+  @@index([durum])
+  @@index([createdAt])
+  @@map("satin_alma_siparisleri")
+}
+
+model SatınAlmaSiparisKalemi {
+  id                  String             @id @default(uuid())
+  satınAlmaSiparisId String
+  stokId              String
+  miktar              Int
+  sevkEdilenMiktar    Int                @default(0)
+  birimFiyat          Decimal            @db.Decimal(10, 2)
+  kdvOrani            Int
+  kdvTutar            Decimal            @db.Decimal(10, 2)
+  tutar               Decimal            @db.Decimal(10, 2)
+  createdAt           DateTime           @default(now())
+  satınAlmaSiparisi  SatınAlmaSiparisi @relation(fields: [satınAlmaSiparisId], references: [id], onDelete: Cascade)
+  stok                Stok               @relation("SatınAlmaSiparisKalemiStok", fields: [stokId], references: [id])
+
+  @@index([satınAlmaSiparisId])
+  @@index([stokId])
+  @@map("satin_alma_siparis_kalemleri")
+}
+
+model SatınAlmaSiparisLog {
+  id                  String             @id @default(uuid())
+  satınAlmaSiparisId String
+  userId              String?
+  actionType          LogAction
+  changes             String?
+  ipAddress           String?
+  userAgent           String?
+  createdAt           DateTime           @default(now())
+  satınAlmaSiparisi  SatınAlmaSiparisi @relation(fields: [satınAlmaSiparisId], references: [id], onDelete: Cascade)
+  user                User?              @relation("SatınAlmaSiparisLogUser", fields: [userId], references: [id])
+
+  @@index([satınAlmaSiparisId])
+  @@index([userId])
+  @@map("satin_alma_siparis_logs")
+}
+
+model SatınAlmaIrsaliyesi {
+  id                      String                       @id @default(uuid())
+  irsaliyeNo              String
+  irsaliyeTarihi          DateTime                     @default(now())
+  tenantId                String?
+  cariId                  String
+  depoId                  String?
+  kaynakTip               IrsaliyeKaynakTip
+  kaynakId                String?
+  durum                   IrsaliyeDurum                @default(FATURALANMADI)
+  toplamTutar             Decimal                      @db.Decimal(12, 2)
+  kdvTutar                Decimal                      @db.Decimal(12, 2)
+  genelToplam             Decimal                      @db.Decimal(12, 2)
+  iskonto                 Decimal                      @default(0) @db.Decimal(10, 2)
+  aciklama                String?
+  createdBy               String?
+  updatedBy               String?
+  deletedAt               DateTime?
+  deletedBy               String?
+  createdAt               DateTime                     @default(now())
+  updatedAt               DateTime                     @updatedAt
+  faturalar               Fatura?                      @relation("SatınAlmaIrsaliyesiFatura")
+  cari                    Cari                         @relation("SatınAlmaIrsaliyesiCari", fields: [cariId], references: [id])
+  createdByUser           User?                        @relation("SatınAlmaIrsaliyesiCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser           User?                        @relation("SatınAlmaIrsaliyesiDeletedBy", fields: [deletedBy], references: [id])
+  depo                    Warehouse?                   @relation("SatınAlmaIrsaliyesiDepo", fields: [depoId], references: [id])
+  kaynakSiparis           SatınAlmaSiparisi?          @relation("IrsaliyeKaynakSatınAlmaSiparis", fields: [kaynakId], references: [id])
+  tenant                  Tenant?                      @relation("SatınAlmaIrsaliyesiTenant", fields: [tenantId], references: [id], onDelete: Cascade)
+  updatedByUser           User?                        @relation("SatınAlmaIrsaliyesiUpdatedBy", fields: [updatedBy], references: [id])
+  kalemler                SatınAlmaIrsaliyesiKalemi[]
+  logs                    SatınAlmaIrsaliyesiLog[]
+  siparisFromDeliveryNote SatınAlmaSiparisi?          @relation("SatınAlmaSiparisIrsaliye")
+
+  @@unique([irsaliyeNo, tenantId])
+  @@index([tenantId])
+  @@index([tenantId, irsaliyeNo])
+  @@index([tenantId, durum])
+  @@index([tenantId, irsaliyeTarihi])
+  @@index([cariId])
+  @@index([durum])
+  @@index([kaynakId])
+  @@map("satin_alma_irsaliyeleri")
+}
+
+model SatınAlmaIrsaliyesiKalemi {
+  id         String               @id @default(uuid())
+  irsaliyeId String
+  stokId     String
+  miktar     Int
+  birimFiyat Decimal              @db.Decimal(10, 2)
+  kdvOrani   Int
+  kdvTutar   Decimal              @db.Decimal(10, 2)
+  tutar      Decimal              @db.Decimal(10, 2)
+  createdAt  DateTime             @default(now())
+  irsaliye   SatınAlmaIrsaliyesi @relation(fields: [irsaliyeId], references: [id], onDelete: Cascade)
+  stok       Stok                 @relation("SatınAlmaIrsaliyesiKalemiStok", fields: [stokId], references: [id])
+
+  @@index([irsaliyeId])
+  @@index([stokId])
+  @@map("satin_alma_irsaliyesi_kalemleri")
+}
+
+model SatınAlmaIrsaliyesiLog {
+  id         String               @id @default(uuid())
+  irsaliyeId String
+  userId     String?
+  actionType LogAction
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime             @default(now())
+  irsaliye   SatınAlmaIrsaliyesi @relation(fields: [irsaliyeId], references: [id], onDelete: Cascade)
+  user       User?                @relation("SatınAlmaIrsaliyesiLogUser", fields: [userId], references: [id])
+
+  @@index([irsaliyeId])
+  @@index([userId])
+  @@map("satin_alma_irsaliyesi_logs")
+}
+
+model Module {
+  id           String          @id @default(cuid())
+  name         String
+  slug         String          @unique
+  description  String?
+  price        Decimal         @db.Decimal(10, 2)
+  currency     String          @default("TRY")
+  isActive     Boolean         @default(true)
+  createdAt    DateTime        @default(now())
+  updatedAt    DateTime        @updatedAt
+  licenses     ModuleLicense[]
+  userLicenses UserLicense[]
+
+  @@index([slug])
+  @@index([isActive])
+  @@map("modules")
+}
+
+model ModuleLicense {
+  id             String       @id @default(cuid())
+  subscriptionId String
+  moduleId       String
+  quantity       Int          @default(1)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  module         Module       @relation(fields: [moduleId], references: [id])
+  subscription   Subscription @relation(fields: [subscriptionId], references: [id], onDelete: Cascade)
+
+  @@index([subscriptionId])
+  @@index([moduleId])
+  @@map("module_licenses")
+}
+
+model UserLicense {
+  id          String      @id @default(cuid())
+  userId      String
+  licenseType LicenseType
+  moduleId    String?
+  assignedBy  String?
+  assignedAt  DateTime    @default(now())
+  revokedAt   DateTime?
+  revokedBy   String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  module      Module?     @relation(fields: [moduleId], references: [id])
+  user        User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, licenseType, moduleId])
+  @@index([userId])
+  @@index([moduleId])
+  @@index([licenseType])
+  @@map("user_licenses")
+}
+
+model Invitation {
+  id         String           @id @default(cuid())
+  email      String
+  tenantId   String
+  invitedBy  String
+  token      String           @unique
+  status     InvitationStatus @default(PENDING)
+  expiresAt  DateTime
+  acceptedAt DateTime?
+  acceptedBy String?
+  createdAt  DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+  tenant     Tenant           @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([email])
+  @@index([tenantId])
+  @@index([token])
+  @@index([status])
+  @@map("invitations")
+}
+
+model HizliToken {
+  id          Int      @id @default(autoincrement())
+  token       String
+  loginHash   String
+  generatedAt DateTime @default(now())
+  expiresAt   DateTime
+
+  @@index([expiresAt])
+  @@index([loginHash])
+  @@map("hizli_tokens")
+}
+
+model EfaturaInbox {
+  id          Int       @id @default(autoincrement())
+  ettn        String    @unique
+  senderVkn   String
+  senderTitle String
+  invoiceNo   String?
+  invoiceDate DateTime?
+  rawXml      String?
+  createdAt   DateTime  @default(now())
+
+  @@index([senderVkn])
+  @@index([createdAt])
+  @@map("efatura_inbox")
+}
+
+model Vehicle {
+  id                    String                      @id @default(uuid())
+  tenantId              String
+  plateNumber           String
+  vin                   String?
+  brand                 String
+  model                 String
+  year                  Int?
+  firstRegistrationDate DateTime?
+  engineSize            String?
+  fuelType              String?
+  color                 String?
+  mileage               Int?
+  customerId            String
+  createdAt             DateTime                    @default(now())
+  updatedAt             DateTime                    @updatedAt
+  maintenanceReminder   VehicleMaintenanceReminder?
+  customer              Cari                        @relation(fields: [customerId], references: [id])
+  tenant                Tenant                      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workOrders            WorkOrder[]
+  timeTracking          TechnicianTimeTracking[]
+  randevular            Randevu[]
+
+  @@unique([tenantId, plateNumber])
+  @@index([tenantId])
+  @@index([tenantId, plateNumber])
+  @@index([customerId])
+  @@index([vin])
+  @@map("vehicles")
+}
+
+model Technician {
+  id             String              @id @default(uuid())
+  tenantId       String
+  code           String
+  firstName      String
+  lastName       String
+  phone          String?
+  email          String?
+  specialization String?
+  isActive       Boolean             @default(true)
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  tenant         Tenant              @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  auditLogs      WorkOrderAuditLog[]
+  workOrders     WorkOrder[]
+
+  @@unique([tenantId, code])
+  @@index([tenantId])
+  @@index([tenantId, code])
+  @@index([isActive])
+  @@map("technicians")
+}
+
+model Randevu {
+  id              String            @id @default(uuid())
+  tenantId        String
+  customerId      String
+  vehicleId       String
+  appointmentDate DateTime
+  status          RandevuStatus     @default(PENDING)
+  notes           String?
+  complaint       String?
+  workOrderId     String?           @unique
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  
+  customer        Cari              @relation("RandevuCustomer", fields: [customerId], references: [id])
+  vehicle         Vehicle           @relation(fields: [vehicleId], references: [id])
+  tenant          Tenant            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  workOrder       WorkOrder?        @relation("RandevuWorkOrder", fields: [workOrderId], references: [id])
+
+  @@index([tenantId])
+  @@index([customerId])
+  @@index([vehicleId])
+  @@index([appointmentDate])
+  @@index([status])
+  @@map("randevular")
+}
+
+model WorkOrder {
+  id                 String                   @id @default(uuid())
+  tenantId           String
+  workOrderNo        String
+  vehicleId          String
+  customerId         String
+  technicianId       String?
+  claimedBy          String?                  // Teknisyen kendisi sahiplendiyse
+  claimedAt          DateTime?                // Sahiplenme zamanı
+  assignedAt         DateTime?                // Teknisyen atama zamanı
+  status             WorkOrderStatus          @default(ACCEPTED)
+  acceptedAt         DateTime                 @default(now())
+  diagnosisAt        DateTime?
+  approvedAt         DateTime?
+  startedAt          DateTime?
+  completedAt        DateTime?
+  closedAt           DateTime?
+  estimatedDelivery  DateTime?
+  complaint          String?
+  findings           String?
+  internalNotes      String?
+  invoiceId          String?                  @unique
+  laborTotal         Decimal                  @default(0) @db.Decimal(12, 2)
+  partsTotal         Decimal                  @default(0) @db.Decimal(12, 2)
+  discountAmount     Decimal                  @default(0) @db.Decimal(12, 2)
+  taxAmount          Decimal                  @default(0) @db.Decimal(12, 2)
+  grandTotal         Decimal                  @default(0) @db.Decimal(12, 2)
+  createdAt          DateTime                 @default(now())
+  updatedAt          DateTime                 @updatedAt
+  clientUpdatedAt    DateTime?                // PWA offline sync için
+
+  diagnosticNotes    DiagnosticNote[]
+  diagnoses          Diagnosis[]              // Yeni teşhis modeli
+  managerApproval    ManagerApproval?
+  managerRejections  ManagerRejection[]
+  solutionPackages   SolutionPackage[]
+  technicalFindings  TechnicalFinding[]
+  auditLogs          WorkOrderAuditLog[]
+  lines              WorkOrderLine[]
+  statusHistory      WorkOrderStatusHistory[]
+  diagnosisApprovals DiagnosisApproval[]      // YENİ: Teşhis onayları
+  supplyRequests     SupplyRequest[]          // YENİ: Tedarik talepleri
+  timeline           WorkOrderTimeline[]      // YENİ: Aktivite zaman çizelgesi
+  priceQuotes        PriceQuote[]             // YENİ: Fiyat teklifleri
+  timeTracking       TechnicianTimeTracking[] // Zaman takibi
+  customer           Cari                     @relation("WorkOrderCustomer", fields: [customerId], references: [id])
+  invoice            Fatura?                  @relation("WorkOrderInvoice", fields: [invoiceId], references: [id])
+  technician         Technician?              @relation(fields: [technicianId], references: [id])
+  tenant             Tenant                   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle            Vehicle                  @relation(fields: [vehicleId], references: [id])
+  tahsilatlar        Tahsilat[]
+  randevu            Randevu?                 @relation("RandevuWorkOrder")
+
+  @@unique([tenantId, workOrderNo])
+  @@index([tenantId])
+  @@index([tenantId, workOrderNo])
+  @@index([vehicleId])
+  @@index([customerId])
+  @@index([technicianId])
+  @@index([status])
+  @@index([acceptedAt])
+  @@index([closedAt])
+  @@map("work_orders")
+}
+
+model WorkOrderLine {
+  id                  String               @id @default(uuid())
+  workOrderId         String
+  lineType            WorkOrderLineType
+  description         String?
+  laborHours          Decimal?             @db.Decimal(5, 2)
+  hourlyRate          Decimal?             @db.Decimal(10, 2)
+  productId           String?
+  quantity            Int                  @default(1)
+  unitPrice           Decimal?             @db.Decimal(10, 2)
+  discountRate        Decimal              @default(0) @db.Decimal(5, 2)
+  discountAmount      Decimal              @default(0) @db.Decimal(10, 2)
+  taxRate             Int                  @default(20)
+  taxAmount           Decimal              @default(0) @db.Decimal(10, 2)
+  lineTotal           Decimal              @default(0) @db.Decimal(12, 2)
+  isUsed              Boolean              @default(false)
+  usedAt              DateTime?
+  partSource          PartSource?          @default(STOCK_DIRECT)
+  supplyRequestStatus SupplyRequestStatus?
+  requestedAt         DateTime?
+  approvedAt          DateTime?
+  approvedBy          String?
+  createdAt           DateTime             @default(now())
+  updatedAt           DateTime             @updatedAt
+  approver            User?                @relation("ApprovedByUser", fields: [approvedBy], references: [id])
+  product             Stok?                @relation(fields: [productId], references: [id])
+  workOrder           WorkOrder            @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId])
+  @@index([lineType])
+  @@index([productId])
+  @@index([isUsed])
+  @@map("work_order_lines")
+}
+
+// Teşhis Onay Yönetimi
+model DiagnosisApproval {
+  id             String         @id @default(uuid())
+  tenantId       String
+  workOrderId    String
+  approvalStatus ApprovalStatus @default(PENDING)
+  approvedBy     String?
+  rejectedBy     String?
+  approvedAt     DateTime?
+  rejectedAt     DateTime?
+  approvedItems  Json? // Onaylanan işlemler [{lineId, approved, notes}]
+  rejectedItems  Json? // Reddedilen işlemler
+  customerNotes  String? // Müşteri notları
+  internalNotes  String? // Dahili notlar
+  totalEstimate  Decimal        @db.Decimal(12, 2)
+  laborEstimate  Decimal        @default(0) @db.Decimal(12, 2)
+  partsEstimate  Decimal        @default(0) @db.Decimal(12, 2)
+  createdAt      DateTime       @default(now())
+  updatedAt      DateTime       @updatedAt
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@index([approvalStatus])
+  @@index([createdAt])
+  @@map("diagnosis_approvals")
+}
+
+// Parça Tedarik Talepleri
+model SupplyRequest {
+  id               String              @id @default(uuid())
+  tenantId         String
+  workOrderId      String
+  requestedBy      String
+  approvedBy       String?
+  status           SupplyRequestStatus @default(PENDING)
+  requestedParts   Json // [{productId, productName, quantity, unitPrice}]
+  estimatedArrival DateTime?
+  actualArrival    DateTime?
+  supplierInfo     Json? // {name, contact, phone}
+  totalCost        Decimal             @db.Decimal(12, 2)
+  notes            String?
+  requestedAt      DateTime            @default(now())
+  approvedAt       DateTime?
+  orderedAt        DateTime?
+  receivedAt       DateTime?
+  cancelledAt      DateTime?
+  createdAt        DateTime            @default(now())
+  updatedAt        DateTime            @updatedAt
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@index([status])
+  @@index([requestedAt])
+  @@map("supply_requests")
+}
+
+// İş Emri Zaman Çizelgesi (Activity Timeline)
+model WorkOrderTimeline {
+  id              String   @id @default(uuid())
+  tenantId        String
+  workOrderId     String
+  eventType       String // CREATED, STATUS_CHANGED, ASSIGNED, NOTE_ADDED, APPROVAL_SENT, etc.
+  eventData       Json? // Ek event verileri
+  description     String? // İnsan okunabilir açıklama
+  performedBy     String? // User ID
+  performedByName String? // Kullanıcı adı (denormalize)
+  timestamp       DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@index([timestamp])
+  @@index([eventType])
+  @@map("work_order_timeline")
+}
+
+// Müşteri Fiyat Teklifi
+model PriceQuote {
+  id               String    @id @default(uuid())
+  tenantId         String
+  workOrderId      String
+  quotedBy         String
+  sentAt           DateTime?
+  viewedAt         DateTime?
+  approvedAt       DateTime?
+  rejectedAt       DateTime?
+  laborCost        Decimal   @db.Decimal(12, 2)
+  partsCost        Decimal   @db.Decimal(12, 2)
+  taxAmount        Decimal   @db.Decimal(12, 2)
+  totalCost        Decimal   @db.Decimal(12, 2)
+  discountAmount   Decimal   @default(0) @db.Decimal(12, 2)
+  customerResponse String? // APPROVED, REJECTED, PARTIAL, PENDING
+  customerNotes    String?
+  itemsBreakdown   Json // Detaylı fiyat kırılımı [{description, amount}]
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@index([createdAt])
+  @@map("price_quotes")
+}
+
+model WorkOrderAuditLog {
+  id             String           @id @default(uuid())
+  workOrderId    String
+  action         String
+  previousStatus WorkOrderStatus?
+  newStatus      WorkOrderStatus?
+  technicianId   String?
+  details        String?
+  userId         String?
+  ipAddress      String?
+  userAgent      String?
+  createdAt      DateTime         @default(now())
+  technician     Technician?      @relation(fields: [technicianId], references: [id])
+  workOrder      WorkOrder        @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([workOrderId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("work_order_audit_logs")
+}
+
+model WorkOrderStatusHistory {
+  id          String             @id @default(cuid())
+  tenantId    String
+  workOrderId String
+  fromStatus  ServiceWorkStatus?
+  toStatus    ServiceWorkStatus
+  changedBy   String
+  changedAt   DateTime           @default(now())
+  reason      String?
+  workOrder   WorkOrder          @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, changedAt])
+  @@map("work_order_status_history")
+}
+
+model TechnicalFinding {
+  id          String    @id @default(cuid())
+  tenantId    String
+  workOrderId String
+  title       String    @db.VarChar(200)
+  description String
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  version     Int       @default(1)
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, createdAt])
+  @@map("technical_findings")
+}
+
+model DiagnosticNote {
+  id          String    @id @default(cuid())
+  tenantId    String
+  workOrderId String
+  note        String
+  createdBy   String
+  createdAt   DateTime  @default(now())
+  version     Int       @default(1)
+  workOrder   WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, createdAt])
+  @@map("diagnostic_notes")
+}
+
+model SolutionPackage {
+  id                       String                @id @default(cuid())
+  tenantId                 String
+  workOrderId              String
+  name                     String                @db.VarChar(200)
+  description              String
+  estimatedDurationMinutes Int
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  version                  Int                   @default(1)
+  managerApprovals         ManagerApproval[]
+  managerRejections        ManagerRejection[]
+  parts                    SolutionPackagePart[]
+  workOrder                WorkOrder             @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, createdAt])
+  @@map("solution_packages")
+}
+
+model SolutionPackagePart {
+  id                String          @id @default(cuid())
+  solutionPackageId String
+  productId         String
+  quantity          Decimal         @db.Decimal(10, 3)
+  product           Stok            @relation(fields: [productId], references: [id])
+  solutionPackage   SolutionPackage @relation(fields: [solutionPackageId], references: [id], onDelete: Cascade)
+
+  @@unique([solutionPackageId, productId])
+  @@index([solutionPackageId])
+  @@map("solution_package_parts")
+}
+
+model ManagerApproval {
+  id                String          @id @default(cuid())
+  tenantId          String
+  workOrderId       String          @unique
+  solutionPackageId String
+  approvedBy        String
+  approvedAt        DateTime        @default(now())
+  approvalNote      String?
+  deletedAt         DateTime?
+  solutionPackage   SolutionPackage @relation(fields: [solutionPackageId], references: [id], onDelete: Cascade)
+  workOrder         WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, approvedAt])
+  @@index([deletedAt])
+  @@map("manager_approvals")
+}
+
+model ManagerRejection {
+  id                String          @id @default(cuid())
+  tenantId          String
+  workOrderId       String
+  solutionPackageId String
+  rejectedBy        String
+  rejectedAt        DateTime        @default(now())
+  rejectionReason   String
+  solutionPackage   SolutionPackage @relation(fields: [solutionPackageId], references: [id], onDelete: Cascade)
+  workOrder         WorkOrder       @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId, workOrderId])
+  @@index([tenantId, rejectedAt])
+  @@map("manager_rejections")
+}
+
+model VehicleMaintenanceReminder {
+  id               String    @id @default(uuid())
+  tenantId         String
+  vehicleId        String    @unique
+  lastServiceDate  DateTime
+  lastWorkOrderId  String?
+  lastMileage      Int?
+  nextReminderDate DateTime
+  reminderSent     Boolean   @default(false)
+  reminderSentAt   DateTime?
+  notes            String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  tenant           Tenant    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  vehicle          Vehicle   @relation(fields: [vehicleId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, vehicleId])
+  @@index([tenantId])
+  @@index([vehicleId])
+  @@index([nextReminderDate])
+  @@index([reminderSent])
+  @@map("vehicle_maintenance_reminders")
+}
+
+model FirmaKrediKartiHatirlatici {
+  id        String          @id @default(uuid())
+  kartId    String
+  tip       String
+  gun       Int
+  aktif     Boolean         @default(true)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  kart      FirmaKrediKarti @relation(fields: [kartId], references: [id], onDelete: Cascade)
+
+  @@unique([kartId, tip])
+  @@index([gun, aktif])
+  @@index([kartId])
+  @@map("firma_kredi_karti_hatirlaticilar")
+}
+
+model InvoiceProfit {
+  id                String        @id @default(uuid())
+  faturaId          String
+  faturaKalemiId    String?
+  stokId            String
+  tenantId          String?
+  miktar            Int
+  birimFiyat        Decimal       @db.Decimal(10, 2)
+  birimMaliyet      Decimal       @db.Decimal(12, 4)
+  toplamSatisTutari Decimal       @db.Decimal(12, 2)
+  toplamMaliyet     Decimal       @db.Decimal(12, 2)
+  kar               Decimal       @db.Decimal(12, 2)
+  karOrani          Decimal       @db.Decimal(10, 2)
+  hesaplamaTarihi   DateTime      @default(now())
+  updatedAt         DateTime      @updatedAt
+  fatura            Fatura        @relation(fields: [faturaId], references: [id], onDelete: Cascade)
+  faturaKalemi      FaturaKalemi? @relation(fields: [faturaKalemiId], references: [id], onDelete: Cascade)
+  stok              Stok          @relation(fields: [stokId], references: [id])
+  tenants           Tenant?       @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([faturaId])
+  @@index([faturaKalemiId])
+  @@index([stokId])
+  @@index([tenantId, faturaId])
+  @@map("invoice_profit")
+}
+
+model PostalCode {
+  id           String   @id @default(uuid())
+  city         String
+  district     String
+  neighborhood String
+  postalCode   String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([city, district, neighborhood])
+  @@index([city, district])
+  @@index([city, district, neighborhood])
+  @@index([city])
+  @@index([district])
+  @@index([neighborhood])
+  @@index([postalCode])
+  @@map("postal_codes")
+}
+
+model SystemParameter {
+  id          String   @id @default(uuid())
+  tenantId    String?
+  key         String
+  value       Json
+  description String?
+  category    String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  tenants     Tenant?  @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@unique([tenantId, key])
+  @@index([category])
+  @@index([tenantId])
+  @@map("system_parameters")
+}
+
+model WarehouseCriticalStock {
+  id          String    @id @default(uuid())
+  warehouseId String
+  productId   String
+  criticalQty Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  stok        Stok      @relation(fields: [productId], references: [id], onDelete: Cascade)
+  warehouse   Warehouse @relation(fields: [warehouseId], references: [id], onDelete: Cascade)
+
+  @@unique([warehouseId, productId])
+  @@index([productId])
+  @@index([warehouseId])
+  @@map("warehouse_critical_stocks")
+}
+
+model WarehouseTransferItem {
+  id             String            @id @default(uuid())
+  transferId     String
+  stokId         String
+  miktar         Int
+  fromLocationId String?
+  toLocationId   String?
+  createdAt      DateTime          @default(now())
+  fromLocation   Location?         @relation("WarehouseTransferItemFrom", fields: [fromLocationId], references: [id])
+  stok           Stok              @relation(fields: [stokId], references: [id])
+  toLocation     Location?         @relation("WarehouseTransferItemTo", fields: [toLocationId], references: [id])
+  transfer       WarehouseTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+
+  @@index([stokId])
+  @@index([transferId])
+  @@map("warehouse_transfer_items")
+}
+
+model WarehouseTransferLog {
+  id         String            @id @default(uuid())
+  transferId String
+  userId     String?
+  actionType LogAction
+  changes    String?
+  ipAddress  String?
+  userAgent  String?
+  createdAt  DateTime          @default(now())
+  transfer   WarehouseTransfer @relation(fields: [transferId], references: [id], onDelete: Cascade)
+  user       User?             @relation(fields: [userId], references: [id])
+
+  @@index([transferId])
+  @@index([userId])
+  @@map("warehouse_transfer_logs")
+}
+
+model WarehouseTransfer {
+  id               String                  @id @default(uuid())
+  transferNo       String
+  tenantId         String?
+  tarih            DateTime                @default(now())
+  fromWarehouseId  String
+  toWarehouseId    String
+  durum            TransferStatus          @default(HAZIRLANIYOR)
+  driverName       String?
+  vehiclePlate     String?
+  aciklama         String?
+  hazirlayanUserId String?
+  onaylayanUserId  String?
+  teslimAlanUserId String?
+  sevkTarihi       DateTime?
+  teslimTarihi     DateTime?
+  createdBy        String?
+  updatedBy        String?
+  deletedAt        DateTime?
+  deletedBy        String?
+  createdAt        DateTime                @default(now())
+  updatedAt        DateTime                @updatedAt
+  kalemler         WarehouseTransferItem[]
+  logs             WarehouseTransferLog[]
+  createdByUser    User?                   @relation("WarehouseTransferCreatedBy", fields: [createdBy], references: [id])
+  deletedByUser    User?                   @relation("WarehouseTransferDeletedBy", fields: [deletedBy], references: [id])
+  fromWarehouse    Warehouse               @relation("WarehouseTransferFrom", fields: [fromWarehouseId], references: [id])
+  hazirlayanUser   User?                   @relation("WarehouseTransferHazirlayan", fields: [hazirlayanUserId], references: [id])
+  onaylayanUser    User?                   @relation("WarehouseTransferOnaylayan", fields: [onaylayanUserId], references: [id])
+  tenant           Tenant?                 @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  teslimAlanUser   User?                   @relation("WarehouseTransferTeslimAlan", fields: [teslimAlanUserId], references: [id])
+  toWarehouse      Warehouse               @relation("WarehouseTransferTo", fields: [toWarehouseId], references: [id])
+  updatedByUser    User?                   @relation("WarehouseTransferUpdatedBy", fields: [updatedBy], references: [id])
+
+  @@unique([transferNo, tenantId])
+  @@index([fromWarehouseId])
+  @@index([tarih])
+  @@index([tenantId, durum])
+  @@index([tenantId])
+  @@index([toWarehouseId])
+  @@map("warehouse_transfers")
+}
+
+enum TenantStatus {
+  PENDING
+  ACTIVE
+  SUSPENDED
+  TRIAL
+  CHURNED
+  DELETED
+}
+
+enum SubscriptionStatus {
+  PENDING
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+enum BillingPeriod {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  LIFETIME
+}
+
+enum PaymentStatus {
+  PENDING
+  PROCESSING
+  SUCCESS
+  FAILED
+  REFUNDED
+  CANCELED
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+  SUSPENDED
+  PENDING_VERIFICATION
+}
+
+enum UserRole {
+  SUPER_ADMIN
+  TENANT_ADMIN
+  ADMIN
+  USER
+  VIEWER
+  SUPPORT
+  MANAGER
+  TECHNICIAN  // Teknisyen - Servis yönetimi
+  SUPPLY      // Tedarik departmanı
+}
+
+enum PriceCardType {
+  SALE
+  PURCHASE
+}
+
+enum HareketTipi {
+  GIRIS
+  CIKIS
+  SATIS
+  IADE
+  SAYIM
+  SAYIM_FAZLA
+  SAYIM_EKSIK
+}
+
+enum CariTip {
+  MUSTERI
+  TEDARIKCI
+  HER_IKISI
+}
+
+enum SirketTipi {
+  KURUMSAL
+  SAHIS
+}
+
+enum BorcAlacak {
+  BORC
+  ALACAK
+  DEVIR
+}
+
+enum BelgeTipi {
+  FATURA
+  TAHSILAT
+  ODEME
+  CEK_SENET
+  DEVIR
+  DUZELTME
+  CEK_GIRIS
+  CEK_CIKIS
+}
+
+enum BankaHesapTipi {
+  VADESIZ
+  KREDI
+  POS
+  FIRMA_KREDI_KARTI
+  VADELI
+  YATIRIM
+  ALTIN
+  DOVIZ
+  DIGER
+}
+
+enum BankaHareketTipi {
+  GELEN // Para girişi
+  GIDEN // Para çıkışı
+}
+
+enum BankaHareketAltTipi {
+  HAVALE_GELEN // Vadesiz: Gelen havale
+  HAVALE_GIDEN // Vadesiz: Giden havale
+  KREDI_KULLANIM // Kredi: Kullanım
+  KREDI_ODEME // Kredi: Ödeme
+  TEMINAT_CEK // Kredi: Teminat çek
+  TEMINAT_SENET // Kredi: Teminat senet
+  POS_TAHSILAT // POS: Kredi kartı tahsilatı
+  KART_HARCAMA // Firma Kredi Kartı: Harcama
+  KART_ODEME // Firma Kredi Kartı: Ödeme
+  VIRMAN // Virman/Transfer
+  DIGER // Diğer
+}
+
+enum KasaTipi {
+  NAKIT
+  POS
+  FIRMA_KREDI_KARTI
+  BANKA
+  CEK_SENET
+}
+
+enum KasaHareketTipi {
+  TAHSILAT
+  ODEME
+  HAVALE_GELEN
+  HAVALE_GIDEN
+  KREDI_KARTI
+  VIRMAN
+  DEVIR
+  CEK_ALINDI
+  CEK_VERILDI
+  SENET_ALINDI
+  SENET_VERILDI
+  CEK_TAHSIL
+  SENET_TAHSIL
+}
+
+enum LogAction {
+  CREATE
+  UPDATE
+  DELETE
+  DURUM_DEGISIKLIK
+  IPTAL
+  RESTORE
+  SIPARISE_DONUSTU
+  EFATURA_GONDERILDI
+  EFATURA_GONDERIM_HATASI
+  SEVK
+  CIRO
+}
+
+enum FaturaTipi {
+  ALIS
+  SATIS
+  SATIS_IADE
+  ALIS_IADE
+}
+
+enum FaturaDurum {
+  ACIK
+  KAPALI
+  KISMEN_ODENDI
+  ONAYLANDI
+  IPTAL
+}
+
+enum EFaturaStatus {
+  PENDING
+  SENT
+  ERROR
+  DRAFT
+}
+
+enum TahsilatTip {
+  TAHSILAT
+  ODEME
+}
+
+enum OdemeTipi {
+  NAKIT
+  KREDI_KARTI
+  BANKA_HAVALESI
+  CEK
+  SENET
+}
+
+enum SiparisTipi {
+  SATIS
+  SATIN_ALMA
+}
+
+enum SiparisDurum {
+  BEKLEMEDE
+  HAZIRLANIYOR
+  HAZIRLANDI
+  SEVK_EDILDI
+  KISMI_SEVK
+  FATURALANDI
+  IPTAL
+}
+
+enum TeklifTipi {
+  SATIS
+  SATIN_ALMA
+}
+
+enum TeklifDurum {
+  TEKLIF
+  ONAYLANDI
+  REDDEDILDI
+  SIPARISE_DONUSTU
+}
+
+enum SayimTipi {
+  URUN_BAZLI
+  RAF_BAZLI
+}
+
+enum SayimDurum {
+  TASLAK
+  TAMAMLANDI
+  ONAYLANDI
+  IPTAL
+}
+
+enum StockMoveType {
+  PUT_AWAY
+  TRANSFER
+  PICKING
+  ADJUSTMENT
+  SALE
+  RETURN
+  DAMAGE
+}
+
+enum HavaleTipi {
+  GELEN
+  GIDEN
+}
+
+enum CekSenetTip {
+  CEK
+  SENET
+}
+
+enum PortfoyTip {
+  ALACAK
+  BORC
+}
+
+enum CekSenetDurum {
+  PORTFOYDE
+  ODENMEDI
+  BANKAYA_VERILDI
+  TAHSIL_EDILDI
+  ODENDI
+  CIRO_EDILDI
+  IADE_EDILDI
+  KARSILIKIZ
+}
+
+enum Cinsiyet {
+  ERKEK
+  KADIN
+  BELIRTILMEMIS
+}
+
+enum MedeniDurum {
+  BEKAR
+  EVLI
+}
+
+enum PersonelOdemeTip {
+  HAK_EDIS
+  MAAS
+  AVANS
+  PRIM
+  KESINTI
+  ZIMMET
+  ZIMMET_IADE
+}
+
+enum ModuleType {
+  WAREHOUSE
+  CASHBOX
+  PERSONNEL
+  PRODUCT
+  CUSTOMER
+  INVOICE_SALES
+  INVOICE_PURCHASE
+  ORDER_SALES
+  ORDER_PURCHASE
+  INVENTORY_COUNT
+  TEKLIF
+  DELIVERY_NOTE_SALES
+  DELIVERY_NOTE_PURCHASE
+  WAREHOUSE_TRANSFER
+  TECHNICIAN
+}
+
+enum IrsaliyeKaynakTip {
+  SIPARIS
+  DOGRUDAN
+  FATURA_OTOMATIK
+}
+
+enum IrsaliyeDurum {
+  FATURALANMADI
+  FATURALANDI
+}
+
+enum OrderStatus {
+  PENDING
+  PARTIAL
+  COMPLETED
+  CANCELLED
+}
+
+enum OrderItemStatus {
+  PENDING
+  PARTIAL
+  COMPLETED
+}
+
+enum BasitSiparisDurum {
+  ONAY_BEKLIYOR
+  ONAYLANDI
+  SIPARIS_VERILDI
+  FATURALANDI
+  IPTAL_EDILDI
+}
+
+enum SatınAlmaSiparisDurum {
+  BEKLEMEDE
+  HAZIRLANIYOR
+  HAZIRLANDI
+  SEVK_EDILDI
+  KISMI_SEVK
+  SIPARIS_VERILDI
+  FATURALANDI
+  IPTAL
+}
+
+enum LicenseType {
+  BASE_PLAN
+  MODULE
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  EXPIRED
+  CANCELLED
+}
+
+enum WorkOrderStatus {
+  ACCEPTED
+  PENDING_ASSIGNMENT // Teknisyen ataması bekleniyor
+  DIAGNOSIS
+  AWAITING_CUSTOMER_APPROVAL // Müşteri onayı bekleniyor
+  WAITING_FOR_APPROVAL // Yönetici onayı bekleniyor
+  PARTIALLY_APPROVED // Kısmi onaylı
+  APPROVED
+  PROCUREMENT_PENDING // Tedarik bekliyor
+  PARTS_ARRIVED // Parçalar geldi
+  PART_WAITING // Mevcut
+  IN_PROGRESS
+  QUALITY_CHECK // Kalite kontrol aşaması
+  QUALITY_CONTROL // Mevcut kalite kontrol
+  READY_FOR_DELIVERY
+  INVOICED
+  CLOSED
+  CANCELLED
+}
+
+enum ServiceWorkStatus {
+  SERVICE_ACCEPTED
+  PRE_DIAGNOSIS
+  TECHNICAL_DIAGNOSIS
+  SOLUTION_PROPOSED
+  WAITING_MANAGER_APPROVAL
+  APPROVED
+  PART_SUPPLY
+  IN_PROGRESS
+  QUALITY_CONTROL
+  READY_FOR_BILLING
+  INVOICED
+  CLOSED
+  CANCELLED
+}
+
+enum WorkOrderLineType {
+  LABOR
+  PART
+}
+
+enum PartSource {
+  STOCK_DIRECT
+  SUPPLY_REQUEST
+}
+
+enum SupplyRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  ORDERED // Sipariş verildi
+  IN_TRANSIT // Yolda
+  RECEIVED // Teslim alındı
+  CANCELLED // İptal edildi
+}
+
+enum RandevuStatus {
+  PENDING
+  CONFIRMED
+  COMPLETED
+  CANCELLED
+}
+
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PARTIALLY_APPROVED
+}
+
+enum TransferStatus {
+  HAZIRLANIYOR
+  YOLDA
+  TAMAMLANDI
+  IPTAL
+}
+
+// Maaş Planı - Her personel için 12 aylık plan
+model MaasPlani {
+  id          String    @id @default(uuid())
+  tenantId    String?
+  personelId  String
+  yil         Int // 2026
+  ay          Int // 1-12
+  maas        Decimal   @db.Decimal(10, 2) // Planlanan maaş
+  prim        Decimal   @default(0) @db.Decimal(10, 2) // Planlanan prim
+  toplam      Decimal   @db.Decimal(10, 2) // maas + prim
+  durum       MaasDurum @default(ODENMEDI)
+  odenenTutar Decimal   @default(0) @db.Decimal(10, 2)
+  kalanTutar  Decimal   @db.Decimal(10, 2) // toplam - odenenTutar
+  aktif       Boolean   @default(true) // Personel çıkış yaptıysa false
+  aciklama    String?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  tenant         Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  personel       Personel           @relation(fields: [personelId], references: [id], onDelete: Cascade)
+  odemeler       MaasOdeme[]
+  mahsuplasmalar AvansMahsuplasma[]
+
+  @@unique([personelId, yil, ay])
+  @@index([tenantId])
+  @@index([personelId, yil])
+  @@index([durum])
+  @@index([yil, ay])
+  @@map("maas_planlari")
+}
+
+enum MaasDurum {
+  ODENMEDI
+  KISMI_ODENDI
+  TAMAMEN_ODENDI
+}
+
+// Maaş Ödeme - Bir plana ait ödemeler (parçalı ödeme desteği)
+model MaasOdeme {
+  id         String   @id @default(uuid())
+  tenantId   String?
+  planId     String // Hangi aya ait
+  personelId String
+  tutar      Decimal  @db.Decimal(10, 2)
+  tarih      DateTime @default(now())
+  aciklama   String?
+  createdBy  String?
+  createdAt  DateTime @default(now())
+
+  tenant         Tenant?          @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  plan           MaasPlani        @relation(fields: [planId], references: [id], onDelete: Cascade)
+  personel       Personel         @relation(fields: [personelId], references: [id], onDelete: Cascade)
+  odemeDetaylari MaasOdemeDetay[]
+  createdByUser  User?            @relation("MaasOdemeCreatedBy", fields: [createdBy], references: [id])
+
+  @@index([tenantId])
+  @@index([planId])
+  @@index([personelId])
+  @@index([tarih])
+  @@map("maas_odemeler")
+}
+
+// Maaş Ödeme Detay - Çoklu ödeme yöntemi desteği
+model MaasOdemeDetay {
+  id           String    @id @default(uuid())
+  tenantId     String?
+  odemeId      String
+  odemeTipi    OdemeTipi
+  tutar        Decimal   @db.Decimal(10, 2)
+  kasaId       String? // Nakit ödeme için
+  bankaHesapId String? // Banka havalesi için
+  referansNo   String? // Dekont/havale no
+  aciklama     String?
+  createdAt    DateTime  @default(now())
+
+  tenant     Tenant?      @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  odeme      MaasOdeme    @relation(fields: [odemeId], references: [id], onDelete: Cascade)
+  kasa       Kasa?        @relation(fields: [kasaId], references: [id])
+  bankaHesap BankaHesabi? @relation(fields: [bankaHesapId], references: [id])
+
+  @@index([tenantId])
+  @@index([odemeId])
+  @@index([kasaId])
+  @@index([bankaHesapId])
+  @@map("maas_odeme_detaylari")
+}
+
+// Avans Sistemi
+model Avans {
+  id         String   @id @default(uuid())
+  tenantId   String?
+  personelId String
+  tutar      Decimal  @db.Decimal(10, 2)
+  tarih      DateTime @default(now())
+  aciklama   String?
+  kasaId     String? // Hangi kasadan verildi
+
+  // Mahsuplaştırma
+  mahsupEdilen Decimal    @default(0) @db.Decimal(10, 2)
+  kalan        Decimal    @db.Decimal(10, 2) // tutar - mahsupEdilen
+  durum        AvansDurum @default(ACIK)
+
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tenant         Tenant?            @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  personel       Personel           @relation(fields: [personelId], references: [id], onDelete: Cascade)
+  kasa           Kasa?              @relation(fields: [kasaId], references: [id])
+  mahsuplasmalar AvansMahsuplasma[]
+  createdByUser  User?              @relation("AvansCreatedBy", fields: [createdBy], references: [id])
+
+  @@index([tenantId])
+  @@index([personelId])
+  @@index([durum])
+  @@index([tarih])
+  @@index([kasaId])
+  @@map("avanslar")
+}
+
+enum AvansDurum {
+  ACIK // Henüz mahsup edilmedi
+  KISMI // Kısmen mahsup edildi
+  KAPALI // Tamamen mahsup edildi
+}
+
+// Avans Mahsuplaştırma - Hangi aydan ne kadar düşüldü
+model AvansMahsuplasma {
+  id       String   @id @default(uuid())
+  tenantId String?
+  avansId  String
+  planId   String // Hangi aydan düşüldü
+  tutar    Decimal  @db.Decimal(10, 2)
+  tarih    DateTime @default(now())
+  aciklama String?
+
+  tenant Tenant?   @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+  avans  Avans     @relation(fields: [avansId], references: [id], onDelete: Cascade)
+  plan   MaasPlani @relation(fields: [planId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([avansId])
+  @@index([planId])
+  @@map("avans_mahsuplasmalar")
+}
+
+model SatisElemani {
+  id        String   @id @default(uuid())
+  adSoyad   String
+  telefon   String?
+  email     String?
+  aktif     Boolean  @default(true)
+  tenantId  String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  cariler     Cari[]
+  faturalar   Fatura[]
+  tahsilatlar Tahsilat[]
+  tenant      Tenant?    @relation(fields: [tenantId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("satis_elemanlari")
+}
+
+// ============================================
+// SERVİS YÖNETİMİ - Bekleyen Araçlar Modülleri
+// ============================================
+
+// Teşhis Modeli - Teknisyenlerin oluşturduğu teşhisler
+model Diagnosis {
+  id                      String            @id @default(uuid())
+  tenantId                String
+  workOrderId             String
+  category                String?           // Elektrik, Motor, Karoseri, Fren Sistemi, vb.
+  title                   String            @db.VarChar(200)
+  description             String            @db.Text
+  difficulty              DiagnosisLevel    @default(ORTA)
+  estimatedHours          Decimal?          @db.Decimal(5, 2)
+  status                  DiagnosisStatus   @default(DRAFT)
+  priority                DiagnosisPriority @default(ORTA)
+  requiresCustomerApproval Boolean          @default(false) // Ek iş varsa true
+  customerNotes           String?           @db.Text
+  internalNotes           String?           @db.Text
+  photos                  Json?             // [{url, caption, uploadedAt}]
+  audioNotes              Json?             // [{url, duration, uploadedAt}]
+  createdBy               String
+  approvedBy              String?           // İlgili departman onay veren kişi
+  rejectedBy              String?
+  approvedAt              DateTime?
+  rejectedAt              DateTime?
+  completedAt             DateTime?
+  createdAt               DateTime          @default(now())
+  updatedAt               DateTime          @updatedAt
+  
+  workOrder               WorkOrder         @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@index([status])
+  @@index([priority])
+  @@index([createdAt])
+  @@map("diagnoses")
+}
+
+enum DiagnosisStatus {
+  DRAFT               // Taslak
+  AWAITING_APPROVAL   // Müşteri onayı bekliyor (sadece ek iş varsa)
+  APPROVED            // Onaylandı
+  REJECTED            // Reddedildi
+  IN_PROGRESS         // İşlem yapılıyor
+  COMPLETED           // Tamamlandı
+}
+
+enum DiagnosisLevel {
+  BASIT
+  ORTA
+  KARMASIK
+}
+
+enum DiagnosisPriority {
+  DUSUK
+  ORTA
+  YUKSEK
+  ACIL
+}
+
+// Teknisyen Zaman Takibi - İkinci aşama için
+model TechnicianTimeTracking {
+  id              String     @id @default(uuid())
+  tenantId        String
+  workOrderId     String
+  diagnosisId     String?
+  technicianId    String
+  startedAt       DateTime
+  endedAt         DateTime?
+  duration        Int?       // Dakika cinsinden
+  taskType        String?    // DIAGNOSIS, REPAIR, WAITING, BREAK
+  notes           String?    @db.Text
+  createdAt       DateTime   @default(now())
+  
+  workOrder       WorkOrder  @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+  technician      Technician @relation(fields: [technicianId], references: [id])
+  
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@index([technicianId])
+  @@index([startedAt])
+  @@map("technician_time_tracking")
+}
+
+// Program İçi Bildirim Modeli
+model InAppNotification {
+  id          String             @id @default(uuid())
+  tenantId    String
+  userId      String             // Alıcı
+  type        NotificationType
+  title       String             @db.VarChar(200)
+  message     String             @db.Text
+  actionUrl   String?            // Tıklandığında gidilecek sayfa
+  resourceId  String?            // İlgili kaynak (workOrderId, diagnosisId, vb.)
+  isRead      Boolean            @default(false)
+  createdAt   DateTime           @default(now())
+  readAt      DateTime?
+  
+  user        User               @relation(fields: [userId], references: [id], onDelete: Cascade)
+  
+  @@index([tenantId, userId, isRead])
+  @@index([createdAt])
+  @@map("in_app_notifications")
+}
+
+enum NotificationType {
+  WORK_ORDER_ASSIGNED
+  WORK_ORDER_CLAIMED
+  CUSTOMER_APPROVAL_RECEIVED
+  CUSTOMER_APPROVAL_REJECTED
+  PARTS_APPROVED
+  PARTS_ARRIVED
+  DIAGNOSIS_COMPLETED
+  WORK_ORDER_STATUS_CHANGED
+  SUPPLY_REQUEST_CREATED
+  SUPPLY_REQUEST_APPROVED
+}
+
+// ============= ENTERPRISE AUDIT LOG (Faz 1) =============
+
+enum AuditActionType {
+  CREATE
+  UPDATE
+  SOFT_DELETE
+  DELETE
+  RESTORE
+  VIEW
+  EXPORT
+  LOGIN
+  LOGOUT
+  LOGIN_FAILED
+  APPROVE
+  REJECT
+  LOCK
+  UNLOCK
+}
+
+model AuditLog {
+  id            String          @id @default(cuid())
+  tenantId      String
+  userId        String?
+  sessionId     String?
+  actionType    AuditActionType
+  entityName    String
+  entityId      String
+  beforeState   Json?
+  afterState    Json?
+  changedFields String[]
+  ipAddress     String?
+  userAgent     String?
+  requestId     String?
+  signature     String
+  signedAt      DateTime        @default(now())
+  createdAt     DateTime        @default(now())
+  tenant        Tenant          @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, entityName, createdAt(sort: Desc)])
+  @@index([tenantId, userId, createdAt(sort: Desc)])
+  @@index([tenantId, actionType, createdAt(sort: Desc)])
+  @@index([entityName, entityId])
+  @@index([createdAt(sort: Desc)])
+  @@map("audit_logs")
+}
+
+// ============= EVENT-DRIVEN ARCHITECTURE (Faz 2) =============
+
+enum OutboxEventStatus {
+  PENDING
+  PUBLISHED
+  FAILED
+}
+
+model OutboxEvent {
+  id             String            @id @default(cuid())
+  tenantId       String
+  eventType      String
+  aggregateId    String
+  aggregateType  String
+  payload        Json
+  status         OutboxEventStatus @default(PENDING)
+  idempotencyKey String            @unique
+  attempts       Int               @default(0)
+  errorMessage   String?
+  publishedAt    DateTime?
+  createdAt      DateTime          @default(now())
+
+  @@index([status, createdAt])
+  @@index([tenantId, aggregateId])
+  @@index([tenantId, eventType])
+  @@map("outbox_events")
+}
+

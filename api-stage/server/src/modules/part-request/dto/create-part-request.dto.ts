@@ -6,6 +6,13 @@ import {
   Min,
 } from 'class-validator';
 
+export enum PartRequestStatus {
+  REQUESTED = 'REQUESTED',
+  SUPPLIED = 'SUPPLIED',
+  USED = 'USED',
+  CANCELLED = 'CANCELLED'
+}
+
 export class CreatePartRequestDto {
   @IsNotEmpty()
   @IsString()
@@ -17,7 +24,7 @@ export class CreatePartRequestDto {
 
   @IsOptional()
   @IsString()
-  stokId?: string;
+  productId?: string;
 
   @IsNumber()
   @Min(1)

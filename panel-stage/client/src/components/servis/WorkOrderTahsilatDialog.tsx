@@ -59,8 +59,8 @@ export default function WorkOrderTahsilatDialog({
     const fetch = async () => {
       try {
         const [kRes, bRes] = await Promise.all([
-          axios.get('/kasa', { params: { aktif: true } }),
-          axios.get('/banka/ozet'),
+          axios.get('/cashbox', { params: { aktif: true } }),
+          axios.get('/bank/ozet'),
         ]);
         const kData = kRes.data?.data ?? kRes.data ?? [];
         setKasalar(Array.isArray(kData) ? kData : []);
@@ -94,7 +94,7 @@ export default function WorkOrderTahsilatDialog({
 
     setLoading(true);
     try {
-      await axios.post('/tahsilat', {
+      await axios.post('/collection', {
         cariId,
         serviceInvoiceId,
         tip: 'TAHSILAT',

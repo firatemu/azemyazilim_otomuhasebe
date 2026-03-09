@@ -8,15 +8,15 @@ export class GetCostingQueryDto {
 
   @IsOptional()
   @IsString()
-  marka?: string;
+  brand?: string;
 
   @IsOptional()
   @IsString()
-  anaKategori?: string;
+  mainCategory?: string;
 
   @IsOptional()
   @IsString()
-  altKategori?: string;
+  subCategory?: string;
 
   @IsOptional()
   @Transform(({ value }) => parseInt(value, 10))

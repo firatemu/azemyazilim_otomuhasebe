@@ -25,7 +25,7 @@ export class CompanyVehiclesController {
     }
 
     @Get(':id')
-    @ApiOperation({ summary: 'Belirtilen şirket aracının detaylarını ve masraflarını getirir' })
+    @ApiOperation({ summary: 'Belirtilen şirket aracının detaylarını ve expensesını getirir' })
     findOne(@Param('id') id: string) {
         return this.companyVehiclesService.findOne(id);
     }

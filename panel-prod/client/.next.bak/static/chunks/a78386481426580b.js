@@ -1,3 +1,0 @@
-(globalThis.TURBOPACK||(globalThis.TURBOPACK=[])).push(["object"==typeof document?document.currentScript:void 0,995386,e=>{"use strict";var t=e.i(121941),i=e.i(752789),l=e.i(789489),r=e.i(163865);function d(){let e="${module}",d=e.charAt(0).toUpperCase()+e.slice(1);return(0,t.jsxs)(r.default,{children:[(0,t.jsxs)(i.default,{variant:"h4",fontWeight:"bold",gutterBottom:!0,children:[d," Modülü"]}),(0,t.jsx)(l.default,{sx:{p:3},children:(0,t.jsxs)(i.default,{variant:"body1",children:[d," modülü içeriği buraya gelecek..."]})})]})}e.s(["default",()=>d])}]);
-
-//# sourceMappingURL=a3649eb5300dddda.js.map

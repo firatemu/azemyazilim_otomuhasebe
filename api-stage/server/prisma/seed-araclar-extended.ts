@@ -34,7 +34,7 @@ async function seedAraclarExtended() {
     // Verileri Prisma formatına dönüştür
     console.log('📥 Araç verileri ekleniyor...');
     const aracData = araclar.map((arac) => ({
-      marka: arac.brand,
+      brand: arac.brand,
       model: arac.model,
       motorHacmi: arac.engine_capacity,
       yakitTipi: arac.fuel_type,
@@ -58,21 +58,21 @@ async function seedAraclarExtended() {
     console.log(`📈 Veritabanındaki toplam araç sayısı: ${toplamArac}\n`);
 
     const markalar = await prisma.arac.groupBy({
-      by: ['marka'],
+      by: ['brand'],
       _count: {
-        marka: true,
+        brand: true,
       },
       orderBy: {
-        marka: 'asc',
+        brand: 'asc',
       },
     });
 
     console.log('📈 Marka İstatistikleri (İlk 20):');
-    markalar.slice(0, 20).forEach((marka) => {
-      console.log(`   • ${marka.marka}: ${marka._count.marka} model`);
+    markalar.slice(0, 20).forEach((brand) => {
+      console.log(`   • ${brand.brand}: ${brand._count.brand} model`);
     });
     if (markalar.length > 20) {
-      console.log(`   ... ve ${markalar.length - 20} marka daha`);
+      console.log(`   ... ve ${markalar.length - 20} brand daha`);
     }
 
     const yakitTipleri = await prisma.arac.groupBy({

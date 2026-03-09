@@ -14,13 +14,13 @@ export class TenantsService {
   ) { }
 
   async create(createTenantDto: CreateTenantDto) {
-    return this.prisma.tenant.create({
+    return this.prisma.extended.tenant.create({
       data: createTenantDto,
     });
   }
 
   async findAll() {
-    return this.prisma.tenant.findMany({
+    return this.prisma.extended.tenant.findMany({
       include: {
         users: true,
         subscription: true,
@@ -29,7 +29,7 @@ export class TenantsService {
   }
 
   async findOne(id: string) {
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await this.prisma.extended.tenant.findUnique({
       where: { id },
       include: {
         users: true,
@@ -45,20 +45,22 @@ export class TenantsService {
   }
 
   async update(id: string, updateTenantDto: UpdateTenantDto) {
-    return this.prisma.tenant.update({
+    return this.prisma.extended.tenant.update({
       where: { id },
       data: updateTenantDto,
     });
   }
 
   async remove(id: string) {
-    return this.prisma.tenant.delete({
+    return this.prisma.extended.tenant.delete({
       where: { id },
     });
   }
 
   async getCurrent(id: string) {
-    const tenant = await this.prisma.tenant.findUnique({
+    if (!id) return null;
+
+    const tenant = await this.prisma.extended.tenant.findUnique({
       where: { id },
       include: {
         settings: true,
@@ -74,7 +76,7 @@ export class TenantsService {
 
   async approveTrial(tenantId: string) {
     // Önce tenant'ı plan olmadan çek (Prisma null plan hatası vermesin)
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await this.prisma.extended.tenant.findUnique({
       where: { id: tenantId },
       include: {
         subscription: true, // Plan olmadan subscription'ı çek
@@ -85,18 +87,18 @@ export class TenantsService {
       throw new NotFoundException(`Tenant with ID ${tenantId} not found`);
     }
 
-    // Sadece PENDING veya TRIAL durumundaki deneme paketlerini onayla
+    // Sadece PENDING veya TRIAL statusundaki deneme paketlerini onayla
     if (tenant.status !== 'PENDING' && tenant.status !== 'TRIAL') {
-      throw new BadRequestException('Tenant zaten onaylanmış veya farklı bir durumda');
+      throw new BadRequestException('Tenant zaten onaylanmış veya farklı bir statusda');
     }
 
     if (!tenant.subscription) {
-      throw new BadRequestException('Tenant için subscription bulunamadı');
+      throw new BadRequestException('Subscription not found for tenant');
     }
 
     // Plan'ı ayrı bir sorgu ile çek (null olabilir)
     const plan = tenant.subscription.planId
-      ? await this.prisma.plan.findUnique({
+      ? await this.prisma.extended.plan.findUnique({
         where: { id: tenant.subscription.planId },
       })
       : null;
@@ -110,13 +112,13 @@ export class TenantsService {
     } else {
       // Plan yoksa, sadece subscription status'ü PENDING ise onayla (geçmiş veri uyumluluğu için)
       if (tenant.subscription.status !== 'PENDING' && tenant.subscription.status !== 'TRIAL') {
-        throw new BadRequestException('Subscription durumu onaylamaya uygun değil');
+        throw new BadRequestException('Subscription statusu onaylamaya uygun değil');
       }
     }
 
     // Tenant ve subscription'ı aktif yap
     // Plan'ı include etmeyelim (null olabilir, Prisma hatası verir)
-    const updatedTenant = await this.prisma.tenant.update({
+    const updatedTenant = await this.prisma.extended.tenant.update({
       where: { id: tenantId },
       data: {
         status: 'ACTIVE',
@@ -134,7 +136,7 @@ export class TenantsService {
 
     // Plan'ı ayrı çekip ekleyelim (eğer varsa)
     if (updatedTenant.subscription?.planId) {
-      const updatedPlan = await this.prisma.plan.findUnique({
+      const updatedPlan = await this.prisma.extended.plan.findUnique({
         where: { id: updatedTenant.subscription.planId },
       });
       if (updatedPlan && updatedTenant.subscription) {
@@ -147,16 +149,16 @@ export class TenantsService {
 
   async getSettings(tenantId: string) {
     if (!tenantId) {
-      throw new BadRequestException('Tenant ID bulunamadı');
+      return null;
     }
 
-    let settings = await this.prisma.tenantSettings.findUnique({
+    let settings = await this.prisma.extended.tenantSettings.findUnique({
       where: { tenantId },
     });
 
     // Eğer settings yoksa, boş bir kayıt oluştur
     if (!settings) {
-      settings = await this.prisma.tenantSettings.create({
+      settings = await this.prisma.extended.tenantSettings.create({
         data: {
           tenantId,
         },
@@ -168,7 +170,7 @@ export class TenantsService {
 
   async updateSettings(tenantId: string, updateSettingsDto: UpdateTenantSettingsDto) {
     if (!tenantId) {
-      throw new BadRequestException('Tenant ID bulunamadı');
+      throw new BadRequestException('Tenant ID not found');
     }
 
     // Encrypt sensitive fields if present
@@ -182,13 +184,13 @@ export class TenantsService {
     }
 
     // Önce mevcut settings'i kontrol et
-    let settings = await this.prisma.tenantSettings.findUnique({
+    let settings = await this.prisma.extended.tenantSettings.findUnique({
       where: { tenantId },
     });
 
     // Eğer yoksa oluştur
     if (!settings) {
-      settings = await this.prisma.tenantSettings.create({
+      settings = await this.prisma.extended.tenantSettings.create({
         data: {
           tenantId,
           ...(data as any),
@@ -196,7 +198,7 @@ export class TenantsService {
       });
     } else {
       // Varsa güncelle
-      settings = await this.prisma.tenantSettings.update({
+      settings = await this.prisma.extended.tenantSettings.update({
         where: { tenantId },
         data: (data as any),
       });
@@ -207,23 +209,23 @@ export class TenantsService {
 
   async updateLogo(tenantId: string, logoUrl: string) {
     if (!tenantId) {
-      throw new BadRequestException('Tenant ID bulunamadı');
+      throw new BadRequestException('Tenant ID not found');
     }
 
     // Settings var mı kontrol et
-    let settings = await this.prisma.tenantSettings.findUnique({
+    let settings = await this.prisma.extended.tenantSettings.findUnique({
       where: { tenantId },
     });
 
     if (!settings) {
-      settings = await this.prisma.tenantSettings.create({
+      settings = await this.prisma.extended.tenantSettings.create({
         data: {
           tenantId,
           logoUrl,
         },
       });
     } else {
-      settings = await this.prisma.tenantSettings.update({
+      settings = await this.prisma.extended.tenantSettings.update({
         where: { tenantId },
         data: {
           logoUrl,

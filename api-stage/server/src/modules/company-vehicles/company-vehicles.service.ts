@@ -13,9 +13,12 @@ export class CompanyVehiclesService {
 
     async create(createDto: CreateCompanyVehicleDto) {
         const tenantId = await this.tenantResolver.resolveForCreate();
-        return this.prisma.extended.companyVehicle.create({
+        const { registrationDate, ...rest } = createDto;
+
+        return this.prisma.extended.extended.companyVehicle.create({
             data: {
-                ...createDto,
+                ...rest,
+                registrationDate: registrationDate ? new Date(registrationDate) : undefined,
                 tenantId,
             },
         });
@@ -23,12 +26,18 @@ export class CompanyVehiclesService {
 
     async findAll() {
         const tenantId = await this.tenantResolver.resolveForQuery();
-        return this.prisma.extended.companyVehicle.findMany({
-            where: { tenantId },
+        return this.prisma.extended.extended.companyVehicle.findMany({
+            where: { tenantId, deletedAt: null },
             include: {
-                personel: true,
+                assignedEmployee: {
+                    select: {
+                        id: true,
+                        firstName: true,
+                        lastName: true
+                    }
+                },
                 expenses: {
-                    orderBy: { tarih: 'desc' },
+                    orderBy: { date: 'desc' },
                 },
             },
         });
@@ -36,12 +45,12 @@ export class CompanyVehiclesService {
 
     async findOne(id: string) {
         const tenantId = await this.tenantResolver.resolveForQuery();
-        const vehicle = await this.prisma.extended.companyVehicle.findFirst({
-            where: { id, tenantId },
+        const vehicle = await this.prisma.extended.extended.companyVehicle.findFirst({
+            where: { id, tenantId, deletedAt: null },
             include: {
-                personel: true,
+                assignedEmployee: true,
                 expenses: {
-                    orderBy: { tarih: 'desc' },
+                    orderBy: { date: 'desc' },
                 },
             },
         });
@@ -56,17 +65,23 @@ export class CompanyVehiclesService {
     async update(id: string, updateDto: UpdateCompanyVehicleDto) {
         await this.findOne(id); // Ensure it exists and belongs to the tenant
 
-        return this.prisma.extended.companyVehicle.update({
+        const { registrationDate, ...rest } = updateDto;
+
+        return this.prisma.extended.extended.companyVehicle.update({
             where: { id },
-            data: updateDto,
+            data: {
+                ...rest,
+                registrationDate: registrationDate ? new Date(registrationDate) : undefined,
+            },
         });
     }
 
     async remove(id: string) {
         await this.findOne(id);
 
-        return this.prisma.extended.companyVehicle.delete({
+        return this.prisma.extended.extended.companyVehicle.update({
             where: { id },
+            data: { deletedAt: new Date() }
         });
     }
 }

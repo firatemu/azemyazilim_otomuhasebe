@@ -3,7 +3,7 @@ import { IsNotEmpty, IsString, IsNumber, Min } from 'class-validator';
 export class SupplyPartRequestDto {
   @IsNotEmpty()
   @IsString()
-  stokId: string;
+  productId: string;
 
   @IsNumber()
   @Min(1)

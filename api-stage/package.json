@@ -1,0 +1,8 @@
+{
+  "devDependencies": {
+    "@prisma/client": "^7.4.2"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1"
+  }
+}

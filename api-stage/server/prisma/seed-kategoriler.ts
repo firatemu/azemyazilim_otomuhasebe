@@ -56,7 +56,7 @@ async function seedKategoriler() {
 
   for (const kategori of kategoriler) {
     // Ana kategori zaten var mı kontrol et
-    const existingAnaKategori = await prisma.stok.findFirst({
+    const existingAnaKategori = await prisma.product.findFirst({
       where: {
         anaKategori: kategori.anaKategori,
       },
@@ -71,18 +71,18 @@ async function seedKategoriler() {
     // Ana kategori placeholder kaydı oluştur
     try {
       const timestamp = Date.now().toString().slice(-6);
-      const stokKodu = `KAT-${kategori.anaKategori.substring(0, 3).toUpperCase()}-${timestamp}`;
+      const code = `KAT-${kategori.anaKategori.substring(0, 3).toUpperCase()}-${timestamp}`;
 
-      await prisma.stok.create({
+      await prisma.product.create({
         data: {
-          stokKodu,
-          stokAdi: `[Ana Kategori Tanımı] ${kategori.anaKategori}`,
-          birim: 'Adet',
-          alisFiyati: 0,
-          satisFiyati: 0,
+          code,
+          name: `[Ana Kategori Tanımı] ${kategori.anaKategori}`,
+          unit: 'Adet',
+          purchasePrice: 0,
+          salesPrice: 0,
           anaKategori: kategori.anaKategori,
           altKategori: null,
-          aciklama: 'Bu kayıt sadece ana kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
+          description: 'Bu kayıt sadece ana kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
         },
       });
 
@@ -96,7 +96,7 @@ async function seedKategoriler() {
           const altKategoriStokKodu = `KAT-${kategori.anaKategori.substring(0, 3).toUpperCase()}-${altKategori.substring(0, 3).toUpperCase()}-${altKategoriTimestamp}`;
 
           // Alt kategori zaten var mı kontrol et
-          const existingAltKategori = await prisma.stok.findFirst({
+          const existingAltKategori = await prisma.product.findFirst({
             where: {
               anaKategori: kategori.anaKategori,
               altKategori: altKategori,
@@ -108,38 +108,38 @@ async function seedKategoriler() {
             continue;
           }
 
-          await prisma.stok.create({
+          await prisma.product.create({
             data: {
-              stokKodu: altKategoriStokKodu,
-              stokAdi: `[Kategori Tanımı] ${kategori.anaKategori} - ${altKategori}`,
-              birim: 'Adet',
-              alisFiyati: 0,
-              satisFiyati: 0,
+              code: altKategoriStokKodu,
+              name: `[Kategori Tanımı] ${kategori.anaKategori} - ${altKategori}`,
+              unit: 'Adet',
+              purchasePrice: 0,
+              salesPrice: 0,
               anaKategori: kategori.anaKategori,
               altKategori: altKategori,
-              aciklama: 'Bu kayıt sadece kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
+              description: 'Bu kayıt sadece kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
             },
           });
 
           console.log(`    ✅ Alt kategori "${altKategori}" eklendi`);
           eklenenAltKategoriSayisi++;
         } catch (error: any) {
-          if (error.code === 'P2002' && error.meta?.target?.includes('stokKodu')) {
+          if (error.code === 'P2002' && error.meta?.target?.includes('code')) {
             // Stok kodu zaten varsa, farklı bir kod dene
             const altKategoriTimestamp = Date.now().toString();
             const altKategoriStokKodu = `KAT-${kategori.anaKategori.substring(0, 3).toUpperCase()}-${altKategori.substring(0, 3).toUpperCase()}-${altKategoriTimestamp}`;
 
             try {
-              await prisma.stok.create({
+              await prisma.product.create({
                 data: {
-                  stokKodu: altKategoriStokKodu,
-                  stokAdi: `[Kategori Tanımı] ${kategori.anaKategori} - ${altKategori}`,
-                  birim: 'Adet',
-                  alisFiyati: 0,
-                  satisFiyati: 0,
+                  code: altKategoriStokKodu,
+                  name: `[Kategori Tanımı] ${kategori.anaKategori} - ${altKategori}`,
+                  unit: 'Adet',
+                  purchasePrice: 0,
+                  salesPrice: 0,
                   anaKategori: kategori.anaKategori,
                   altKategori: altKategori,
-                  aciklama: 'Bu kayıt sadece kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
+                  description: 'Bu kayıt sadece kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
                 },
               });
 
@@ -154,22 +154,22 @@ async function seedKategoriler() {
         }
       }
     } catch (error: any) {
-      if (error.code === 'P2002' && error.meta?.target?.includes('stokKodu')) {
+      if (error.code === 'P2002' && error.meta?.target?.includes('code')) {
         // Stok kodu zaten varsa, farklı bir kod dene
         const timestamp = Date.now().toString();
-        const stokKodu = `KAT-${kategori.anaKategori.substring(0, 3).toUpperCase()}-${timestamp}`;
+        const code = `KAT-${kategori.anaKategori.substring(0, 3).toUpperCase()}-${timestamp}`;
 
         try {
-          await prisma.stok.create({
+          await prisma.product.create({
             data: {
-              stokKodu,
-              stokAdi: `[Ana Kategori Tanımı] ${kategori.anaKategori}`,
-              birim: 'Adet',
-              alisFiyati: 0,
-              satisFiyati: 0,
+              code,
+              name: `[Ana Kategori Tanımı] ${kategori.anaKategori}`,
+              unit: 'Adet',
+              purchasePrice: 0,
+              salesPrice: 0,
               anaKategori: kategori.anaKategori,
               altKategori: null,
-              aciklama: 'Bu kayıt sadece ana kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
+              description: 'Bu kayıt sadece ana kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
             },
           });
 
@@ -182,7 +182,7 @@ async function seedKategoriler() {
               const altKategoriTimestamp = Date.now().toString();
               const altKategoriStokKodu = `KAT-${kategori.anaKategori.substring(0, 3).toUpperCase()}-${altKategori.substring(0, 3).toUpperCase()}-${altKategoriTimestamp}`;
 
-              const existingAltKategori = await prisma.stok.findFirst({
+              const existingAltKategori = await prisma.product.findFirst({
                 where: {
                   anaKategori: kategori.anaKategori,
                   altKategori: altKategori,
@@ -193,16 +193,16 @@ async function seedKategoriler() {
                 continue;
               }
 
-              await prisma.stok.create({
+              await prisma.product.create({
                 data: {
-                  stokKodu: altKategoriStokKodu,
-                  stokAdi: `[Kategori Tanımı] ${kategori.anaKategori} - ${altKategori}`,
-                  birim: 'Adet',
-                  alisFiyati: 0,
-                  satisFiyati: 0,
+                  code: altKategoriStokKodu,
+                  name: `[Kategori Tanımı] ${kategori.anaKategori} - ${altKategori}`,
+                  unit: 'Adet',
+                  purchasePrice: 0,
+                  salesPrice: 0,
                   anaKategori: kategori.anaKategori,
                   altKategori: altKategori,
-                  aciklama: 'Bu kayıt sadece kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
+                  description: 'Bu kayıt sadece kategori tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
                 },
               });
 

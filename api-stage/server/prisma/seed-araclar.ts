@@ -32,7 +32,7 @@ async function seedAraclar() {
         // Aynı araç zaten var mı kontrol et
         const existingArac = await prisma.arac.findFirst({
           where: {
-            marka: arac.brand,
+            brand: arac.brand,
             model: arac.model,
             motorHacmi: arac.engine_capacity,
             yakitTipi: arac.fuel_type,
@@ -48,7 +48,7 @@ async function seedAraclar() {
         // Yeni araç ekle
         await prisma.arac.create({
           data: {
-            marka: arac.brand,
+            brand: arac.brand,
             model: arac.model,
             motorHacmi: arac.engine_capacity,
             yakitTipi: arac.fuel_type,
@@ -71,18 +71,18 @@ async function seedAraclar() {
 
     // İstatistikler
     const markalar = await prisma.arac.groupBy({
-      by: ['marka'],
+      by: ['brand'],
       _count: {
-        marka: true,
+        brand: true,
       },
       orderBy: {
-        marka: 'asc',
+        brand: 'asc',
       },
     });
 
     console.log('📈 Marka İstatistikleri:');
-    markalar.forEach((marka) => {
-      console.log(`   • ${marka.marka}: ${marka._count.marka} model`);
+    markalar.forEach((brand) => {
+      console.log(`   • ${brand.brand}: ${brand._count.brand} model`);
     });
 
     const yakitTipleri = await prisma.arac.groupBy({

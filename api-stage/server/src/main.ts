@@ -1,6 +1,7 @@
 import { NestFactory } from '@nestjs/core';
 import { ValidationPipe } from '@nestjs/common';
 import { AppModule } from './app.module';
+import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { AllExceptionsFilter } from './common/filters/http-exception.filter';
 import helmet from 'helmet';
 import compression = require('compression');
@@ -126,15 +127,37 @@ async function bootstrap() {
   // Global prefix
   app.setGlobalPrefix('api');
 
+  // Swagger/OpenAPI Yapılandırması
+  const config = new DocumentBuilder()
+    .setTitle('Oto Muhasebe API')
+    .setDescription('Oto Muhasebe ERP/SaaS API Dokümantasyonu')
+    .setVersion('1.0')
+    .addTag('auth')
+    .addTag('tenants')
+    .addBearerAuth()
+    .build();
+
+  try {
+    const document = SwaggerModule.createDocument(app, config);
+    SwaggerModule.setup('api-docs', app, document, {
+      jsonDocumentUrl: 'api-json',
+    });
+  } catch (err) {
+    console.warn('⚠️ Swagger document creation skipped (e.g. circular enum):', err?.message || err);
+  }
+
   // Static files serving - uploads klasörü için (Docker volume ile kalıcı)
   const express = require('express');
   const path = require('path');
   const fs = require('fs');
-  const uploadsDir = path.join(__dirname, '..', '..', 'uploads');
+  const uploadsDir = path.join(__dirname, '..', 'uploads');
   try {
-    fs.mkdirSync(uploadsDir, { recursive: true });
-  } catch {
-    // Klasör zaten var veya volume mount sonrası oluşacak
+    if (!fs.existsSync(uploadsDir)) {
+      fs.mkdirSync(uploadsDir, { recursive: true });
+      console.log('📁 Created uploads directory:', uploadsDir);
+    }
+  } catch (err) {
+    console.warn('⚠️ Could not ensure uploads directory:', err.message);
   }
   app.use('/api/uploads', express.static(uploadsDir));
 

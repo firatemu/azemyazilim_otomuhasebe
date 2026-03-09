@@ -48,10 +48,10 @@ async function seedMarkalar() {
   let mevcutSayisi = 0;
 
   for (const markaAdi of markalar) {
-    // Bu marka zaten var mı kontrol et
-    const existingStok = await prisma.stok.findFirst({
+    // Bu brand zaten var mı kontrol et
+    const existingStok = await prisma.product.findFirst({
       where: {
-        marka: markaAdi,
+        brand: markaAdi,
       },
     });
 
@@ -64,17 +64,17 @@ async function seedMarkalar() {
     // Marka tanımı için placeholder stok kaydı oluştur
     try {
       const timestamp = Date.now().toString().slice(-6);
-      const stokKodu = `MRK-${markaAdi.substring(0, 3).toUpperCase()}-${timestamp}`;
+      const code = `MRK-${markaAdi.substring(0, 3).toUpperCase()}-${timestamp}`;
 
-      await prisma.stok.create({
+      await prisma.product.create({
         data: {
-          stokKodu,
-          stokAdi: `[Marka Tanımı] ${markaAdi}`,
-          birim: 'Adet',
-          alisFiyati: 0,
-          satisFiyati: 0,
-          marka: markaAdi,
-          aciklama: 'Bu kayıt sadece marka tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
+          code,
+          name: `[Marka Tanımı] ${markaAdi}`,
+          unit: 'Adet',
+          purchasePrice: 0,
+          salesPrice: 0,
+          brand: markaAdi,
+          description: 'Bu kayıt sadece brand tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
         },
       });
 
@@ -82,20 +82,20 @@ async function seedMarkalar() {
       eklenenSayisi++;
     } catch (error: any) {
       // Eğer stok kodu zaten varsa, farklı bir kod dene
-      if (error.code === 'P2002' && error.meta?.target?.includes('stokKodu')) {
+      if (error.code === 'P2002' && error.meta?.target?.includes('code')) {
         const timestamp = Date.now().toString();
-        const stokKodu = `MRK-${markaAdi.substring(0, 3).toUpperCase()}-${timestamp}`;
+        const code = `MRK-${markaAdi.substring(0, 3).toUpperCase()}-${timestamp}`;
 
         try {
-          await prisma.stok.create({
+          await prisma.product.create({
             data: {
-              stokKodu,
-              stokAdi: `[Marka Tanımı] ${markaAdi}`,
-              birim: 'Adet',
-              alisFiyati: 0,
-              satisFiyati: 0,
-              marka: markaAdi,
-              aciklama: 'Bu kayıt sadece marka tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
+              code,
+              name: `[Marka Tanımı] ${markaAdi}`,
+              unit: 'Adet',
+              purchasePrice: 0,
+              salesPrice: 0,
+              brand: markaAdi,
+              description: 'Bu kayıt sadece brand tanımı için oluşturulmuştur. Gerçek bir stok kaydı değildir.',
             },
           });
 
@@ -111,9 +111,9 @@ async function seedMarkalar() {
   }
 
   console.log(`\n✅ Marka ekleme işlemi tamamlandı!`);
-  console.log(`   📊 Eklenen: ${eklenenSayisi} marka`);
-  console.log(`   📊 Mevcut: ${mevcutSayisi} marka`);
-  console.log(`   📊 Toplam: ${markalar.length} marka\n`);
+  console.log(`   📊 Eklenen: ${eklenenSayisi} brand`);
+  console.log(`   📊 Mevcut: ${mevcutSayisi} brand`);
+  console.log(`   📊 Toplam: ${markalar.length} brand\n`);
 }
 
 seedMarkalar()

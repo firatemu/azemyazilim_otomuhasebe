@@ -6,7 +6,9 @@ import {
   IsOptional,
   IsEnum,
 } from 'class-validator';
-import { UserRole } from '@prisma/client';
+import { ApiProperty } from '@nestjs/swagger';
+
+import { UserRole } from '../../../common/enums/user-role.enum';
 
 export class RegisterDto {
   @IsNotEmpty()
@@ -42,14 +44,14 @@ export class RegisterDto {
   @IsString()
   fullName?: string;
 
+  @ApiProperty({ enum: UserRole, required: false })
   @IsOptional()
   @IsEnum(UserRole)
   role?: UserRole;
 
   @IsOptional()
-  @IsOptional()
   @IsString()
-  planSlug?: string; // 'trial' veya ücretli plan slug'ı (örn: 'basic', 'professional')
+  planSlug?: string;
 
   @IsOptional()
   @IsString()

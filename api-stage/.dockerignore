@@ -1,37 +1,7 @@
-# Node / package managers
-node_modules
-npm-debug.log
-yarn-error.log
-pnpm-lock.yaml
-.pnpm-store
-
-# Builds / outputs
-dist
-build
-.next
-out
-coverage
-
-# VCS
+**/node_modules
+**/dist
 .git
-.gitignore
-
-# Env / secrets
 .env
-.env.*
-*.pem
-*.key
-
-# Logs
-logs
 *.log
-
-# OS / IDE
-.DS_Store
-Thumbs.db
-.vscode
-.idea
-
-# Docker & misc
-docker-compose*.yml
-backups
+api-stage/server/node_modules
+api-stage/server/dist

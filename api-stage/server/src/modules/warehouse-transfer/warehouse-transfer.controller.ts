@@ -23,8 +23,8 @@ export class WarehouseTransferController {
   ) {}
 
   @Get()
-  findAll(@Query('durum') durum?: string) {
-    return this.warehouseTransferService.findAll(durum);
+  findAll(@Query('status') status?: string) {
+    return this.warehouseTransferService.findAll(status);
   }
 
   @Get(':id')

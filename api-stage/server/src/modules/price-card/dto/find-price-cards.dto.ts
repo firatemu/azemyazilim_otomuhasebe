@@ -1,6 +1,6 @@
-import { PriceCardType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import { IsEnum, IsOptional } from 'class-validator';
+import { PriceCardType } from './create-price-card.dto';
 
 export class FindPriceCardsDto {
   @IsEnum(PriceCardType)
@@ -9,4 +9,4 @@ export class FindPriceCardsDto {
   type?: PriceCardType = PriceCardType.SALE;
 }
 
-export class LatestPriceQueryDto extends FindPriceCardsDto {}
+export class LatestPriceQueryDto extends FindPriceCardsDto { }

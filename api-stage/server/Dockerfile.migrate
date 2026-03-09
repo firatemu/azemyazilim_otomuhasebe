@@ -1,13 +1,16 @@
-# Dockerfile.migrate - Run Prisma migrations (keeps devDependencies for prisma CLI)
 FROM node:20-alpine
-
 WORKDIR /app/server
 
-COPY server/package*.json ./
-RUN npm install --legacy-peer-deps
+RUN apk add --no-cache openssl
+
+# Build context is api-stage, so paths are relative to that
+COPY server/package.json server/pnpm-lock.yaml* server/package-lock.json* ./
+RUN corepack enable && (pnpm i || npm ci || npm i)
 
 COPY server/prisma ./prisma
-RUN npx prisma generate --schema=./prisma/schema.prisma
 
-# Default: run migrate deploy (override in compose)
-CMD ["npx", "prisma", "migrate", "deploy", "--schema=./prisma/schema.prisma"]
+# Generate client (dummy URL for build)
+ENV DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy?schema=public"
+RUN npx prisma generate
+
+CMD ["npx", "prisma", "migrate", "deploy"]

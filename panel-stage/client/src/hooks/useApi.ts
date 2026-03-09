@@ -6,7 +6,7 @@ export function useStoklar(search?: string, limit = 20) {
   return useQuery({
     queryKey: ['stoklar', search, limit],
     queryFn: async () => {
-      const response = await axios.get('/stok', {
+      const response = await axios.get('/product', {
         params: { search, limit },
       });
       const data = response.data?.data || response.data;
@@ -21,7 +21,7 @@ export function useCariler(tip?: string, limit = 1000) {
   return useQuery({
     queryKey: ['cariler', tip, limit],
     queryFn: async () => {
-      const response = await axios.get('/cari', {
+      const response = await axios.get('/account', {
         params: { tip, limit },
       });
       const data = response.data?.data || response.data;
@@ -36,7 +36,7 @@ export function useKasalar(aktif = true) {
   return useQuery({
     queryKey: ['kasalar', aktif],
     queryFn: async () => {
-      const response = await axios.get('/kasa', {
+      const response = await axios.get('/cashbox', {
         params: { aktif },
       });
       return response.data || [];
@@ -50,7 +50,7 @@ export function useFaturalar(faturaTipi?: string, page = 1, limit = 50) {
   return useQuery({
     queryKey: ['faturalar', faturaTipi, page, limit],
     queryFn: async () => {
-      const response = await axios.get('/fatura', {
+      const response = await axios.get('/invoice', {
         params: { faturaTipi, page, limit },
       });
       const data = response.data?.data || response.data;
@@ -76,7 +76,7 @@ export function useTahsilatlar(page = 1, limit = 50) {
   return useQuery({
     queryKey: ['tahsilatlar', page, limit],
     queryFn: async () => {
-      const response = await axios.get('/tahsilat', {
+      const response = await axios.get('/collection', {
         params: { page, limit },
       });
       const data = response.data?.data || response.data;
@@ -91,7 +91,7 @@ export function useStokHareketler(stokId?: string, hareketTipi?: string, limit =
   return useQuery({
     queryKey: ['stok-hareketler', stokId, hareketTipi, limit],
     queryFn: async () => {
-      const response = await axios.get('/stok-hareket', {
+      const response = await axios.get('/product-movement', {
         params: { stokId, hareketTipi, limit },
       });
       const data = response.data?.data || response.data;
@@ -107,7 +107,7 @@ export function usePersoneller() {
   return useQuery({
     queryKey: ['personeller'],
     queryFn: async () => {
-      const response = await axios.get('/personel');
+      const response = await axios.get('/employee');
       // Personel API returns a direct array, not wrapped in { data: [...] }
       const data = response.data?.data || response.data;
       return Array.isArray(data) ? data : [];
@@ -122,7 +122,7 @@ export function useCreateStok() {
 
   return useMutation({
     mutationFn: async (data: any) => {
-      const response = await axios.post('/stok', data);
+      const response = await axios.post('/product', data);
       return response.data;
     },
     onSuccess: () => {
@@ -136,7 +136,7 @@ export function useCreateCari() {
 
   return useMutation({
     mutationFn: async (data: any) => {
-      const response = await axios.post('/cari', data);
+      const response = await axios.post('/account', data);
       return response.data;
     },
     onSuccess: () => {
@@ -150,7 +150,7 @@ export function useCreateFatura() {
 
   return useMutation({
     mutationFn: async (data: any) => {
-      const response = await axios.post('/fatura', data);
+      const response = await axios.post('/invoice', data);
       return response.data;
     },
     onSuccess: () => {

@@ -13,11 +13,11 @@ import { Type } from 'class-transformer';
 export class CreateWarehouseTransferItemDto {
   @IsString()
   @IsNotEmpty()
-  stokId: string;
+  productId: string;
 
   @IsNumber()
   @Min(1)
-  miktar: number;
+  quantity: number;
 
   @IsString()
   @IsOptional()
@@ -30,7 +30,7 @@ export class CreateWarehouseTransferItemDto {
 
 export class CreateWarehouseTransferDto {
   @IsDateString()
-  tarih: string;
+  date: string;
 
   @IsString()
   @IsNotEmpty()
@@ -50,12 +50,12 @@ export class CreateWarehouseTransferDto {
 
   @IsString()
   @IsOptional()
-  aciklama?: string;
+  notes?: string;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreateWarehouseTransferItemDto)
-  kalemler: CreateWarehouseTransferItemDto[];
+  items: CreateWarehouseTransferItemDto[];
 
   @IsString()
   @IsOptional()

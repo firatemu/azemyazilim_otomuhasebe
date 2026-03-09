@@ -1,5 +1,40 @@
 import type { NextConfig } from 'next';
 
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const withPWA = require('next-pwa')({
+  dest: 'public',
+  register: true,
+  skipWaiting: true,
+  disable: process.env.NODE_ENV !== 'production',
+  runtimeCaching: [
+    {
+      urlPattern: /\/api\/work-orders/,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'work-orders-cache',
+        expiration: { maxEntries: 200, maxAgeSeconds: 86400 },
+        networkTimeoutSeconds: 5,
+      },
+    },
+    {
+      urlPattern: /\/api\/stok/,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'stok-cache',
+        expiration: { maxEntries: 500, maxAgeSeconds: 3600 },
+      },
+    },
+    {
+      urlPattern: /\.(png|jpg|jpeg|webp|avif|svg|gif|ico)$/i,
+      handler: 'CacheFirst',
+      options: {
+        cacheName: 'images-cache',
+        expiration: { maxEntries: 200, maxAgeSeconds: 2592000 },
+      },
+    },
+  ],
+});
+
 // API Proxy Target: Docker'da API_PROXY_TARGET (http://backend-staging:3000), local'de localhost:3020
 const apiProxyTarget = (process.env.API_PROXY_TARGET || 'http://localhost:3020').replace(/\/$/, '');
 const isDevelopment = process.env.NODE_ENV === 'development';
@@ -33,6 +68,8 @@ const nextConfig: NextConfig = {
       'date-fns',
       'recharts',
     ],
+    // HMR: Server Components cache (Fast Refresh ile birlikte varsayılan açık)
+    serverComponentsHmrCache: true,
   },
 
   // Compiler optimizasyonları
@@ -60,7 +97,7 @@ const nextConfig: NextConfig = {
     reactStrictMode: false,
   }),
 
-  // Turbopack config (Next.js 16 default)
+  // Turbopack config (Next.js 16 default) – HMR/Fast Refresh varsayılan açık
   turbopack: {},
 
   // Images optimizasyonu
@@ -85,13 +122,17 @@ const nextConfig: NextConfig = {
     ],
   },
 
-
-
-  // Developer modu ayarları
+  // Developer modu ayarları (NODE_ENV=development)
   ...(isDevelopment && {
     onDemandEntries: {
       maxInactiveAge: 60 * 1000,
       pagesBufferLength: 5,
+    },
+    // Build aktivite göstergesi (sol alt köşe)
+    devIndicators: {
+      appIsrStatus: true,
+      buildActivity: true,
+      buildActivityPosition: 'bottom-left',
     },
   }),
 
@@ -117,18 +158,18 @@ const nextConfig: NextConfig = {
         }
       }
 
-      if (!isServer && !config.watchOptions) {
-        config.watchOptions = {
-          poll: false,
-          aggregateTimeout: 200, // Daha hızlı refresh için timeout'u azalt
-          ignored: [
-            '**/node_modules/**',
-            '**/.git/**',
-            '**/.next/**',
-            '**/dist/**',
-            '**/build/**',
-          ],
-        };
+      if (!isServer) {
+        const watchPolling = process.env.WATCHPACK_POLLING === 'true' || process.env.CHOKIDAR_USEPOLLING === 'true';
+        config.watchOptions = config.watchOptions || {};
+        config.watchOptions.poll = watchPolling ? 500 : false;
+        config.watchOptions.aggregateTimeout = 200;
+        config.watchOptions.ignored = [
+          '**/node_modules/**',
+          '**/.git/**',
+          '**/.next/**',
+          '**/dist/**',
+          '**/build/**',
+        ];
       }
     } else {
       // Production modunda cache aktif
@@ -165,5 +206,6 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withPWA(nextConfig);
+
 

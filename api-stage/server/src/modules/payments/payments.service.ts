@@ -9,7 +9,7 @@ export class PaymentsService {
 
   async create(createPaymentDto: CreatePaymentDto) {
     // Check if subscription exists
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { id: createPaymentDto.subscriptionId },
     });
 
@@ -17,7 +17,7 @@ export class PaymentsService {
       throw new NotFoundException(`Subscription with ID ${createPaymentDto.subscriptionId} not found`);
     }
 
-    return this.prisma.payment.create({
+    return this.prisma.extended.payment.create({
       data: {
         subscriptionId: createPaymentDto.subscriptionId,
         amount: createPaymentDto.amount,
@@ -38,7 +38,7 @@ export class PaymentsService {
   }
 
   async findAll() {
-    return this.prisma.payment.findMany({
+    return this.prisma.extended.payment.findMany({
       include: {
         subscription: {
           include: {
@@ -51,7 +51,7 @@ export class PaymentsService {
   }
 
   async findOne(id: string) {
-    const payment = await this.prisma.payment.findUnique({
+    const payment = await this.prisma.extended.payment.findUnique({
       where: { id },
       include: {
         subscription: {
@@ -70,7 +70,7 @@ export class PaymentsService {
   }
 
   async findBySubscriptionId(subscriptionId: string) {
-    return this.prisma.payment.findMany({
+    return this.prisma.extended.payment.findMany({
       where: { subscriptionId },
       orderBy: { createdAt: 'desc' },
     });
@@ -92,7 +92,7 @@ export class PaymentsService {
     if (updatePaymentDto.errorMessage) updateData.errorMessage = updatePaymentDto.errorMessage;
     if (updatePaymentDto.paymentMethod) updateData.paymentMethod = updatePaymentDto.paymentMethod;
 
-    return this.prisma.payment.update({
+    return this.prisma.extended.payment.update({
       where: { id },
       data: updateData,
       include: {
@@ -102,7 +102,7 @@ export class PaymentsService {
   }
 
   async remove(id: string) {
-    return this.prisma.payment.delete({
+    return this.prisma.extended.payment.delete({
       where: { id },
     });
   }

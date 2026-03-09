@@ -73,7 +73,7 @@ async function bootstrap() {
             // 4. Create Code Templates
             const templates = [
                 { module: 'INVOICE', prefix: 'FAT', digitCount: 6 },
-                { module: 'CUSTOMER', prefix: 'CARI', digitCount: 5 },
+                { module: 'CUSTOMER', prefix: 'CUSTOMER', digitCount: 5 },
                 { module: 'STOCK', prefix: 'STK', digitCount: 5 },
             ];
 

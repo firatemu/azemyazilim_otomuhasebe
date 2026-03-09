@@ -28,24 +28,24 @@ export default function KPIHeader({ loading, data, type }: StatsProps) {
     const cards = [
         {
             title: isSatis ? 'Bu Ay Satış' : 'Bu Ay Alış',
-            value: data?.aylikSatis.tutar || 0,
-            count: data?.aylikSatis.adet || 0,
+            value: data?.aylikSatis?.tutar || 0,
+            count: data?.aylikSatis?.adet || 0,
             icon: isSatis ? <TrendingUp /> : <TrendingDown />,
             color: isSatis ? '#10b981' : '#f59e0b', // emerald-500 : amber-500
             bgColor: isSatis ? 'color-mix(in srgb, var(--chart-3) 15%, transparent)' : 'color-mix(in srgb, var(--chart-2) 15%, transparent)',
         },
         {
             title: isSatis ? 'Tahsilat Bekleyen' : 'Ödeme Bekleyen',
-            value: data?.tahsilatBekleyen.tutar || 0,
-            count: data?.tahsilatBekleyen.adet || 0,
+            value: data?.tahsilatBekleyen?.tutar || 0,
+            count: data?.tahsilatBekleyen?.adet || 0,
             icon: <HourglassEmpty />,
             color: '#3b82f6', // blue-500
             bgColor: 'color-mix(in srgb, var(--chart-1) 15%, transparent)',
         },
         {
             title: 'Vadesi Geçmiş',
-            value: data?.vadesiGecmis.tutar || 0,
-            count: data?.vadesiGecmis.adet || 0,
+            value: data?.vadesiGecmis?.tutar || 0,
+            count: data?.vadesiGecmis?.adet || 0,
             icon: <Dangerous />,
             color: '#ef4444', // red-500
             bgColor: 'color-mix(in srgb, var(--destructive) 15%, transparent)',

@@ -54,13 +54,13 @@ export class CustomerVehicleController {
     @Query('page') page?: string,
     @Query('limit') limit?: string,
     @Query('search') search?: string,
-    @Query('cariId') cariId?: string,
+    @Query('accountId') accountId?: string,
   ) {
     return this.customerVehicleService.findAll(
       page ? parseInt(page) : 1,
       limit ? parseInt(limit) : 50,
       search,
-      cariId,
+      accountId,
     );
   }
 

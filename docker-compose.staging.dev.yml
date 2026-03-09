@@ -12,6 +12,7 @@ services:
     networks: [ app_net ]
 
   backend-staging:
+    container_name: otomuhasebe-backend-staging
     build:
       context: ./api-stage
       dockerfile: server/Dockerfile.staging.prod
@@ -31,6 +32,7 @@ services:
       start_period: 30s
     restart: unless-stopped
   user-panel-staging:
+    container_name: otomuhasebe-user-panel-staging
     image: node:20-alpine
     working_dir: /app
     ports:
@@ -45,16 +47,19 @@ services:
       # Daha hızlı derleme: daha fazla bellek (Turbopack)
       NODE_OPTIONS: "--max-old-space-size=8192"
       # Docker/Linux'ta hot reload için polling (local PC'de false yaparak daha hızlı olabilir)
-      CHOKIDAR_USEPOLLING: "${CHOKIDAR_USEPOLLING:-true}"
-      WATCHPACK_POLLING: "${WATCHPACK_POLLING:-true}"
-      # Panel /api/* isteklerini backend container'a yönlendirir (Compose servis adı)
-      API_PROXY_TARGET: "http://backend-staging:3000"
+      CHOKIDAR_USEPOLLING: "true"
+      WATCHPACK_POLLING: "true"
+      # Panel /api/* isteklerini backend container'a yönlendirir (Compose servis adı veya container_name)
+      API_PROXY_TARGET: "http://otomuhasebe-backend-staging:3000"
     volumes:
       - ./panel-stage/client:/app
       - panel_stage_node_modules:/app/node_modules
       - panel_stage_next_cache:/app/.next
-    command: sh -c "corepack enable && (pnpm install --prefer-offline 2>/dev/null || pnpm install) && pnpm run dev:fastest"
+    command: sh -c "npx pnpm install --prefer-offline && npx pnpm run dev:fastest"
     networks: [ app_net ]
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
     depends_on:
       - backend-staging
     healthcheck:

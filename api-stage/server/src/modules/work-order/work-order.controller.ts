@@ -21,12 +21,13 @@ import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { GetCurrentUser } from '../../common/decorators/get-current-user.decorator';
 import { RolesGuard } from '../../common/guards/roles.guard';
 import { Roles } from '../../common/guards/roles.guard';
-import { WorkOrderStatus, UserRole, PartWorkflowStatus } from '@prisma/client';
+import { UserRole } from '../../common/enums/user-role.enum';
+import { WorkOrderStatus, PartWorkflowStatus } from './work-order.enums';
 
 @UseGuards(JwtAuthGuard)
 @Controller('work-order')
 export class WorkOrderController {
-  constructor(private readonly workOrderService: WorkOrderService) {}
+  constructor(private readonly workOrderService: WorkOrderService) { }
 
   @Post()
   @UseGuards(RolesGuard)
@@ -68,23 +69,23 @@ export class WorkOrderController {
     @Query('limit') limit?: string,
     @Query('search') search?: string,
     @Query('status') status?: WorkOrderStatus,
-    @Query('cariId') cariId?: string,
+    @Query('accountId') accountId?: string,
     @Query('createdAtFrom') createdAtFrom?: string,
     @Query('createdAtTo') createdAtTo?: string,
     @Query('customerVehicleId') customerVehicleId?: string,
     @Query('readyForInvoice') readyForInvoice?: string,
   ) {
-    return this.workOrderService.findAll(
-      page ? parseInt(page) : 1,
-      limit ? parseInt(limit) : 50,
+    return this.workOrderService.findAll({
+      page: page ? parseInt(page) : 1,
+      limit: limit ? parseInt(limit) : 50,
       search,
       status,
-      cariId,
-      createdAtFrom,
-      createdAtTo,
-      customerVehicleId,
-      readyForInvoice === 'true',
-    );
+      customerId: accountId,
+      startDate: createdAtFrom ? new Date(createdAtFrom) : undefined,
+      endDate: createdAtTo ? new Date(createdAtTo) : undefined,
+      vehicleId: customerVehicleId,
+      readyForInvoice: readyForInvoice === 'true',
+    });
   }
 
   @Get(':id/activities')

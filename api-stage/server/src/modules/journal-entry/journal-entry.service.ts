@@ -8,7 +8,7 @@ export class JournalEntryService {
   constructor(
     private prisma: PrismaService,
     private tenantResolver: TenantResolverService,
-  ) {}
+  ) { }
 
   async findAll(
     page = 1,
@@ -24,7 +24,7 @@ export class JournalEntryService {
     if (referenceId) where.referenceId = referenceId;
 
     const [data, total] = await Promise.all([
-      this.prisma.journalEntry.findMany({
+      this.prisma.extended.journalEntry.findMany({
         where,
         skip,
         take: limit,
@@ -36,7 +36,7 @@ export class JournalEntryService {
           },
         },
       }),
-      this.prisma.journalEntry.count({ where }),
+      this.prisma.extended.journalEntry.count({ where }),
     ]);
 
     return {
@@ -50,21 +50,21 @@ export class JournalEntryService {
 
   async findOne(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const entry = await this.prisma.journalEntry.findFirst({
+    const entry = await this.prisma.extended.journalEntry.findFirst({
       where: { id, ...buildTenantWhereClause(tenantId ?? undefined) },
       include: {
         lines: true,
         serviceInvoice: {
           include: {
             workOrder: { select: { id: true, workOrderNo: true } },
-            cari: { select: { id: true, cariKodu: true, unvan: true } },
+            account: { select: { id: true, code: true, title: true } },
           },
         },
       },
     });
 
     if (!entry) {
-      throw new NotFoundException(`Muhasebe kaydı bulunamadı: ${id}`);
+      throw new NotFoundException(`Accounting record not found: ${id}`);
     }
 
     return entry;
@@ -72,7 +72,7 @@ export class JournalEntryService {
 
   async findByReference(referenceType: string, referenceId: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const entry = await this.prisma.journalEntry.findFirst({
+    const entry = await this.prisma.extended.journalEntry.findFirst({
       where: {
         referenceType,
         referenceId,
@@ -85,9 +85,7 @@ export class JournalEntryService {
     });
 
     if (!entry) {
-      throw new NotFoundException(
-        `Muhasebe kaydı bulunamadı: ${referenceType}/${referenceId}`,
-      );
+      throw new NotFoundException(`Accounting record not found: ${referenceType}/${referenceId}`);
     }
 
     return entry;

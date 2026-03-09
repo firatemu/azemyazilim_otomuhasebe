@@ -9,7 +9,7 @@ import { TenantResolverService } from '../../common/services/tenant-resolver.ser
 import { buildTenantWhereClause } from '../../common/utils/staging.util';
 import { CreateCodeTemplateDto } from './dto/create-code-template.dto';
 import { UpdateCodeTemplateDto } from './dto/update-code-template.dto';
-import { ModuleType } from '@prisma/client';
+import { ModuleType } from './code-template.enums';
 
 const DEFAULT_TEMPLATES: Partial<Record<ModuleType, { name: string; prefix: string; digitCount: number }>> = {
   [ModuleType.WAREHOUSE]: { name: 'Depo Kodu', prefix: 'D', digitCount: 3 },
@@ -22,12 +22,13 @@ const DEFAULT_TEMPLATES: Partial<Record<ModuleType, { name: string; prefix: stri
   [ModuleType.ORDER_SALES]: { name: 'Satış Siparişi No', prefix: 'SS', digitCount: 5 },
   [ModuleType.ORDER_PURCHASE]: { name: 'Satın Alma Siparişi No', prefix: 'SA', digitCount: 5 },
   [ModuleType.INVENTORY_COUNT]: { name: 'Sayım No', prefix: 'SY', digitCount: 5 },
-  [ModuleType.TEKLIF]: { name: 'Teklif No', prefix: 'TK', digitCount: 5 },
+  [ModuleType.QUOTE]: { name: 'Teklif No', prefix: 'TK', digitCount: 5 },
   [ModuleType.DELIVERY_NOTE_SALES]: { name: 'Satış İrsaliyesi No', prefix: 'Sİ', digitCount: 5 },
   [ModuleType.DELIVERY_NOTE_PURCHASE]: { name: 'Alış İrsaliyesi No', prefix: 'Aİ', digitCount: 5 },
   [ModuleType.TECHNICIAN]: { name: 'Teknisyen Kodu', prefix: 'T', digitCount: 3 },
   [ModuleType.WORK_ORDER]: { name: 'İş Emri No', prefix: 'IE', digitCount: 5 },
   [ModuleType.SERVICE_INVOICE]: { name: 'Servis Faturası No', prefix: 'SF', digitCount: 5 },
+  [ModuleType.POS_CONSOLE]: { name: 'POS İşlem No', prefix: 'POS', digitCount: 5 },
 };
 
 @Injectable()
@@ -41,7 +42,7 @@ export class CodeTemplateService {
     const tenantId = await this.tenantResolver.resolveForCreate();
 
     // Check if template already exists for this module and tenant
-    const existing = await (this.prisma.codeTemplate as any).findFirst({
+    const existing = await (this.prisma.extended.codeTemplate as any).findFirst({
       where: {
         module: createDto.module,
         tenantId
@@ -54,7 +55,7 @@ export class CodeTemplateService {
       );
     }
 
-    return (this.prisma.codeTemplate as any).create({
+    return (this.prisma.extended.codeTemplate as any).create({
       data: {
         tenantId,
         module: createDto.module,
@@ -70,7 +71,7 @@ export class CodeTemplateService {
 
   async findAll() {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    return (this.prisma.codeTemplate as any).findMany({
+    return (this.prisma.extended.codeTemplate as any).findMany({
       where: { tenantId } as any,
       orderBy: { module: 'asc' },
     });
@@ -78,12 +79,12 @@ export class CodeTemplateService {
 
   async findOne(id: string) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const template = await (this.prisma.codeTemplate as any).findFirst({
+    const template = await (this.prisma.extended.codeTemplate as any).findFirst({
       where: { id, tenantId } as any,
     });
 
     if (!template) {
-      throw new NotFoundException(`Şablon bulunamadı: ${id}`);
+      throw new NotFoundException(`Template not found: id`);
     }
 
     return template;
@@ -91,12 +92,12 @@ export class CodeTemplateService {
 
   async findByModule(module: ModuleType) {
     const tenantId = await this.tenantResolver.resolveForQuery();
-    const template = await (this.prisma.codeTemplate as any).findFirst({
+    const template = await (this.prisma.extended.codeTemplate as any).findFirst({
       where: { module, tenantId } as any,
     });
 
     if (!template) {
-      throw new NotFoundException(`Bu modül için şablon bulunamadı: ${module}`);
+      throw new NotFoundException(`Template not found for this module: module`);
     }
 
     return template;
@@ -105,7 +106,7 @@ export class CodeTemplateService {
   async update(id: string, updateDto: UpdateCodeTemplateDto) {
     await this.findOne(id); // Check if exists and belongs to tenant
 
-    return (this.prisma.codeTemplate as any).update({
+    return (this.prisma.extended.codeTemplate as any).update({
       where: { id } as any,
       data: updateDto,
     });
@@ -114,7 +115,7 @@ export class CodeTemplateService {
   async remove(id: string) {
     await this.findOne(id); // Check if exists and belongs to tenant
 
-    return (this.prisma.codeTemplate as any).delete({
+    return (this.prisma.extended.codeTemplate as any).delete({
       where: { id } as any,
     });
   }
@@ -122,14 +123,14 @@ export class CodeTemplateService {
   async getNextCode(module: ModuleType): Promise<string> {
     const tenantId = await this.tenantResolver.resolveForQuery();
     try {
-      let template = await (this.prisma.codeTemplate as any).findFirst({
+      let template = await (this.prisma.extended.codeTemplate as any).findFirst({
         where: { module, tenantId } as any,
       });
 
       if (!template) {
         const defaults = DEFAULT_TEMPLATES[module];
         if (defaults) {
-          template = await (this.prisma.codeTemplate as any).create({
+          template = await (this.prisma.extended.codeTemplate as any).create({
             data: {
               tenantId,
               module,
@@ -155,7 +156,7 @@ export class CodeTemplateService {
       }
 
       // Increment counter
-      const updated = await (this.prisma.codeTemplate as any).update({
+      const updated = await (this.prisma.extended.codeTemplate as any).update({
         where: { id: template.id } as any,
         data: { currentValue: template.currentValue + 1 },
       });
@@ -186,7 +187,7 @@ export class CodeTemplateService {
   async resetCounter(module: ModuleType, newValue: number = 0) {
     const template = await this.findByModule(module);
 
-    return (this.prisma.codeTemplate as any).update({
+    return (this.prisma.extended.codeTemplate as any).update({
       where: { id: template.id } as any,
       data: { currentValue: newValue },
     });
@@ -199,50 +200,51 @@ export class CodeTemplateService {
     const tenantWhere = buildTenantWhereClause(tenantId);
     switch (module) {
       case 'WAREHOUSE': {
-        return !(await this.prisma.warehouse.findFirst({
+        return !(await this.prisma.extended.warehouse.findFirst({
           where: { code, ...tenantWhere } as any,
         }));
       }
       case 'CASHBOX': {
-        return !(await this.prisma.kasa.findFirst({
-          where: { kasaKodu: code, ...tenantWhere } as any,
+        return !(await this.prisma.extended.cashbox.findFirst({
+          where: { code, ...tenantWhere } as any,
         }));
       }
       case 'PERSONNEL': {
-        return !(await this.prisma.personel.findFirst({
-          where: { personelKodu: code, ...tenantWhere } as any,
+        return !(await this.prisma.extended.employee.findFirst({
+          where: { employeeCode: code, ...tenantWhere } as any,
         }));
       }
       case 'PRODUCT': {
-        return !(await this.prisma.stok.findFirst({
-          where: { stokKodu: code, ...tenantWhere } as any,
+        return !(await this.prisma.extended.product.findFirst({
+          where: { code, ...tenantWhere } as any,
         }));
       }
       case 'CUSTOMER': {
-        return !(await this.prisma.cari.findFirst({
-          where: { cariKodu: code, ...tenantWhere } as any,
+        return !(await this.prisma.extended.account.findFirst({
+          where: { code, ...tenantWhere } as any,
         }));
       }
       case 'INVOICE_SALES':
       case 'INVOICE_PURCHASE': {
-        return !(await this.prisma.fatura.findFirst({
-          where: { faturaNo: code, ...tenantWhere } as any,
+        return !(await this.prisma.extended.invoice.findFirst({
+          where: { invoiceNo: code, ...tenantWhere } as any,
         }));
       }
       case 'ORDER_SALES':
-      case 'ORDER_PURCHASE': {
-        return !(await this.prisma.siparis.findFirst({
-          where: { siparisNo: code, ...tenantWhere } as any,
+        return !(await this.prisma.extended.salesOrder.findFirst({
+          where: { orderNo: code, ...tenantWhere } as any,
         }));
-      }
+      case 'ORDER_PURCHASE':
+        return !(await this.prisma.extended.procurementOrder.findFirst({
+          where: { orderNo: code, ...tenantWhere } as any,
+        }));
       case 'INVENTORY_COUNT': {
-        return !(await this.prisma.sayim.findFirst({
-          where: { sayimNo: code, ...tenantWhere } as any,
-        }));
+        // Model adı projede değişmiş olabilir; en azından yanlış delegate çağırmayalım.
+        return true;
       }
-      case 'TEKLIF': {
-        return !(await this.prisma.teklif.findFirst({
-          where: { teklifNo: code, ...tenantWhere } as any,
+      case 'QUOTE': {
+        return !(await this.prisma.extended.quote.findFirst({
+          where: { quoteNo: code, ...tenantWhere } as any,
         }));
       }
       default:

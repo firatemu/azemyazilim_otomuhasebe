@@ -20,7 +20,7 @@ export class WarehouseCriticalStockController {
     }
 
     @Put('bulk-update')
-    bulkUpdate(@Body() data: { stokKodu: string; ambarKodu: string; criticalQty: number }[]) {
+    bulkUpdate(@Body() data: { code: string; ambarKodu: string; criticalQty: number }[]) {
         return this.service.bulkUpdateFromExcel(data);
     }
 }

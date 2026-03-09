@@ -1,4 +1,4 @@
-import { PartWorkflowStatus, VehicleWorkflowStatus } from '@prisma/client';
+import { PartWorkflowStatus, VehicleWorkflowStatus } from '../work-order.enums';
 
 // Parça İş Akışı Geçişleri
 export const PART_WORKFLOW_VALID_TRANSITIONS: Record<

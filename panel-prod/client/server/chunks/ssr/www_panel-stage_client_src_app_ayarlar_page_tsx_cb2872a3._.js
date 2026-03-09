@@ -1,3 +1,0 @@
-module.exports=[976639,a=>{"use strict";var b=a.i(470628),c=a.i(115957),d=a.i(734629),e=a.i(182311);function f(){let a="${module}",f=a.charAt(0).toUpperCase()+a.slice(1);return(0,b.jsxs)(e.default,{children:[(0,b.jsxs)(c.default,{variant:"h4",fontWeight:"bold",gutterBottom:!0,children:[f," Modülü"]}),(0,b.jsx)(d.default,{sx:{p:3},children:(0,b.jsxs)(c.default,{variant:"body1",children:[f," modülü içeriği buraya gelecek..."]})})]})}a.s(["default",()=>f])}];
-
-//# sourceMappingURL=www_panel-stage_client_src_app_ayarlar_page_tsx_cb2872a3._.js.map

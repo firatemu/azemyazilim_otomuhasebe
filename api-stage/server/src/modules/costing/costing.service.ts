@@ -1,31 +1,31 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, FaturaDurum, FaturaTipi, HareketTipi } from '@prisma/client';
+import { Prisma, InvoiceStatus, InvoiceType, MovementType } from '@prisma/client';
 import { PrismaService } from '../../common/prisma.service';
 import { GetCostingQueryDto } from './dto/get-costing-query.dto';
 
 type TimelineEvent =
   | {
-      type: 'increase';
-      date: Date;
-      quantity: number;
-      unitCost: number;
-    }
+    type: 'increase';
+    date: Date;
+    quantity: number;
+    unitCost: number;
+  }
   | {
-      type: 'decrease';
-      date: Date;
-      quantity: number;
-    };
+    type: 'decrease';
+    date: Date;
+    quantity: number;
+  };
 
 @Injectable()
 export class CostingService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(private readonly prisma: PrismaService) { }
 
   async getLatestCosts(query: GetCostingQueryDto) {
     const {
       search,
-      marka,
-      anaKategori,
-      altKategori,
+      brand,
+      mainCategory,
+      subCategory,
       limit: limitParam,
       page: pageParam,
     } = query;
@@ -46,41 +46,41 @@ export class CostingService {
     const page = Number.isFinite(parsedPage) && parsedPage > 0 ? parsedPage : 1;
     const skip = (page - 1) * limit;
 
-    const stokWhere: Prisma.StokWhereInput = {};
+    const productWhere: Prisma.ProductWhereInput = {};
 
     if (search?.trim()) {
       const term = search.trim();
-      stokWhere.OR = [
-        { stokKodu: { contains: term, mode: 'insensitive' } },
-        { stokAdi: { contains: term, mode: 'insensitive' } },
+      productWhere.OR = [
+        { code: { contains: term, mode: 'insensitive' } },
+        { name: { contains: term, mode: 'insensitive' } },
       ];
     }
 
-    if (marka) {
-      stokWhere.marka = { equals: marka };
+    if (brand) {
+      productWhere.brand = { equals: brand };
     }
 
-    if (anaKategori) {
-      stokWhere.anaKategori = { equals: anaKategori };
+    if (mainCategory) {
+      productWhere.mainCategory = { equals: mainCategory };
     }
 
-    if (altKategori) {
-      stokWhere.altKategori = { equals: altKategori };
+    if (subCategory) {
+      productWhere.subCategory = { equals: subCategory };
     }
 
-    const [total, stocks] = await this.prisma.$transaction([
-      this.prisma.stok.count({ where: stokWhere }),
-      this.prisma.stok.findMany({
-        where: stokWhere,
+    const [total, stocks] = await this.prisma.extended.$transaction([
+      this.prisma.extended.product.count({ where: productWhere }),
+      this.prisma.extended.product.findMany({
+        where: productWhere,
         select: {
           id: true,
-          stokKodu: true,
-          stokAdi: true,
-          marka: true,
-          anaKategori: true,
-          altKategori: true,
+          code: true,
+          name: true,
+          brand: true,
+          mainCategory: true,
+          subCategory: true,
         },
-        orderBy: { stokKodu: 'asc' },
+        orderBy: { code: 'asc' },
         skip,
         take: limit,
       }),
@@ -95,31 +95,31 @@ export class CostingService {
       };
     }
 
-    const stokIds = stocks.map((stock) => stock.id);
+    const productIds = stocks.map((stock) => stock.id);
 
-    const histories = await this.prisma.stockCostHistory.findMany({
+    const histories = await this.prisma.extended.productCostHistory.findMany({
       where: {
-        stokId: { in: stokIds },
+        productId: { in: productIds },
       },
       orderBy: { computedAt: 'desc' },
     });
 
     const latestHistoryMap = new Map<string, (typeof histories)[number]>();
     for (const history of histories) {
-      if (!latestHistoryMap.has(history.stokId)) {
-        latestHistoryMap.set(history.stokId, history);
+      if (!latestHistoryMap.has((history as any).productId)) {
+        latestHistoryMap.set((history as any).productId, history);
       }
     }
 
     const data = stocks.map((stock) => {
       const latest = latestHistoryMap.get(stock.id);
       return {
-        stokId: stock.id,
-        stokKodu: stock.stokKodu,
-        stokAdi: stock.stokAdi,
-        marka: stock.marka,
-        anaKategori: stock.anaKategori,
-        altKategori: stock.altKategori,
+        productId: stock.id,
+        code: (stock as any).code,
+        name: (stock as any).name,
+        brand: (stock as any).brand,
+        mainCategory: (stock as any).mainCategory,
+        subCategory: (stock as any).subCategory,
         cost: latest ? Number(latest.cost) : null,
         computedAt: latest?.computedAt?.toISOString() ?? null,
         note: latest?.note ?? null,
@@ -134,119 +134,119 @@ export class CostingService {
     };
   }
 
-  async calculateWeightedAverageCost(stokId: string) {
-    const stok = await this.prisma.stok.findUnique({
-      where: { id: stokId },
+  async calculateWeightedAverageCost(productId: string) {
+    const product = await this.prisma.extended.product.findUnique({
+      where: { id: productId },
       select: {
         id: true,
-        stokKodu: true,
-        stokAdi: true,
-        marka: true,
-        anaKategori: true,
-        altKategori: true,
+        code: true,
+        name: true,
+        brand: true,
+        mainCategory: true,
+        subCategory: true,
       },
     });
 
-    if (!stok) {
-      throw new NotFoundException('Stok bulunamadı.');
+    if (!product) {
+      throw new NotFoundException('Product not found.');
     }
 
-    // Tüm geçmiş hareketleri al (sadece ONAYLANDI değil, tüm durumlar)
+    // Tüm geçmiş hareketleri al (sadece ONAYLANDI değil, tüm statuslar)
     // Ancak silinmemiş faturaları al (deletedAt null olanlar)
-    const purchaseLines = await this.prisma.faturaKalemi.findMany({
+    const purchaseLines = await this.prisma.extended.invoiceItem.findMany({
       where: {
-        stokId,
-        fatura: {
-          faturaTipi: FaturaTipi.ALIS,
-          durum: FaturaDurum.ONAYLANDI,
+        productId: productId,
+        invoice: {
+          invoiceType: InvoiceType.PURCHASE,
+          status: InvoiceStatus.APPROVED,
           deletedAt: null, // Silinmemiş faturalar
         },
       },
       select: {
-        miktar: true,
-        birimFiyat: true,
-        tutar: true,
-        kdvTutar: true, // KDV dahil hesaplama için
-        fatura: {
-          select: { 
-            tarih: true,
-            faturaNo: true,
+        quantity: true,
+        unitPrice: true,
+        amount: true,
+        vatAmount: true, // KDV dahil hesaplama için
+        invoice: {
+          select: {
+            date: true,
+            invoiceNo: true,
           },
         },
       },
       orderBy: {
-        fatura: {
-          tarih: 'asc', // Tarih sırasına göre sırala
+        invoice: {
+          date: 'asc', // Tarih sırasına göre sırala
         },
       },
     });
 
-    const salesLines = await this.prisma.faturaKalemi.findMany({
+    const salesLines = await this.prisma.extended.invoiceItem.findMany({
       where: {
-        stokId,
-        fatura: {
-          faturaTipi: { in: [FaturaTipi.SATIS, FaturaTipi.ALIS_IADE] },
-          durum: FaturaDurum.ONAYLANDI,
+        productId: productId,
+        invoice: {
+          invoiceType: { in: [InvoiceType.SALE, InvoiceType.PURCHASE_RETURN] as any },
+          status: InvoiceStatus.APPROVED,
           deletedAt: null, // Silinmemiş faturalar
         },
       },
       select: {
-        miktar: true,
-        fatura: {
-          select: { 
-            tarih: true,
-            faturaNo: true,
+        quantity: true,
+        invoice: {
+          select: {
+            date: true,
+            invoiceNo: true,
           },
         },
       },
       orderBy: {
-        fatura: {
-          tarih: 'asc', // Tarih sırasına göre sırala
+        invoice: {
+          date: 'asc', // Tarih sırasına göre sırala
         },
       },
     });
 
-    const salesReturnLines = await this.prisma.faturaKalemi.findMany({
+    const salesReturnLines = await this.prisma.extended.invoiceItem.findMany({
       where: {
-        stokId,
-        fatura: {
-          faturaTipi: FaturaTipi.SATIS_IADE,
-          durum: FaturaDurum.ONAYLANDI,
+        productId: productId,
+        invoice: {
+          invoiceType: InvoiceType.SALES_RETURN,
+          status: InvoiceStatus.APPROVED,
           deletedAt: null, // Silinmemiş faturalar
         },
       },
       select: {
-        miktar: true,
-        birimFiyat: true,
-        tutar: true,
-        kdvTutar: true, // KDV dahil hesaplama için
-        fatura: {
-          select: { 
-            tarih: true,
-            faturaNo: true,
+        quantity: true,
+        unitPrice: true,
+        amount: true,
+        vatAmount: true, // KDV dahil hesaplama için
+        invoice: {
+          select: {
+            date: true,
+            invoiceNo: true,
           },
         },
       },
       orderBy: {
-        fatura: {
-          tarih: 'asc', // Tarih sırasına göre sırala
+        invoice: {
+          date: 'asc', // Tarih sırasına göre sırala
         },
       },
     });
 
-    // Tüm geçmiş stok hareketlerini al (onaylanmış tüm hareketler)
+    // Tüm geçmiş product hareketlerini al (onaylanmış tüm hareketler)
     // Stok hareketleri genellikle faturalardan otomatik oluşturulur,
     // ancak manuel girişler, sayımlar vb. de olabilir
-    const stockMovements = await this.prisma.stokHareket.findMany({
+    const stockMovements = await this.prisma.extended.productMovement.findMany({
       where: {
-        stokId,
+        productId: productId,
       },
       select: {
-        hareketTipi: true,
-        miktar: true,
-        birimFiyat: true,
+        movementType: true,
+        quantity: true,
+        unitPrice: true,
         createdAt: true,
-        aciklama: true,
+        notes: true,
       },
       orderBy: {
         createdAt: 'asc', // Tarih sırasına göre sırala
@@ -256,40 +256,40 @@ export class CostingService {
     const timeline: TimelineEvent[] = [];
 
     for (const line of purchaseLines) {
-      const qty = Number(line.miktar);
+      const qty = Number((line as any).quantity);
       if (!qty || qty <= 0) continue;
-      const tutarNet = Number(line.tutar || 0);
-      const kdvTutar = Number(line.kdvTutar || 0);
-      const totalKdvDahil = tutarNet + kdvTutar; // KDV dahil tutar
-      const unitCost = qty ? totalKdvDahil / qty : 0;
+      const netAmount = Number((line as any).amount || 0);
+      const vatAmount = Number((line as any).vatAmount || 0);
+      const totalVatIncluded = netAmount + vatAmount; // Total amount including VAT
+      const unitCost = qty ? totalVatIncluded / qty : 0;
       timeline.push({
         type: 'increase',
-        date: line.fatura.tarih,
+        date: (line as any).invoice.date,
         quantity: qty,
         unitCost,
       });
     }
 
     for (const line of salesLines) {
-      const qty = Number(line.miktar);
+      const qty = Number((line as any).quantity);
       if (!qty || qty <= 0) continue;
       timeline.push({
         type: 'decrease',
-        date: line.fatura.tarih,
+        date: (line as any).invoice.date,
         quantity: qty,
       });
     }
 
     for (const line of salesReturnLines) {
-      const qty = Number(line.miktar);
+      const qty = Number((line as any).quantity);
       if (!qty || qty <= 0) continue;
-      const tutarNet = Number(line.tutar || 0);
-      const kdvTutar = Number(line.kdvTutar || 0);
-      const totalKdvDahil = tutarNet + kdvTutar; // KDV dahil tutar
-      const unitCost = qty ? totalKdvDahil / qty : 0;
+      const netAmount = Number((line as any).amount || 0);
+      const vatAmount = Number((line as any).vatAmount || 0);
+      const totalVatIncluded = netAmount + vatAmount; // Total amount including VAT
+      const unitCost = qty ? totalVatIncluded / qty : 0;
       timeline.push({
         type: 'increase',
-        date: line.fatura.tarih,
+        date: (line as any).invoice.date,
         quantity: qty,
         unitCost,
       });
@@ -298,26 +298,26 @@ export class CostingService {
     // Stok hareketlerini timeline'a ekle
     // Not: Stok hareketleri genellikle faturalardan otomatik oluşturulur
     // Bu yüzden sadece faturadan bağımsız hareketleri ekliyoruz
-    // (aciklama'da "Fatura" kelimesi geçmeyenler veya manuel girişler)
+    // (notes'da "Invoice" kelimesi geçmeyenler veya manuel girişler)
     for (const movement of stockMovements) {
-      const qty = Number(movement.miktar);
+      const qty = Number((movement as any).quantity);
       if (!qty || qty <= 0) continue;
 
-      // Eğer hareket bir faturadan kaynaklanıyorsa (aciklama'da "Fatura" geçiyorsa),
-      // bu hareket zaten fatura kalemlerinde dahil edilmiştir, bu yüzden atlıyoruz
-      const aciklama = movement.aciklama?.toLowerCase() || '';
-      if (aciklama.includes('fatura') || aciklama.includes('fatura:')) {
-        continue; // Fatura kaynaklı hareketleri atla, zaten fatura kalemlerinde var
+      // Eğer hareket bir faturadan kaynaklanıyorsa (notes'da "Invoice" geçiyorsa),
+      // bu hareket zaten fatura itemsinde dahil edilmiştir, bu yüzden atlıyoruz
+      const notes = (movement as any).notes?.toLowerCase() || '';
+      if (notes.includes('invoice') || notes.includes('fatura:')) {
+        continue; // Invoice kaynaklı hareketleri atla, zaten fatura itemsinde var
       }
 
-      const unitCost = Number(movement.birimFiyat) || 0;
+      const unitCost = Number((movement as any).unitPrice) || 0;
       const date = movement.createdAt;
 
       // Hareket tipine göre increase veya decrease olarak ekle
-      switch (movement.hareketTipi) {
-        case HareketTipi.GIRIS:
-        case HareketTipi.IADE:
-        case HareketTipi.SAYIM_FAZLA:
+      switch ((movement as any).movementType) {
+        case MovementType.ENTRY:
+        case MovementType.RETURN:
+        case MovementType.COUNT_SURPLUS:
           // Stok artışı - birim fiyatı ile birlikte maliyete dahil et
           if (unitCost > 0) {
             timeline.push({
@@ -329,9 +329,9 @@ export class CostingService {
           }
           break;
 
-        case HareketTipi.CIKIS:
-        case HareketTipi.SATIS:
-        case HareketTipi.SAYIM_EKSIK:
+        case MovementType.EXIT:
+        case MovementType.SALE:
+        case MovementType.COUNT_SHORTAGE:
           // Stok azalışı - maliyetten çıkar
           timeline.push({
             type: 'decrease',
@@ -340,8 +340,8 @@ export class CostingService {
           });
           break;
 
-        case HareketTipi.SAYIM:
-          // Sayım hareketleri genellikle miktar düzeltmesi için kullanılır
+        case MovementType.COUNT:
+          // Sayım hareketleri genellikle quantity düzeltmesi için kullanılır
           // Birim fiyatı varsa artış, yoksa azalış olarak değerlendirilebilir
           // Ancak sayım hareketleri genellikle maliyet hesaplamasına dahil edilmez
           // Bu yüzden atlıyoruz veya birim fiyatı varsa artış olarak ekliyoruz
@@ -358,24 +358,24 @@ export class CostingService {
     }
 
     if (timeline.length === 0) {
-      await this.prisma.stockCostHistory.create({
+      await this.prisma.extended.productCostHistory.create({
         data: {
-          stokId,
+          productId: productId,
           cost: new Prisma.Decimal(0),
-          note: 'Geçerli satın alma hareketi bulunamadı.',
-          marka: stok.marka ?? undefined,
-          anaKategori: stok.anaKategori ?? undefined,
-          altKategori: stok.altKategori ?? undefined,
+          note: 'No valid purchase movement found.',
+          brand: (product as any).brand ?? undefined,
+          mainCategory: (product as any).mainCategory ?? undefined,
+          subCategory: (product as any).subCategory ?? undefined,
         },
       });
 
       return {
-        stokId: stok.id,
-        stokKodu: stok.stokKodu,
-        stokAdi: stok.stokAdi,
+        productId: product.id,
+        code: (product as any).code,
+        name: (product as any).name,
         cost: 0,
         method: 'WEIGHTED_AVERAGE',
-        message: 'Geçerli satın alma hareketi bulunamadı.',
+        message: 'No valid purchase movement found.',
       };
     }
 
@@ -417,13 +417,13 @@ export class CostingService {
     const roundedCost = averageCost > 0 ? Number(averageCost.toFixed(4)) : 0;
 
     try {
-      await this.prisma.stockCostHistory.create({
+      await this.prisma.extended.productCostHistory.create({
         data: {
-          stokId,
+          productId: productId,
           cost: new Prisma.Decimal(roundedCost),
-          marka: stok.marka ?? undefined,
-          anaKategori: stok.anaKategori ?? undefined,
-          altKategori: stok.altKategori ?? undefined,
+          brand: (product as any).brand ?? undefined,
+          mainCategory: (product as any).mainCategory ?? undefined,
+          subCategory: (product as any).subCategory ?? undefined,
         },
       });
     } catch (error) {
@@ -438,49 +438,49 @@ export class CostingService {
     }
 
     return {
-      stokId: stok.id,
-      stokKodu: stok.stokKodu,
-      stokAdi: stok.stokAdi,
+      productId: product.id,
+      code: (product as any).code,
+      name: (product as any).name,
       cost: roundedCost,
       method: 'WEIGHTED_AVERAGE',
     };
   }
 
   /**
-   * Toplu maliyet hesaplama (rate limit aşımını önlemek için tek istekte tüm stoklar)
+   * Toplu maliyet hesaplama (rate limit aşımını önlemek için tek istekte tüm products)
    */
-  async calculateWeightedAverageCostBulk(stokIds: string[]) {
+  async calculateWeightedAverageCostBulk(productIds: string[]) {
     const results: Array<{
-      stokId: string;
-      stokKodu: string;
-      stokAdi: string;
+      productId: string;
+      code: string;
+      name: string;
       cost: number;
       status: 'success' | 'failed';
       message?: string;
     }> = [];
 
-    for (const stokId of stokIds) {
+    for (const productId of productIds) {
       try {
-        const result = await this.calculateWeightedAverageCost(stokId);
+        const result = await this.calculateWeightedAverageCost(productId);
         results.push({
-          stokId: result.stokId,
-          stokKodu: result.stokKodu,
-          stokAdi: result.stokAdi,
+          productId: result.productId,
+          code: result.code,
+          name: result.name,
           cost: result.cost,
           status: 'success',
         });
       } catch (error: any) {
-        const stok = await this.prisma.stok.findUnique({
-          where: { id: stokId },
-          select: { stokKodu: true, stokAdi: true },
+        const product = await this.prisma.extended.product.findUnique({
+          where: { id: productId },
+          select: { code: true, name: true },
         });
         results.push({
-          stokId,
-          stokKodu: stok?.stokKodu ?? '-',
-          stokAdi: stok?.stokAdi ?? '-',
+          productId,
+          code: (product as any)?.code ?? '-',
+          name: (product as any)?.name ?? '-',
           cost: 0,
           status: 'failed',
-          message: error?.message ?? 'Beklenmeyen hata',
+          message: error?.message ?? 'Unexpected error',
         });
       }
     }

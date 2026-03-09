@@ -4,7 +4,6 @@ import { useAuthStore } from '@/stores/authStore';
 import { useTabStore } from '@/stores/tabStore';
 import { useQuickMenuStore } from '@/stores/quickMenuStore';
 import axios from '@/lib/axios';
-import * as Icons from '@mui/icons-material';
 import {
   AccountBalance,
   AccountBalanceWallet,
@@ -51,6 +50,7 @@ import {
   Warning,
   AdminPanelSettings,
   Event,
+  Help,
 } from '@mui/icons-material';
 import {
   Box,
@@ -98,228 +98,68 @@ const palette = {
   searchBorder: 'color-mix(in srgb, var(--border) 80%, var(--primary) 20%)',
 };
 
-const menuItems = [
-  { id: 'dashboard', label: 'Dashboard', icon: Dashboard, path: '/dashboard', color: '#667eea', bgColor: '#f0f4ff' },
-  {
-    id: 'stok',
-    label: 'Stok Yönetimi',
-    icon: Inventory,
-    color: '#06b6d4',
-    bgColor: '#ecfeff',
-    subItems: [
-      { id: 'stok-malzeme-listesi', label: 'Malzeme Listesi', icon: Inventory, path: '/stok/malzeme-listesi', color: '#06b6d4' },
-      { id: 'stok-malzeme-hareketleri', label: 'Malzeme Hareketleri', icon: Assessment, path: '/stok/malzeme-hareketleri', color: '#06b6d4' },
-      { id: 'stok-urun-eslestirme', label: 'Ürün Eşleştirme', icon: Settings, path: '/stok/urun-eslestirme', color: '#8b5cf6' },
-      { id: 'stok-kategori-yonetimi', label: 'Kategori Yönetimi', icon: Assessment, path: '/stok/kategori-yonetimi', color: '#06b6d4' },
-      { id: 'stok-marka-yonetimi', label: 'Marka Yönetimi', icon: DirectionsCar, path: '/stok/marka-yonetimi', color: '#06b6d4' },
-      { id: 'arac-yonetimi', label: 'Araç Yönetimi', icon: DirectionsCar, path: '/arac', color: '#10b981' },
-      { id: 'stok-birim-setleri', label: 'Birim Setleri Yönetimi', icon: Settings, path: '/stok/birim-setleri', color: '#06b6d4' },
-      { id: 'stok-satis-fiyatlari', label: 'Satış Fiyatları', icon: AttachMoney, path: '/stok/satis-fiyatlari', color: '#ef4444' },
-      { id: 'stok-alis-fiyatlari', label: 'Satın Alma Fiyatları', icon: AttachMoney, path: '/stok/satin-alma-fiyatlari', color: '#0ea5e9' },
-      { id: 'stok-toplu-satis-guncelle', label: 'Toplu Satış Fiyat Güncelleme', icon: AttachMoney, path: '/stok/toplu-satis-fiyat-guncelle', color: '#22c55e' },
-      { id: 'stok-maliyet', label: 'Maliyetlendirme', icon: AttachMoney, path: '/stok/maliyet', color: '#9333ea' },
-      { id: 'stok-kritik-stok', label: 'Kritik Stok Yönetimi', icon: Warning, path: '/stok/kritik-stok-yonetimi', color: '#ef4444' },
-    ],
-  },
-  {
-    id: 'cek-senet',
-    label: 'Bordro (Çek/Senet)',
-    icon: Description,
-    color: '#334155',
-    bgColor: '#f8fafc',
-    subItems: [
-      { id: 'bordro-listesi', label: 'Bordrolar', icon: Assignment, path: '/bordro', color: '#8b5cf6' },
-      { id: 'cek-senet-listesi', label: 'Çek/Senet Listesi', icon: Payment, path: '/cek-senet', color: '#8b5cf6' },
-    ],
-  },
-  {
-    id: 'cari',
-    label: 'Cari Yönetimi',
-    icon: People,
-    color: '#334155',
-    bgColor: '#f8fafc',
-    subItems: [
-      { id: 'cari-liste', label: 'Cari Listesi', icon: People, path: '/cari', color: '#8b5cf6' },
-      { id: 'cari-fatura-kapatma', label: 'Fatura Kapatma & Ekstre', icon: AccountBalance, path: '/cari/fatura-kapatma', color: '#0891b2' },
-      { id: 'cari-borc-alacak', label: 'Borç Alacak Durumu', icon: Assessment, path: '/cari/rapor/borc-alacak', color: '#10b981' },
-      { id: 'cari-vade-analiz', label: 'Vade Analizi', icon: CalendarMonth, path: '/vade-analiz', color: '#667eea' },
-    ],
-  },
-  {
-    id: 'fatura',
-    label: 'Faturalar',
-    icon: Receipt,
-    color: '#1e293b',
-    bgColor: '#f1f5f9',
-    subItems: [
-      { id: 'fatura-satis', label: 'Satış Faturaları', icon: PointOfSale, path: '/fatura/satis', color: '#8b5cf6' },
-      { id: 'fatura-alis', label: 'Satın Alma Faturaları', icon: ShoppingCart, path: '/fatura/alis', color: '#f59e0b' },
-      { id: 'fatura-iade-satis', label: 'Satış İade Faturaları', icon: TrendingDown, path: '/fatura/iade/satis', color: '#ef4444' },
-      { id: 'fatura-iade-alis', label: 'Satınalma İade Faturaları', icon: TrendingUp, path: '/fatura/iade/alis', color: '#06b6d4' },
-      { id: 'fatura-karlilik', label: 'Fatura Karlılığı', icon: TrendingUp, path: '/fatura/karlilik', color: '#10b981' },
-      { id: 'fatura-arsiv', label: 'Fatura Arşivi', icon: Assessment, path: '/fatura/arsiv', color: '#ef4444' },
-      { id: 'fatura-gelen-efatura', label: 'Gelen E-Faturalar', icon: CloudDownload, path: '/efatura/gelen', color: '#0ea5e9' },
-    ],
-  },
-  {
-    id: 'teklif',
-    label: 'Teklif',
-    icon: Description,
-    color: '#f59e0b',
-    bgColor: '#fffbeb',
-    subItems: [
-      { id: 'teklif-satis', label: 'Satış Teklifleri', icon: PointOfSale, path: '/teklif/satis', color: '#f59e0b' },
-      { id: 'teklif-satin-alma', label: 'Satın Alma Teklifleri', icon: ShoppingCart, path: '/teklif/satin-alma', color: '#10b981' },
-    ],
-  },
-  {
-    id: 'siparis',
-    label: 'Siparişler',
-    icon: ShoppingCart,
-    color: '#0891b2',
-    bgColor: '#ecfeff',
-    subItems: [
-      { id: 'siparis-satis', label: 'Satış Siparişleri', icon: PointOfSale, path: '/siparis/satis', color: '#0891b2' },
-      { id: 'siparis-satin-alma', label: 'Satın Alma Siparişleri', icon: ShoppingCart, path: '/siparis/satin-alma', color: '#06b6d4' },
-    ],
-  },
-  {
-    id: 'irsaliyeler',
-    label: 'İrsaliyeler',
-    icon: LocalShipping,
-    color: '#334155',
-    bgColor: '#f8fafc',
-    subItems: [
-      { id: 'satis-irsaliyesi-liste', label: 'Satış İrsaliyesi', icon: ReceiptLong, path: '/satis-irsaliyesi', color: '#8b5cf6' },
-      { id: 'satin-alma-irsaliyesi-liste', label: 'Satın Alma İrsaliyesi', icon: ReceiptLong, path: '/satin-alma-irsaliyesi', color: '#06b6d4' },
-    ],
-  },
-  { id: 'tahsilat', label: 'Tahsilat & Ödeme', icon: Payment, path: '/tahsilat', color: '#10b981', bgColor: '#ecfdf5' },
-  { id: 'kasa', label: 'Kasa', icon: AccountBalance, path: '/kasa', color: '#f59e0b', bgColor: '#fffbeb' },
-  {
-    id: 'banka',
-    label: 'Banka İşlemleri',
-    icon: AccountBalanceWallet,
-    color: '#0891b2',
-    bgColor: '#ecfeff',
-    subItems: [
-      { id: 'bankalar', label: 'Banka ve Hesapları', icon: AccountBalance, path: '/banka', color: '#2563eb' },
-      { id: 'banka-kredi', label: 'Kredi İşlemleri', icon: CreditCard, path: '/banka/kredi-islemleri', color: '#9333ea' },
-      { id: 'banka-gelen-havale', label: 'Gelen Havale', icon: TrendingUp, path: '/banka-havale/gelen', color: '#10b981' },
-      { id: 'banka-giden-havale', label: 'Giden Havale', icon: TrendingDown, path: '/banka-havale/giden', color: '#ef4444' },
-      { id: 'banka-silinen', label: 'Silinen Kayıtlar', icon: Delete, path: '/banka-havale/silinen', color: '#6b7280' },
-    ],
-  },
-
-  {
-    id: 'ik',
-    label: 'İnsan Kaynakları',
-    icon: Badge,
-    color: '#d946ef',
-    bgColor: '#fdf4ff',
-    subItems: [
-      { id: 'ik-personel', label: 'Personel Listesi', icon: People, path: '/ik/personel', color: '#d946ef' },
-      { id: 'ik-maas', label: 'Maaş Yönetimi', icon: AttachMoney, path: '/ik/maas-yonetimi', color: '#d946ef' },
-      { id: 'ik-avans', label: 'Avans Yönetimi', icon: Payment, path: '/ik/avans', color: '#d946ef' },
-    ],
-  },
-  {
-    id: 'depo',
-    label: 'Depo/Raf Yönetimi',
-    icon: Warehouse,
-    color: '#3b82f6',
-    bgColor: '#eff6ff',
-    subItems: [
-      { id: 'depo-depolar', label: 'Depo Yönetimi', icon: Warehouse, path: '/depo/depolar', color: '#6366f1' },
-      { id: 'depo-transfer-fisi', label: 'Ambar Transfer Fişi', icon: LocalShipping, path: '/depo/transfer-fisi', color: '#f59e0b' },
-      { id: 'depo-put-away', label: 'Put-Away İşlemi', icon: TrendingUp, path: '/depo/islemler/put-away', color: '#10b981' },
-      { id: 'depo-transfer', label: 'Transfer İşlemi', icon: TrendingDown, path: '/depo/islemler/transfer', color: '#f59e0b' },
-      { id: 'depo-siparis-hazirlama', label: 'Sipariş Hazırlama', icon: Assignment, path: '/siparis/hazirlama-listesi', color: '#f59e0b' },
-      { id: 'depo-sayim', label: 'Stok Sayım', icon: Inventory, path: '/sayim', color: '#14b8a6' },
-      { id: 'depo-stok-raporu', label: 'Ambar Stok Raporu', icon: Assessment, path: '/depo/stok-raporu', color: '#14b8a6' },
-      { id: 'depo-raporlar', label: 'Depo Raporları', icon: Assessment, path: '/depo/raporlar', color: '#14b8a6' },
-    ],
-  },
-  {
-    id: 'masraf-yonetimi',
-    label: 'Masraf Yönetimi',
-    icon: AttachMoney,
-    color: '#ef4444',
-    bgColor: '#fef2f2',
-    subItems: [
-      { id: 'masraf', label: 'Masraf', icon: AttachMoney, path: '/masraf', color: '#ef4444' },
-    ],
-  },
-  {
-    id: 'sirket-araclari',
-    label: 'Şirket Araçları',
-    icon: DirectionsCar,
-    color: '#10b981',
-    bgColor: '#ecfdf5',
-    path: '/sirket-araclari', // Aktif hale getirilene kadar yer tutucu
-  },
-  {
-    id: 'raporlama',
-    label: 'Raporlama',
-    icon: Assessment,
-    color: '#14b8a6',
-    bgColor: '#f0fdfa',
-    subItems: [
-      { id: 'raporlama-genel', label: 'Genel Özet', icon: Assessment, path: '/raporlama', color: '#14b8a6' },
-      { id: 'raporlama-satis-elemanlari', label: 'Satış Elemanı Performansı', icon: People, path: '/raporlama/satis-elemani', color: '#8b5cf6' },
-    ],
-  },
-  {
-    id: 'veri-aktarim',
-    label: 'Veri Aktarımı',
-    icon: CloudUpload,
-    color: '#334155',
-    bgColor: '#f8fafc',
-    subItems: [
-      { id: 'veri-aktarim-cari-hesap', label: 'Cari Hesap Aktarımı', icon: People, path: '/veri-aktarim/cari-hesap-aktarim', color: '#8b5cf6' },
-      { id: 'veri-aktarim-malzeme', label: 'Malzeme Aktarımı', icon: Inventory, path: '/veri-aktarim/malzeme-aktarim', color: '#06b6d4' },
-      { id: 'veri-aktarim-satis-fiyat', label: 'Satış Fiyat Aktarımı', icon: AttachMoney, path: '/veri-aktarim/satis-fiyat-aktarim', color: '#ef4444' },
-      { id: 'veri-aktarim-satin-alma-fiyat', label: 'Satın Alma Fiyat Aktarımı', icon: AttachMoney, path: '/veri-aktarim/satin-alma-fiyat-aktarim', color: '#0ea5e9' },
-    ],
-  },
-  {
-    id: 'ayarlar',
-    label: 'Ayarlar',
-    icon: Settings,
-    color: '#6b7280',
-    bgColor: '#f9fafb',
-    subItems: [
-      { id: 'ayarlar-hizli-menu', label: 'Hızlı Menü', icon: FlashOn, path: '/ayarlar/hizli-menu', color: '#f59e0b' },
-      { id: 'ayarlar-satis-elemanlari', label: 'Satış Elemanları', icon: People, path: '/ayarlar/satis-elemanlari', color: '#8b5cf6' },
-      { id: 'ayarlar-numara-sablonlari', label: 'Numara Şablonları', icon: Settings, path: '/ayarlar/numara-sablonlari', color: '#6b7280' },
-      { id: 'ayarlar-parametreler', label: 'Parametreler', icon: Settings, path: '/ayarlar/parametreler', color: '#6b7280' },
-      { id: 'ayarlar-firma', label: 'Firma Ayarları', icon: Settings, path: '/ayarlar/firma-ayarlari', color: '#6b7280' },
-    ],
-  },
-  {
-    id: 'yetkilendirme',
-    label: 'Yetkilendirme',
-    icon: AdminPanelSettings,
-    color: '#ec4899',
-    bgColor: '#fdf2f8',
-    subItems: [
-      { id: 'yetkilendirme-kullanicilar', label: 'Kullanıcılar', icon: People, path: '/yetkilendirme', color: '#ec4899' },
-      { id: 'yetkilendirme-roller', label: 'Roller & İzinler', icon: AdminPanelSettings, path: '/yetkilendirme/roller', color: '#ec4899' },
-    ],
-  },
-];
+// İkon Haritası - Wildcard import yerine güvenli ve performanslı eşleme
+const IconMap: Record<string, any> = {
+  AccountBalance,
+  AccountBalanceWallet,
+  Add,
+  Assessment,
+  Assignment,
+  AttachMoney,
+  Badge,
+  Build,
+  CalendarMonth,
+  CheckCircle,
+  Close,
+  CloudUpload,
+  CloudDownload,
+  CreditCard,
+  Dashboard,
+  Delete,
+  Description,
+  DirectionsCar,
+  Engineering,
+  FlashOn,
+  ExpandLess,
+  ExpandMore,
+  Inventory,
+  LocalShipping,
+  Logout,
+  Menu: MenuIcon,
+  MoreVert,
+  Notifications,
+  Payment,
+  People,
+  PointOfSale,
+  PushPin,
+  Receipt,
+  ReceiptLong,
+  Search,
+  Settings,
+  ShoppingCart,
+  SwapHoriz,
+  TrendingDown,
+  TrendingUp,
+  Tv,
+  Warehouse,
+  Warning,
+  AdminPanelSettings,
+  Event,
+  Help,
+};
 
 interface SidebarProps {
   open: boolean;
   pinned: boolean;
   onClose: () => void;
   onTogglePin: () => void;
+  menuItems: any[];
 }
 
-export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarProps) {
+export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems }: SidebarProps) {
   const { addTab, setActiveTab, activeTab } = useTabStore();
-  const { user: authUser, clearAuth } = useAuthStore((state: any) => state) as any;
-  const { items: quickMenuItems, fetchQuickMenuItems } = (useQuickMenuStore as any)();
+  const { user: authUser, clearAuth } = useAuthStore();
+  const { items: quickMenuItems, fetchQuickMenuItems } = useQuickMenuStore();
 
   useEffect(() => {
     fetchQuickMenuItems();
@@ -380,14 +220,11 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
 
   const filteredMenuItems = useMemo(() => {
     if (!searchTerm) {
-      // If no search term, filter by adminOnly property
-      return menuItems.filter(item => !(item as any).adminOnly || authUser?.isAdmin);
+      return menuItems;
     }
 
     const searchLower = searchTerm.toLowerCase();
-    // First, filter by adminOnly, then apply search filter
-    const visibleMenuItems = menuItems.filter(item => !(item as any).adminOnly || authUser?.isAdmin);
-    return visibleMenuItems.filter((item) => {
+    return menuItems.filter((item) => {
       if (item.label.toLowerCase().includes(searchLower)) {
         return true;
       }
@@ -398,7 +235,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
 
       return false;
     });
-  }, [searchTerm]);
+  }, [searchTerm, menuItems]);
 
   useEffect(() => {
     if (!searchTerm) {
@@ -620,7 +457,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
             .filter((item: any) => item.enabled)
             .sort((a: any, b: any) => a.order - b.order)
             .map((item: any) => {
-              const IconComponent = (Icons as any)[item.icon];
+              const IconComponent = IconMap[item.icon];
               return (
                 <MenuItem
                   key={item.id}
@@ -729,6 +566,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
             const isActive = activeTab === item.id;
             const hasSubMenu = !!item.subItems;
             const isOpen = openSubMenu === item.id;
+            const ParentIcon: any = IconMap[item.icon] || IconMap.Help;
 
             return (
               <React.Fragment key={item.id}>
@@ -778,7 +616,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                           transition: 'all 0.2s ease',
                         }}
                       >
-                        <item.icon sx={{
+                        <ParentIcon sx={{
                           color: isActive ? 'var(--primary)' : 'var(--muted-foreground)',
                           fontSize: 18,
                           transition: 'color 0.2s ease',
@@ -830,6 +668,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                           )
                           .map((subItem: any) => {
                             const isSubActive = activeTab === subItem.id;
+                            const SubIcon: any = IconMap[subItem.icon] || IconMap.Help;
 
                             return (
                               <ListItem key={subItem.id} disablePadding>
@@ -864,7 +703,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin }: SidebarP
                                           : 'transparent',
                                       }}
                                     >
-                                      <subItem.icon sx={{
+                                      <SubIcon sx={{
                                         color: isSubActive ? '#527575' : 'var(--muted-foreground)',
                                         fontSize: 16,
                                       }} />

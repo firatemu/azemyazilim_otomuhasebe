@@ -1,6 +1,7 @@
 import {
   IsString,
   IsNotEmpty,
+  IsEnum,
   IsArray,
   IsOptional,
   IsNumber,
@@ -9,36 +10,82 @@ import {
   Min,
 } from 'class-validator';
 import { Type } from 'class-transformer';
+import { ApiProperty } from '@nestjs/swagger';
+import { PurchaseOrderLocalStatus } from '@prisma/client';
 
 export class CreatePurchaseOrderItemDto {
   @IsString()
   @IsNotEmpty()
+  @ApiProperty()
   productId: string;
 
   @IsNumber()
   @Min(1)
-  orderedQuantity: number;
+  @ApiProperty()
+  quantity: number;
 
   @IsNumber()
   @Min(0)
+  @ApiProperty()
   unitPrice: number;
+
+  @IsNumber()
+  @Min(0)
+  @ApiProperty()
+  vatRate: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @ApiProperty({ required: false })
+  discountRate?: number;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @ApiProperty({ required: false })
+  discountAmount?: number;
 }
 
 export class CreatePurchaseOrderDto {
   @IsString()
   @IsNotEmpty()
-  supplierId: string;
+  @ApiProperty()
+  orderNo: string;
+
+  @IsString()
+  @IsNotEmpty()
+  @ApiProperty()
+  accountId: string;
+
+  @IsDateString()
+  @ApiProperty()
+  date: string;
 
   @IsDateString()
   @IsOptional()
-  expectedDeliveryDate?: string;
+  @ApiProperty({ required: false })
+  dueDate?: string;
+
+  @IsNumber()
+  @IsOptional()
+  @Min(0)
+  @ApiProperty({ required: false })
+  discount?: number;
 
   @IsString()
   @IsOptional()
+  @ApiProperty({ required: false })
   notes?: string;
+
+  @IsEnum(PurchaseOrderLocalStatus)
+  @IsOptional()
+  @ApiProperty({ enum: PurchaseOrderLocalStatus, required: false })
+  status?: PurchaseOrderLocalStatus;
 
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => CreatePurchaseOrderItemDto)
+  @ApiProperty({ type: [CreatePurchaseOrderItemDto] })
   items: CreatePurchaseOrderItemDto[];
 }

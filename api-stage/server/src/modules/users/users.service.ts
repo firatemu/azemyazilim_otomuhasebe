@@ -23,7 +23,7 @@ export class UsersService {
     }
 
     const [users, total] = await Promise.all([
-      this.prisma.user.findMany({
+      this.prisma.extended.user.findMany({
         where,
         skip,
         take: limit,
@@ -45,7 +45,7 @@ export class UsersService {
         },
         orderBy: { createdAt: 'desc' },
       }),
-      this.prisma.user.count({ where }),
+      this.prisma.extended.user.count({ where }),
     ]);
 
     return {
@@ -58,7 +58,7 @@ export class UsersService {
   }
 
   async findOne(id: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id },
       include: {
         tenant: {
@@ -78,7 +78,7 @@ export class UsersService {
 
   async remove(id: string) {
     // Kullanıcıyı kontrol et
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id },
     });
 
@@ -88,14 +88,14 @@ export class UsersService {
 
     // Kullanıcıyı sil
     // Not: Prisma cascade ayarlarına göre ilgili kayıtlar otomatik silinir
-    await this.prisma.user.delete({
+    await this.prisma.extended.user.delete({
       where: { id },
     });
   }
 
   async suspend(id: string) {
     // Kullanıcıyı kontrol et
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id },
     });
 
@@ -103,8 +103,8 @@ export class UsersService {
       throw new NotFoundException(`User with ID ${id} not found`);
     }
 
-    // Kullanıcının aktif durumunu tersine çevir
-    const updatedUser = await this.prisma.user.update({
+    // Kullanıcının aktif statusunu tersine çevir
+    const updatedUser = await this.prisma.extended.user.update({
       where: { id },
       data: {
         isActive: !user.isActive,
@@ -125,7 +125,7 @@ export class UsersService {
 
   async updateRole(userId: string, newRole: string) {
     // Validate user exists
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
     });
 
@@ -134,7 +134,7 @@ export class UsersService {
     }
 
     // Update role
-    const updatedUser = await this.prisma.user.update({
+    const updatedUser = await this.prisma.extended.user.update({
       where: { id: userId },
       data: {
         role: newRole as any,
@@ -156,13 +156,13 @@ export class UsersService {
   async getStats() {
     // Get total counts
     const [totalUsers, activeUsers, inactiveUsers] = await Promise.all([
-      this.prisma.user.count(),
-      this.prisma.user.count({ where: { isActive: true } }),
-      this.prisma.user.count({ where: { isActive: false } }),
+      this.prisma.extended.user.count(),
+      this.prisma.extended.user.count({ where: { isActive: true } }),
+      this.prisma.extended.user.count({ where: { isActive: false } }),
     ]);
 
     // Get counts by role
-    const roleStats = await this.prisma.user.groupBy({
+    const roleStats = await this.prisma.extended.user.groupBy({
       by: ['role'],
       _count: {
         id: true,

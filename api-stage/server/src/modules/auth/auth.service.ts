@@ -30,7 +30,7 @@ export class AuthService {
     const fullName = dto.fullName || `${dto.firstName} ${dto.lastName}`;
 
     // Kullanıcı kontrolü
-    const existingUser = await this.prisma.user.findFirst({
+    const existingUser = await this.prisma.extended.user.findFirst({
       where: {
         OR: [
           { email: dto.email },
@@ -53,12 +53,12 @@ export class AuthService {
     if (dto.companyName) {
       // Plan slug'ını al (varsayılan olarak 'trial' kullan, eğer belirtilmediyse)
       const planSlug = dto.planSlug || 'trial';
-      const plan = await this.prisma.plan.findFirst({
+      const plan = await this.prisma.extended.plan.findFirst({
         where: { slug: planSlug },
       });
 
       if (!plan) {
-        throw new ConflictException(`Plan '${planSlug}' bulunamadı`);
+        throw new ConflictException(`Plan 'planSlug' not found`);
       }
 
       // Plan ücretsiz (trial) mi kontrol et
@@ -74,7 +74,7 @@ export class AuthService {
       // - Ücretli plan ise → PENDING (ödeme bekliyor)
       const subscriptionStatus = SubscriptionStatus.PENDING;
 
-      const tenant = await this.prisma.tenant.create({
+      const tenant = await this.prisma.extended.tenant.create({
         data: {
           name: dto.companyName,
           status: tenantStatus,
@@ -98,7 +98,7 @@ export class AuthService {
     }
 
     // Kullanıcı oluştur
-    const user = await this.prisma.user.create({
+    const user = await this.prisma.extended.user.create({
       data: {
         email: dto.email,
         username,
@@ -115,7 +115,7 @@ export class AuthService {
     // Tenant oluşturulduysa ama henüz aktif değilse token verme
     // (Kullanıcı ödeme yapmalı veya admin onayı beklemeli)
     if (tenantId) {
-      const tenant = await this.prisma.tenant.findUnique({
+      const tenant = await this.prisma.extended.tenant.findUnique({
         where: { id: tenantId },
         include: { subscription: true },
       });
@@ -132,7 +132,7 @@ export class AuthService {
             console.error(`❌ [AuthService] Hoş geldiniz maili gönderilemedi: ${user.email} - Hata: ${error.message}`);
           });
 
-        // PENDING durumunda token verme, sadece kullanıcı bilgisini döndür
+        // PENDING statusunda token verme, sadece kullanıcı bilgisini döndür
         return {
           user: this.sanitizeUser(user),
           requiresPayment: !(dto.planSlug === 'trial' || !dto.planSlug),
@@ -149,7 +149,7 @@ export class AuthService {
     // Token version'ı artır (yeni kayıt = yeni token version)
     const newTokenVersion = (user.tokenVersion || 0) + 1;
 
-    await this.prisma.user.update({
+    await this.prisma.extended.user.update({
       where: { id: user.id },
       data: { tokenVersion: newTokenVersion },
     });
@@ -187,8 +187,9 @@ export class AuthService {
   }
 
   async login(dto: LoginDto) {
+    console.log(`[AUTH] Login attempt for username/email: "${dto.username}"`);
     // Kullanıcıyı bul - sadece email ile giriş yapılabilir
-    const user = await this.prisma.user.findFirst({
+    const user = await this.prisma.extended.user.findFirst({
       where: { email: dto.username },
       include: {
         tenant: {
@@ -234,12 +235,12 @@ export class AuthService {
 
     // Tenant ve abonelik kontrolü - sadece normal kullanıcılar için
     if (!isAdminUser && user.tenantId && user.tenant) {
-      // PENDING durumunda giriş yapılamaz
+      // PENDING statusunda giriş yapılamaz
       if (user.tenant.status === TenantStatus.PENDING) {
         const subscription = user.tenant.subscription;
         if (subscription?.status === SubscriptionStatus.PENDING) {
           // Deneme paketi mi kontrol et
-          const plan = await this.prisma.plan.findUnique({
+          const plan = await this.prisma.extended.plan.findUnique({
             where: { id: subscription.planId },
           });
           const isTrialPlan = plan && (plan.slug === 'trial' || Number(plan.price) === 0);
@@ -282,7 +283,7 @@ export class AuthService {
     }
 
     // Token version'ı güncelleme (artık her girişte artırmıyoruz - çoklu oturum desteği)
-    // Sadece şifre değişikliği veya manuel logout-all durumunda artırılabilir
+    // Sadece şifre değişikliği veya manuel logout-all statusunda artırılabilir
     const currentTokenVersion = user.tokenVersion || 0;
 
     // Eski token'ı Redis'ten silmeye gerek yok (set overwrites it)
@@ -305,7 +306,7 @@ export class AuthService {
     await this.redisService.set(redisKey, tokens.accessToken, tokenExpiry);
 
     // Son giriş zamanını sadece login anında güncelle (performans için)
-    await this.prisma.user.update({
+    await this.prisma.extended.user.update({
       where: { id: user.id },
       data: { lastLoginAt: new Date() },
     });
@@ -317,7 +318,7 @@ export class AuthService {
   }
 
   async refreshTokens(userId: string, refreshToken: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
     });
 
@@ -358,7 +359,7 @@ export class AuthService {
 
   async logout(userId: string) {
     // Token version'ı artır (logout = token geçersiz)
-    await this.prisma.user.update({
+    await this.prisma.extended.user.update({
       where: { id: userId },
       data: {
         refreshToken: null,
@@ -372,12 +373,12 @@ export class AuthService {
   }
 
   async getProfile(userId: string) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new UnauthorizedException('Kullanıcı bulunamadı');
+      throw new UnauthorizedException('User not found');
     }
 
     return this.sanitizeUser(user);
@@ -391,7 +392,7 @@ export class AuthService {
     permissions: string[] = [],
     tokenVersion?: number,
   ) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
       select: { tokenVersion: true },
     });
@@ -413,14 +414,18 @@ export class AuthService {
       ...(tenantId && { tenantId }),
     };
 
+    // JWT süresi devre dışı: varsayılan 10 yıl (pratikte süresiz). .env ile JWT_ACCESS_EXPIRATION / JWT_REFRESH_EXPIRATION verilirse kullanılır.
+    const accessExpiry = process.env.JWT_ACCESS_EXPIRATION ?? '10y';
+    const refreshExpiry = process.env.JWT_REFRESH_EXPIRATION ?? '10y';
+
     const [accessToken, refreshToken] = await Promise.all([
       this.jwtService.signAsync(payload, {
         secret: process.env.JWT_ACCESS_SECRET || 'secret',
-        expiresIn: process.env.JWT_ACCESS_EXPIRATION || '15m',
+        expiresIn: accessExpiry,
       } as any),
       this.jwtService.signAsync(refreshPayload, {
         secret: process.env.JWT_REFRESH_SECRET || 'refresh_secret',
-        expiresIn: process.env.JWT_REFRESH_EXPIRATION || '7d',
+        expiresIn: refreshExpiry,
       } as any),
     ]);
 
@@ -429,7 +434,7 @@ export class AuthService {
 
   private async updateRefreshToken(userId: string, refreshToken: string) {
     const hashedRefreshToken = await bcrypt.hash(refreshToken, 10);
-    await this.prisma.user.update({
+    await this.prisma.extended.user.update({
       where: { id: userId },
       data: { refreshToken: hashedRefreshToken },
     });
@@ -440,12 +445,12 @@ export class AuthService {
     currentPassword: string,
     newPassword: string,
   ) {
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
     });
 
     if (!user) {
-      throw new UnauthorizedException('Kullanıcı bulunamadı');
+      throw new UnauthorizedException('User not found');
     }
 
     // Mevcut şifreyi kontrol et
@@ -458,7 +463,7 @@ export class AuthService {
     const hashedPassword = await bcrypt.hash(newPassword, 10);
 
     // Şifreyi güncelle
-    await this.prisma.user.update({
+    await this.prisma.extended.user.update({
       where: { id: userId },
       data: { password: hashedPassword },
     });

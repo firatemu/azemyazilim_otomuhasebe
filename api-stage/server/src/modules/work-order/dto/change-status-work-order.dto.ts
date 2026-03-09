@@ -1,5 +1,6 @@
 import { IsEnum } from 'class-validator';
-import { WorkOrderStatus } from '@prisma/client';
+
+import { WorkOrderStatus } from '../work-order.enums';
 
 export class ChangeStatusWorkOrderDto {
   @IsEnum(WorkOrderStatus)

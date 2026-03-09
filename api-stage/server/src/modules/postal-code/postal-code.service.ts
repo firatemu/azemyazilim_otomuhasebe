@@ -22,7 +22,7 @@ export class PostalCodeService {
     }
 
     // Normalize: Büyük/küçük harf duyarsız arama
-    const postalCode = await this.prisma.postalCode.findFirst({
+    const postalCode = await this.prisma.extended.postalCode.findFirst({
       where: {
         city: {
           equals: city.trim(),
@@ -59,7 +59,7 @@ export class PostalCodeService {
       return [];
     }
 
-    const postalCodes = await this.prisma.postalCode.findMany({
+    const postalCodes = await this.prisma.extended.postalCode.findMany({
       where: {
         city: {
           equals: city.trim(),
@@ -92,7 +92,7 @@ export class PostalCodeService {
     neighborhood: string,
     postalCode: string,
   ): Promise<void> {
-    await this.prisma.postalCode.upsert({
+    await this.prisma.extended.postalCode.upsert({
       where: {
         city_district_neighborhood: {
           city: city.trim(),
@@ -129,7 +129,7 @@ export class PostalCodeService {
 
     for (const pc of postalCodes) {
       try {
-        const existing = await this.prisma.postalCode.findUnique({
+        const existing = await this.prisma.extended.postalCode.findUnique({
           where: {
             city_district_neighborhood: {
               city: pc.city.trim(),
@@ -140,13 +140,13 @@ export class PostalCodeService {
         });
 
         if (existing) {
-          await this.prisma.postalCode.update({
+          await this.prisma.extended.postalCode.update({
             where: { id: existing.id },
             data: { postalCode: pc.postalCode.trim() },
           });
           updated++;
         } else {
-          await this.prisma.postalCode.create({
+          await this.prisma.extended.postalCode.create({
             data: {
               city: pc.city.trim(),
               district: pc.district.trim(),
@@ -178,7 +178,7 @@ export class PostalCodeService {
       return [];
     }
 
-    const neighborhoods = await this.prisma.postalCode.findMany({
+    const neighborhoods = await this.prisma.extended.postalCode.findMany({
       where: {
         city: {
           equals: city.trim(),

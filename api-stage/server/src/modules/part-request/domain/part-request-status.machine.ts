@@ -24,7 +24,7 @@ export function validatePartRequestStatusTransition(
 ): void {
   if (!canTransitionPartRequestStatus(currentStatus, newStatus)) {
     throw new Error(
-      `Geçersiz parça talebi durum geçişi: ${currentStatus} -> ${newStatus}`,
+      `Geçersiz parça talebi status geçişi: ${currentStatus} -> ${newStatus}`,
     );
   }
 }

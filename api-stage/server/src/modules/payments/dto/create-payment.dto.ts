@@ -1,6 +1,7 @@
 import { IsString, IsNumber, IsOptional, IsDateString, IsEnum } from 'class-validator';
 import { Type } from 'class-transformer';
-import { PaymentStatus } from '@prisma/client';
+
+export enum PaymentStatus { PENDING = 'PENDING', PROCESSING = 'PROCESSING', SUCCESS = 'SUCCESS', FAILED = 'FAILED', REFUNDED = 'REFUNDED', CANCELED = 'CANCELED' }
 
 export class CreatePaymentDto {
   @IsString()

@@ -1,3 +1,0 @@
-module.exports=[617239,a=>{"use strict";var b=a.i(923963),c=a.i(819755);let d=(0,b.default)((0,c.jsx)("path",{d:"M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5m0 8c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3"}),"ToggleOn");a.s(["default",0,d])},910584,a=>{"use strict";var b=a.i(923963),c=a.i(819755);let d=(0,b.default)((0,c.jsx)("path",{d:"M17 7H7c-2.76 0-5 2.24-5 5s2.24 5 5 5h10c2.76 0 5-2.24 5-5s-2.24-5-5-5M7 15c-1.66 0-3-1.34-3-3s1.34-3 3-3 3 1.34 3 3-1.34 3-3 3"}),"ToggleOff");a.s(["default",0,d])}];
-
-//# sourceMappingURL=056a0_%40mui_icons-material_esm_ee2022a2._.js.map

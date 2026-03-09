@@ -6,11 +6,11 @@ import {
   LatestPriceQueryDto,
 } from './dto/find-price-cards.dto';
 import { type Request } from 'express';
-import { PriceCardType } from '@prisma/client';
+import { PriceCardType } from './dto/create-price-card.dto';
 
 @Controller('price-cards')
 export class PriceCardController {
-  constructor(private readonly priceCardService: PriceCardService) {}
+  constructor(private readonly priceCardService: PriceCardService) { }
 
   @Post()
   create(@Body() createDto: CreatePriceCardDto, @Req() req: Request) {
@@ -18,20 +18,20 @@ export class PriceCardController {
     return this.priceCardService.create(createDto, userId);
   }
 
-  @Get('stok/:stokId')
+  @Get('product/:productId')
   findByStok(
-    @Param('stokId') stokId: string,
+    @Param('productId') productId: string,
     @Query() query: FindPriceCardsDto,
   ) {
-    return this.priceCardService.findByStok(stokId, query);
+    return this.priceCardService.findByStok(productId, query);
   }
 
-  @Get('stok/:stokId/latest')
+  @Get('product/:productId/latest')
   findLatest(
-    @Param('stokId') stokId: string,
+    @Param('productId') productId: string,
     @Query() query: LatestPriceQueryDto,
   ) {
     const type = query.type ?? PriceCardType.SALE;
-    return this.priceCardService.findLatest(stokId, type);
+    return this.priceCardService.findLatest(productId, type);
   }
 }

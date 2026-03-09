@@ -74,3 +74,10 @@ docker-health-report.txt
 
 # Uploaded files (firma logosu vb. - Docker volume / bind mount ile kalıcı)
 api-stage/server/uploads/
+secrets/
+
+# Agent Governance
+/tmp/*
+/.agent-work/*
+*.generated.js
+*.generated.sh

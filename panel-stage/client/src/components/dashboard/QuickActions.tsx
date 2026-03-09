@@ -17,31 +17,31 @@ export default function QuickActions() {
         {
             title: 'Yeni Satış Faturası',
             icon: ReceiptOutlined,
-            path: '/fatura/satis',
+            path: '/invoice/sales',
             color: 'var(--primary)',
         },
         {
             title: 'Yeni Cari Kartı',
             icon: PersonAddOutlined,
-            path: '/cari',
+            path: '/account',
             color: 'var(--chart-2)',
         },
         {
             title: 'Stok Girişi',
             icon: Inventory2Outlined,
-            path: '/stok',
+            path: '/product',
             color: 'var(--chart-3)',
         },
         {
             title: 'Tahsilat Ekle',
             icon: PaymentOutlined,
-            path: '/kasa',
+            path: '/cashbox',
             color: 'var(--chart-4)',
         },
         {
             title: 'Teklif Hazırla',
             icon: DescriptionOutlined,
-            path: '/teklif',
+            path: '/quote',
             color: 'var(--chart-5)',
         },
     ];
@@ -64,7 +64,7 @@ export default function QuickActions() {
 
             <Grid container spacing={2}>
                 {actions.map((action, index) => (
-                    <Grid item xs={12} sm={6} key={index}>
+                    <Grid size={{ xs: 12, sm: 6 }} key={index}>
                         <Button
                             fullWidth
                             variant="outlined"
@@ -93,11 +93,11 @@ export default function QuickActions() {
                         </Button>
                     </Grid>
                 ))}
-                <Grid item xs={12}>
+                <Grid size={{ xs: 12 }}>
                     <Button
                         fullWidth
                         variant="contained"
-                        onClick={() => router.push('/fatura/satis')}
+                        onClick={() => router.push('/invoice/sales')}
                         startIcon={<AddOutlined />}
                         sx={{
                             mt: 1,

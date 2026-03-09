@@ -1,12 +1,6 @@
 node_modules
 dist
-build
+npm-debug.log
 .git
-.vscode
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.env*.local
-.cache
+.env
 prisma/migrations

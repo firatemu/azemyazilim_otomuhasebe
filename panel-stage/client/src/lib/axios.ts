@@ -56,32 +56,47 @@ const TENANT_HEADER_NAME = 'x-tenant-id';
 // Request interceptor
 axiosInstance.interceptors.request.use(
   (config) => {
+    // #region agent log
+    // Debug logging removed - was causing CORS errors in production
+    // fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'panel-stage/client/src/lib/axios.ts:58',message:'Axios request interceptor',data:{url:config.url,fullURL:config.baseURL + config.url,method:config.method},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
+    // #endregion
+
+    let token = null;
+    let tenantIdToUse = null;
+
     if (typeof window !== 'undefined') {
-      // #region agent log
-      // Debug logging removed - was causing CORS errors in production
-      // fetch('http://localhost:7247/ingest/4fbe5973-d45f-4058-9235-4d634c6bd17e',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'panel-stage/client/src/lib/axios.ts:58',message:'Axios request interceptor',data:{url:config.url,fullURL:config.baseURL + config.url,method:config.method},timestamp:Date.now(),sessionId:'debug-session',runId:'initial',hypothesisId:'A'})}).catch(()=>{});
-      // #endregion
-      const token = safeLocalStorage.getItem('accessToken');
-      if (token) {
-        config.headers = config.headers || {};
-        config.headers.Authorization = `Bearer ${token}`;
-      }
+      token = safeLocalStorage.getItem('accessToken');
+      tenantIdToUse = safeLocalStorage.getItem('tenantId');
+    } else {
+      // Optional fallback for server-side Axios usage to prevent desync
+      try {
+        const { cookies } = require('next/headers');
+        const cookiePromise = cookies() as any;
 
-      // ✅ SaaS Multi-Tenant: Add tenant ID header
-      // Auth endpoint'lerinde tenant ID ekleme (login ve refresh hariç)
-      const isAuthEndpoint = config.url?.includes('/auth/login') || config.url?.includes('/auth/refresh');
-
-      if (!isAuthEndpoint) {
-        // Sadece production ortamında değil, her zaman tenant ID header'ı ekle
-        const tenantIdToUse = safeLocalStorage.getItem('tenantId');
-
-        if (tenantIdToUse) {
-          if (!config.headers) {
-            config.headers = {} as any;
-          }
-          (config.headers as any)[TENANT_HEADER_NAME] = tenantIdToUse;
+        // Use synchronous get if possible, otherwise we might be in SSR environment where cookies are async
+        // Next.js 15 makes cookies() async but usually server components use next/server tools.
+        // This is a dynamic try-catch specifically for interceptor edges.
+        if (cookiePromise && typeof cookiePromise.get === 'function') {
+          token = cookiePromise.get('accessToken')?.value || null;
+          tenantIdToUse = cookiePromise.get('tenantId')?.value || null;
         }
+      } catch (e) { } // Handle cases outside Next context safely
+    }
+
+    if (token) {
+      config.headers = config.headers || {};
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+
+    // ✅ SaaS Multi-Tenant: Add tenant ID header
+    // Auth endpoint'lerinde tenant ID ekleme (login ve refresh hariç)
+    const isAuthEndpoint = config.url?.includes('/auth/login') || config.url?.includes('/auth/refresh');
+
+    if (!isAuthEndpoint && tenantIdToUse) {
+      if (!config.headers) {
+        config.headers = {} as any;
       }
+      (config.headers as any)[TENANT_HEADER_NAME] = tenantIdToUse;
     }
     return config;
   },
@@ -91,6 +106,7 @@ axiosInstance.interceptors.request.use(
 );
 
 // Response interceptor
+
 axiosInstance.interceptors.response.use(
   (response) => response,
   async (error) => {

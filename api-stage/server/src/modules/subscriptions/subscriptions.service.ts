@@ -13,7 +13,7 @@ export class SubscriptionsService {
     const { tenantId, planId, planName, startDate, endDate, billingType, paymentMethod = 'credit_card' } = createSubscriptionDto;
     
     // Check if tenant exists
-    const tenant = await this.prisma.tenant.findUnique({
+    const tenant = await this.prisma.extended.tenant.findUnique({
       where: { id: tenantId },
     });
 
@@ -22,7 +22,7 @@ export class SubscriptionsService {
     }
 
     // Check if subscription already exists
-    const existing = await this.prisma.subscription.findUnique({
+    const existing = await this.prisma.extended.subscription.findUnique({
       where: { tenantId },
     });
 
@@ -34,11 +34,11 @@ export class SubscriptionsService {
     let finalPlanId = planId;
     if (planName && !planId) {
       const planSlug = planName.toLowerCase();
-      const plan = await this.prisma.plan.findFirst({
+      const plan = await this.prisma.extended.plan.findFirst({
         where: { slug: planSlug },
       });
       if (!plan) {
-        throw new NotFoundException(`Plan '${planName}' bulunamadı`);
+        throw new NotFoundException(`Plan 'planName' not found`);
       }
       finalPlanId = plan.id;
     }
@@ -64,7 +64,7 @@ export class SubscriptionsService {
     // Banka havalesi seçildiyse PENDING, kredi kartı ise ACTIVE
     const subscriptionStatus = paymentMethod === 'bank_transfer' ? SubscriptionStatus.PENDING : SubscriptionStatus.ACTIVE;
 
-    const subscription = await this.prisma.subscription.create({
+    const subscription = await this.prisma.extended.subscription.create({
       data: {
         id: require('uuid').v4(),
         tenantId,
@@ -84,12 +84,12 @@ export class SubscriptionsService {
 
     // Payment kaydı oluştur (banka havalesi için)
     if (paymentMethod === 'bank_transfer') {
-      const plan = await this.prisma.plan.findUnique({
+      const plan = await this.prisma.extended.plan.findUnique({
         where: { id: finalPlanId },
       });
       
       if (plan) {
-        await this.prisma.payment.create({
+        await this.prisma.extended.payment.create({
           data: {
             subscriptionId: subscription.id,
             amount: plan.price,
@@ -105,7 +105,7 @@ export class SubscriptionsService {
   }
 
   async findAll() {
-    return this.prisma.subscription.findMany({
+    return this.prisma.extended.subscription.findMany({
       include: {
         tenant: {
           include: {
@@ -118,7 +118,7 @@ export class SubscriptionsService {
   }
 
   async findOne(id: string) {
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { id },
       include: {
         tenant: {
@@ -137,7 +137,7 @@ export class SubscriptionsService {
   }
 
   async findByTenantId(tenantId: string) {
-    return this.prisma.subscription.findUnique({
+    return this.prisma.extended.subscription.findUnique({
       where: { tenantId },
       include: {
         tenant: true,
@@ -146,7 +146,7 @@ export class SubscriptionsService {
   }
 
   async update(id: string, updateSubscriptionDto: UpdateSubscriptionDto) {
-    return this.prisma.subscription.update({
+    return this.prisma.extended.subscription.update({
       where: { id },
       data: updateSubscriptionDto,
       include: {
@@ -156,7 +156,7 @@ export class SubscriptionsService {
   }
 
   async cancel(id: string) {
-    return this.prisma.subscription.update({
+    return this.prisma.extended.subscription.update({
       where: { id },
       data: {
         autoRenew: false,
@@ -167,13 +167,13 @@ export class SubscriptionsService {
   }
 
   async reactivate(id: string) {
-    const subscription = await this.prisma.subscription.findUnique({
+    const subscription = await this.prisma.extended.subscription.findUnique({
       where: { id },
       include: { plan: true },
     });
 
     if (!subscription) {
-      throw new NotFoundException('Abonelik bulunamadı');
+      throw new NotFoundException('Subscription not found');
     }
 
     if (subscription.status !== SubscriptionStatus.CANCELED) {
@@ -189,7 +189,7 @@ export class SubscriptionsService {
     }
 
     // Aboneliği tekrar aktif et
-    const updatedSubscription = await this.prisma.subscription.update({
+    const updatedSubscription = await this.prisma.extended.subscription.update({
       where: { id },
       data: {
         status: SubscriptionStatus.ACTIVE,
@@ -207,7 +207,7 @@ export class SubscriptionsService {
 
     // Tenant'ı da aktif et (eğer varsa)
     if (subscription.tenantId) {
-      await this.prisma.tenant.update({
+      await this.prisma.extended.tenant.update({
         where: { id: subscription.tenantId },
         data: { status: TenantStatus.ACTIVE },
       });
@@ -217,7 +217,7 @@ export class SubscriptionsService {
   }
 
   async remove(id: string) {
-    return this.prisma.subscription.delete({
+    return this.prisma.extended.subscription.delete({
       where: { id },
     });
   }
@@ -228,19 +228,19 @@ export class SubscriptionsService {
     }
 
     // Kullanıcıyı bul
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
       include: { tenant: true },
     });
 
     if (!user) {
-      throw new NotFoundException('Kullanıcı bulunamadı');
+      throw new NotFoundException('User not found');
     }
 
     // Tenant yoksa oluştur
     let tenant = user.tenant;
     if (!tenant) {
-      tenant = await this.prisma.tenant.create({
+      tenant = await this.prisma.extended.tenant.create({
         data: {
           name: user.fullName || user.email,
           status: TenantStatus.TRIAL,
@@ -248,14 +248,14 @@ export class SubscriptionsService {
       });
 
       // User'ın tenantId'sini güncelle
-      await this.prisma.user.update({
+      await this.prisma.extended.user.update({
         where: { id: userId },
         data: { tenantId: tenant.id },
       });
     }
 
     // Mevcut abonelik var mı kontrol et
-    const existingSubscription = await this.prisma.subscription.findUnique({
+    const existingSubscription = await this.prisma.extended.subscription.findUnique({
       where: { tenantId: tenant.id },
     });
 
@@ -271,19 +271,19 @@ export class SubscriptionsService {
     }
 
     // Deneme paketini bul (slug: 'trial')
-    const trialPlan = await this.prisma.plan.findFirst({
+    const trialPlan = await this.prisma.extended.plan.findFirst({
       where: { slug: 'trial' },
     });
 
     if (!trialPlan) {
-      throw new NotFoundException('Deneme paketi bulunamadı');
+      throw new NotFoundException('Trial package not found');
     }
 
     // Deneme aboneliği oluştur
     const now = new Date();
     const trialEnd = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000); // 14 gün
 
-    const subscription = await this.prisma.subscription.create({
+    const subscription = await this.prisma.extended.subscription.create({
       data: {
         id: uuidv4(),
         tenantId: tenant.id,
@@ -301,7 +301,7 @@ export class SubscriptionsService {
     });
 
     // Tenant status'unu güncelle
-    await this.prisma.tenant.update({
+    await this.prisma.extended.tenant.update({
       where: { id: tenant.id },
       data: { status: TenantStatus.TRIAL },
     });
@@ -311,13 +311,13 @@ export class SubscriptionsService {
 
   async upgradeFromTrial(userId: string, planName: string) {
     // Kullanıcıyı bul
-    const user = await this.prisma.user.findUnique({
+    const user = await this.prisma.extended.user.findUnique({
       where: { id: userId },
       include: { tenant: { include: { subscription: { include: { plan: true } } } } },
     });
 
     if (!user || !user.tenant) {
-      throw new NotFoundException('Kullanıcı veya tenant bulunamadı');
+      throw new NotFoundException('User or tenant not found');
     }
 
     const tenant = user.tenant;
@@ -325,7 +325,7 @@ export class SubscriptionsService {
 
     // Eğer abonelik yoksa veya deneme değilse hata ver
     if (!existingSubscription) {
-      throw new BadRequestException('Deneme aboneliği bulunamadı');
+      throw new BadRequestException('Trial subscription not found');
     }
 
     if (existingSubscription.status !== SubscriptionStatus.TRIAL) {
@@ -334,12 +334,12 @@ export class SubscriptionsService {
 
     // Plan adını slug'a çevir
     const planSlug = planName.toLowerCase();
-    const plan = await this.prisma.plan.findFirst({
+    const plan = await this.prisma.extended.plan.findFirst({
       where: { slug: planSlug },
     });
 
     if (!plan) {
-      throw new NotFoundException(`Plan '${planName}' bulunamadı`);
+      throw new NotFoundException(`Plan 'planName' not found`);
     }
 
     // Yıllık abonelik için tarihleri hesapla
@@ -348,7 +348,7 @@ export class SubscriptionsService {
     endDate.setFullYear(endDate.getFullYear() + 1); // 1 yıl
 
     // Mevcut aboneliği güncelle
-    const updatedSubscription = await this.prisma.subscription.update({
+    const updatedSubscription = await this.prisma.extended.subscription.update({
       where: { id: existingSubscription.id },
       data: {
         planId: plan.id,
@@ -366,7 +366,7 @@ export class SubscriptionsService {
     });
 
     // Tenant status'unu güncelle
-    await this.prisma.tenant.update({
+    await this.prisma.extended.tenant.update({
       where: { id: tenant.id },
       data: { status: TenantStatus.ACTIVE },
     });

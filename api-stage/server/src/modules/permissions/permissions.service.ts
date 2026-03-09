@@ -28,7 +28,7 @@ export class PermissionsService {
         }
 
         // 2. Fetch from DB if not in cache
-        const user = await this.prisma.user.findUnique({
+        const user = await this.prisma.extended.user.findUnique({
             where: { id: userId },
             include: {
                 roleRelation: {
@@ -78,7 +78,7 @@ export class PermissionsService {
      * Use this when updating a role's permissions.
      */
     async invalidateRoleCache(roleId: string): Promise<void> {
-        const users = await this.prisma.user.findMany({
+        const users = await this.prisma.extended.user.findMany({
             where: { roleId },
             select: { id: true },
         });

@@ -1,4 +1,3 @@
-import { PriceCardType } from '@prisma/client';
 import { Type } from 'class-transformer';
 import {
   IsEnum,
@@ -9,9 +8,11 @@ import {
   MaxLength,
 } from 'class-validator';
 
+export enum PriceCardType { SALE = 'SALE', PURCHASE = 'PURCHASE' }
+
 export class CreatePriceCardDto {
   @IsUUID()
-  stokId!: string;
+  productId!: string;
 
   @IsEnum(PriceCardType)
   @IsOptional()

@@ -1,4 +1,4 @@
-import { WorkOrderStatus } from '@prisma/client';
+import { WorkOrderStatus } from '../work-order.enums';
 
 export const WORK_ORDER_VALID_TRANSITIONS: Record<
   WorkOrderStatus,
@@ -29,7 +29,7 @@ export function validateWorkOrderStatusTransition(
 ): void {
   if (!canTransitionWorkOrderStatus(currentStatus, newStatus)) {
     throw new Error(
-      `Geçersiz durum geçişi: ${currentStatus} -> ${newStatus}`,
+      `Geçersiz status geçişi: ${currentStatus} -> ${newStatus}`,
     );
   }
 }
