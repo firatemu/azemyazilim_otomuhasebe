@@ -12,7 +12,7 @@ otomuhasebe/
 ├── panel-stage/            # Next.js frontend (React + TypeScript)
 │
 ├── infra/                  # Infrastructure as Code
-│   ├── docker/             # Docker Compose configurations
+│   ├── compose/            # Docker Compose configurations
 │   ├── caddy/              # Reverse proxy configs
 │   ├── pgbouncer/          # Connection pooler configs
 │   ├── monitoring/         # Prometheus & Grafana
@@ -134,18 +134,18 @@ Automated PostgreSQL backups run daily at 23:30.
 ### Manual Backup
 ```bash
 # Backup to local storage + MinIO
-docker compose -f infra/docker/docker-compose.backup.yml exec backup \
+docker compose -f infra/compose/docker-compose.backup.yml exec backup \
   /usr/local/bin/backup.sh
 ```
 
 ### Restore Database
 ```bash
 # List available backups
-docker compose -f infra/docker/docker-compose.backup.yml exec backup \
+docker compose -f infra/compose/docker-compose.backup.yml exec backup \
   /usr/local/bin/restore.sh
 
 # Test backup integrity (safe - doesn't touch production)
-docker compose -f infra/docker/docker-compose.backup.yml exec backup \
+docker compose -f infra/compose/docker-compose.backup.yml exec backup \
   /usr/local/bin/restore-test.sh
 ```
 
