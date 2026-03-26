@@ -1,4 +1,5 @@
 export const menuItems = [
+  { id: 'menu', label: 'Menü', icon: 'Menu', path: '/menu', color: '#0ea5e9', bgColor: '#f0f9ff', section: 'GENEL' },
   { id: 'dashboard', label: 'Dashboard', icon: 'Dashboard', path: '/dashboard', color: '#667eea', bgColor: '#f0f4ff', section: 'GENEL' },
   {
     id: 'accounts',

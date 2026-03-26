@@ -22,7 +22,7 @@ export default function Home() {
       }
 
       if (accessToken) {
-        router.push('/dashboard');
+        router.push('/menu');
       } else {
         router.push('/login');
       }

@@ -1,14 +1,23 @@
 'use client';
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Box, Tabs, Tab } from '@mui/material';
 import { Close } from '@mui/icons-material';
 import { useTabStore } from '@/stores/tabStore';
 import { useRouter } from 'next/navigation';
+import { usePathname } from 'next/navigation';
 
 export default function TabBar() {
   const { tabs, activeTab, setActiveTab, removeTab } = useTabStore();
   const router = useRouter();
+  const pathname = usePathname();
+
+  // Redirect to /menu when all tabs are closed and not on /menu page
+  useEffect(() => {
+    if (tabs.length === 0 && pathname !== '/menu') {
+      router.push('/menu');
+    }
+  }, [tabs.length, pathname, router]);
 
   const handleChange = (_event: React.SyntheticEvent, newValue: string) => {
     setActiveTab(newValue);
@@ -37,11 +46,12 @@ export default function TabBar() {
     removeTab(tabId);
 
     if (isClosingActive) {
-      router.push(fallbackPath ?? '/dashboard');
+      router.push(fallbackPath ?? '/menu');
     }
   };
 
-  if (tabs.length === 0) {
+  // Hide TabBar on /menu page
+  if (tabs.length === 0 || pathname === '/menu') {
     return null;
   }
 
@@ -81,7 +91,7 @@ export default function TabBar() {
         }}
       >
         {tabs.map((tab) => {
-          const canCloseTab = tabs.length > 1 || tab.id !== 'dashboard';
+          const canCloseTab = true; // All tabs can be closed
           const isActive = tab.id === activeTab;
 
           return (

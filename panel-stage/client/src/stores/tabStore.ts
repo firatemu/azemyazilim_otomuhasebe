@@ -17,28 +17,29 @@ interface TabState {
 }
 
 export const useTabStore = create<TabState>((set, get) => ({
-  tabs: [{ id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'home' }],
-  activeTab: 'dashboard',
-  
+  tabs: [],
+  activeTab: '',
+
   addTab: (tab) => {
     const { tabs } = get();
     const existingTab = tabs.find((t) => t.id === tab.id);
-    
+
     if (!existingTab) {
       set({ tabs: [...tabs, tab], activeTab: tab.id });
     } else {
       set({ activeTab: tab.id });
     }
   },
-  
+
   removeTab: (tabId) => {
     const { tabs, activeTab } = get();
     const newTabs = tabs.filter((t) => t.id !== tabId);
- 
+
     if (newTabs.length === 0) {
+      // Clear all tabs when last tab is closed
       set({
-        tabs: [{ id: 'dashboard', label: 'Dashboard', path: '/dashboard', icon: 'home' }],
-        activeTab: 'dashboard',
+        tabs: [],
+        activeTab: '',
       });
       return;
     }
@@ -48,15 +49,15 @@ export const useTabStore = create<TabState>((set, get) => ({
       const index = tabs.findIndex((t) => t.id === tabId);
       newActiveTab = newTabs[Math.max(0, index - 1)].id;
     }
-    
+
     set({ tabs: newTabs, activeTab: newActiveTab });
   },
-  
+
   setActiveTab: (tabId) => set({ activeTab: tabId }),
-  
-  clearTabs: () => set({ 
-    tabs: [{ id: 'dashboard', label: 'Dashboard', path: '/dashboard' }],
-    activeTab: 'dashboard'
+
+  clearTabs: () => set({
+    tabs: [],
+    activeTab: ''
   }),
 }));
 
