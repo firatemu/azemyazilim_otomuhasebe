@@ -78,6 +78,7 @@ import {
   Typography,
   Avatar,
   Skeleton,
+  useTheme,
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { clearServerAuthCookies } from '@/lib/clearServerAuthCookies';
@@ -188,6 +189,7 @@ interface SidebarProps {
 }
 
 export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems }: SidebarProps) {
+  const theme = useTheme();
   const { addTab, setActiveTab, activeTab } = useTabStore();
   const { user: authUser, clearAuth } = useAuthStore();
   const { items: quickMenuItems, fetchQuickMenuItems } = useQuickMenuStore();
@@ -391,9 +393,13 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
         '& .MuiDrawer-paper': {
           width: SIDEBAR_WIDTH,
           boxSizing: 'border-box',
-          background: 'linear-gradient(180deg, #F5F7FA 0%, #E8EEF5 100%)',
+          background: theme.palette.mode === 'light'
+            ? 'linear-gradient(180deg, #F5F7FA 0%, #E8EEF5 100%)'
+            : 'linear-gradient(180deg, #0F172A 0%, #1E293B 100%)',
           color: 'var(--foreground)',
-          borderRight: '1px solid rgba(0, 0, 0, 0.06)',
+          borderRight: theme.palette.mode === 'light'
+            ? '1px solid rgba(0, 0, 0, 0.06)'
+            : '1px solid rgba(255, 255, 255, 0.08)',
           position: pinned ? 'relative' : 'fixed',
           display: 'flex',
           flexDirection: 'column',
@@ -409,14 +415,23 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
           inset: 0,
           zIndex: 0,
           pointerEvents: 'none',
-          background: `
-            radial-gradient(at 40% 20%, rgba(227, 242, 253, 0.6) 0px, transparent 50%),
-            radial-gradient(at 80% 0%, rgba(224, 242, 241, 0.5) 0px, transparent 50%),
-            radial-gradient(at 0% 50%, rgba(252, 228, 236, 0.4) 0px, transparent 50%),
-            radial-gradient(at 80% 50%, rgba(243, 229, 245, 0.5) 0px, transparent 50%),
-            radial-gradient(at 0% 100%, rgba(255, 253, 231, 0.4) 0px, transparent 50%),
-            radial-gradient(at 80% 100%, rgba(232, 245, 233, 0.5) 0px, transparent 50%)
-          `,
+          background: theme.palette.mode === 'light'
+            ? `
+              radial-gradient(at 40% 20%, rgba(227, 242, 253, 0.6) 0px, transparent 50%),
+              radial-gradient(at 80% 0%, rgba(224, 242, 241, 0.5) 0px, transparent 50%),
+              radial-gradient(at 0% 50%, rgba(252, 228, 236, 0.4) 0px, transparent 50%),
+              radial-gradient(at 80% 50%, rgba(243, 229, 245, 0.5) 0px, transparent 50%),
+              radial-gradient(at 0% 100%, rgba(255, 253, 231, 0.4) 0px, transparent 50%),
+              radial-gradient(at 80% 100%, rgba(232, 245, 233, 0.5) 0px, transparent 50%)
+            `
+            : `
+              radial-gradient(at 40% 20%, rgba(30, 41, 59, 0.4) 0px, transparent 50%),
+              radial-gradient(at 80% 0%, rgba(15, 23, 42, 0.3) 0px, transparent 50%),
+              radial-gradient(at 0% 50%, rgba(51, 65, 85, 0.35) 0px, transparent 50%),
+              radial-gradient(at 80% 50%, rgba(30, 41, 59, 0.3) 0px, transparent 50%),
+              radial-gradient(at 0% 100%, rgba(15, 23, 42, 0.25) 0px, transparent 50%),
+              radial-gradient(at 80% 100%, rgba(30, 41, 59, 0.3) 0px, transparent 50%)
+            `,
           animation: 'meshMove 25s linear infinite',
           '@keyframes meshMove': {
             '0%': { backgroundPosition: '0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%' },
@@ -438,14 +453,23 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
             borderRadius: '50%',
             top: `${[10, 20, 60, 70, 30, 80][i]}%`,
             left: `${[80, 15, 70, 20, 60, 85][i]}%`,
-            opacity: [0.15, 0.12, 0.14, 0.1, 0.13, 0.15][i],
-            background: [
+            opacity: theme.palette.mode === 'light'
+              ? [0.15, 0.12, 0.14, 0.1, 0.13, 0.15][i]
+              : [0.1, 0.08, 0.09, 0.07, 0.08, 0.1][i],
+            background: theme.palette.mode === 'light' ? [
               'radial-gradient(circle, rgba(187, 222, 251, 0.5), transparent)',
               'radial-gradient(circle, rgba(178, 223, 219, 0.45), transparent)',
               'radial-gradient(circle, rgba(248, 187, 208, 0.4), transparent)',
               'radial-gradient(circle, rgba(225, 190, 231, 0.45), transparent)',
               'radial-gradient(circle, rgba(255, 249, 196, 0.4), transparent)',
               'radial-gradient(circle, rgba(200, 230, 201, 0.45), transparent)',
+            ][i] : [
+              'radial-gradient(circle, rgba(30, 58, 138, 0.3), transparent)',
+              'radial-gradient(circle, rgba(15, 23, 42, 0.25), transparent)',
+              'radial-gradient(circle, rgba(51, 65, 85, 0.25), transparent)',
+              'radial-gradient(circle, rgba(30, 41, 59, 0.2), transparent)',
+              'radial-gradient(circle, rgba(15, 23, 42, 0.25), transparent)',
+              'radial-gradient(circle, rgba(30, 58, 138, 0.3), transparent)',
             ][i],
             filter: 'blur(50px)',
             zIndex: 0,
@@ -473,13 +497,19 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
         sx={{
           position: 'relative',
           zIndex: 1,
-          background: 'rgba(255, 255, 255, 0.6)',
+          background: theme.palette.mode === 'light'
+            ? 'rgba(255, 255, 255, 0.6)'
+            : 'rgba(30, 41, 59, 0.6)',
           backdropFilter: 'blur(12px)',
-          border: '1px solid rgba(255, 255, 255, 0.8)',
+          border: theme.palette.mode === 'light'
+            ? '1px solid rgba(255, 255, 255, 0.8)'
+            : '1px solid rgba(255, 255, 255, 0.1)',
           borderRadius: '10px',
           m: 1,
           mb: 0.5,
-          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)',
+          boxShadow: theme.palette.mode === 'light'
+            ? '0 2px 8px rgba(0, 0, 0, 0.04), inset 0 1px 0 rgba(255, 255, 255, 0.8)'
+            : '0 2px 8px rgba(0, 0, 0, 0.2), inset 0 1px 0 rgba(255, 255, 255, 0.1)',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'space-between',
@@ -494,7 +524,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
             position: 'absolute',
             inset: 0,
             borderRadius: '10px',
-            background: `radial-gradient(300px circle at ${headerMouse.x}px ${headerMouse.y}px, rgba(255, 255, 255, 0.4), transparent 40%)`,
+            background: `radial-gradient(300px circle at ${headerMouse.x}px ${headerMouse.y}px, ${theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.4)' : 'rgba(255, 255, 255, 0.1)'}, transparent 40%)`,
             pointerEvents: 'none',
           },
         }}
@@ -510,12 +540,18 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
               borderRadius: '8px',
               background: tenantSettings?.logoUrl
                 ? 'transparent'
-                : 'linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%)',
-              border: tenantSettings?.logoUrl ? '1px solid rgba(0, 0, 0, 0.08)' : 'none',
+                : (theme.palette.mode === 'light'
+                  ? 'linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%)'
+                  : 'linear-gradient(135deg, #1E40AF 0%, #1E3A8A 100%)'),
+              border: tenantSettings?.logoUrl
+                ? (theme.palette.mode === 'light' ? '1px solid rgba(0, 0, 0, 0.08)' : '1px solid rgba(255, 255, 255, 0.1)')
+                : 'none',
               padding: tenantSettings?.logoUrl ? 0.5 : 0,
               boxShadow: tenantSettings?.logoUrl
                 ? 'none'
-                : '0 2px 8px rgba(187, 222, 251, 0.4)',
+                : (theme.palette.mode === 'light'
+                  ? '0 2px 8px rgba(187, 222, 251, 0.4)'
+                  : '0 2px 8px rgba(30, 64, 175, 0.4)'),
               flexShrink: 0,
               overflow: 'hidden',
               animation: tenantSettings?.logoUrl ? 'none' : 'iconFloat 4s ease-in-out infinite',
@@ -534,7 +570,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                 sx={{ width: '100%', height: '100%', objectFit: 'contain' }}
               />
             ) : (
-              <DirectionsCar sx={{ fontSize: 16, color: '#1565C0' }} />
+              <DirectionsCar sx={{ fontSize: 16, color: theme.palette.mode === 'light' ? '#1565C0' : '#60A5FA' }} />
             )}
           </Box>
           <Box sx={{ flex: 1, minWidth: 0 }}>
@@ -552,7 +588,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                   sx={{
                     lineHeight: 1.2,
                     fontSize: '0.75rem',
-                    color: '#1E293B',
+                    color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9',
                     letterSpacing: '-0.02em',
                   }}
                 >
@@ -561,7 +597,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                 <Typography
                   variant="caption"
                   sx={{
-                    color: '#64748B',
+                    color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8',
                     fontSize: '0.6rem',
                     fontWeight: 500,
                     display: 'block',
@@ -580,13 +616,19 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
           sx={{
             width: 28,
             height: 28,
-            color: '#64748B',
-            background: 'rgba(255, 255, 255, 0.5)',
+            color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8',
+            background: theme.palette.mode === 'light'
+              ? 'rgba(255, 255, 255, 0.5)'
+              : 'rgba(30, 41, 59, 0.5)',
             backdropFilter: 'blur(10px)',
-            border: '1px solid rgba(0, 0, 0, 0.06)',
+            border: theme.palette.mode === 'light'
+              ? '1px solid rgba(0, 0, 0, 0.06)'
+              : '1px solid rgba(255, 255, 255, 0.1)',
             '&:hover': {
-              background: 'rgba(255, 255, 255, 0.8)',
-              color: '#1E293B',
+              background: theme.palette.mode === 'light'
+                ? 'rgba(255, 255, 255, 0.8)'
+                : 'rgba(30, 41, 59, 0.8)',
+              color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9',
               transform: 'scale(1.05)',
             },
             transition: 'all 0.2s ease',
@@ -711,7 +753,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
         </Menu>
       </Box>
 
-      <Divider sx={{ borderColor: 'rgba(0, 0, 0, 0.06)', mx: 1, mb: 0.5 }} />
+      <Divider sx={{ borderColor: theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)', mx: 1, mb: 0.5 }} />
 
       {/* Glassmorphism Search */}
       <Box sx={{ px: 1, pt: 0, pb: 0.5, position: 'relative', zIndex: 1 }}>
@@ -724,26 +766,38 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
           InputProps={{
             startAdornment: (
               <InputAdornment position="start">
-                <Search sx={{ color: '#94A3B8', fontSize: 16 }} />
+                <Search sx={{ color: theme.palette.mode === 'light' ? '#94A3B8' : '#64748B', fontSize: 16 }} />
               </InputAdornment>
             ),
           }}
           sx={{
             '& .MuiOutlinedInput-root': {
-              bgcolor: 'rgba(255, 255, 255, 0.6)',
+              bgcolor: theme.palette.mode === 'light'
+                ? 'rgba(255, 255, 255, 0.6)'
+                : 'rgba(30, 41, 59, 0.6)',
               backdropFilter: 'blur(10px)',
               borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.8)',
+              border: theme.palette.mode === 'light'
+                ? '1px solid rgba(255, 255, 255, 0.8)'
+                : '1px solid rgba(255, 255, 255, 0.1)',
               '& fieldset': {
                 borderColor: 'transparent',
               },
               '&:hover': {
-                bgcolor: 'rgba(255, 255, 255, 0.8)',
-                border: '1px solid rgba(255, 255, 255, 1)',
+                bgcolor: theme.palette.mode === 'light'
+                  ? 'rgba(255, 255, 255, 0.8)'
+                  : 'rgba(30, 41, 59, 0.8)',
+                border: theme.palette.mode === 'light'
+                  ? '1px solid rgba(255, 255, 255, 1)'
+                  : '1px solid rgba(255, 255, 255, 0.15)',
               },
               '&.Mui-focused': {
-                bgcolor: 'rgba(255, 255, 255, 0.9)',
-                border: '1px solid #BBDEFB',
+                bgcolor: theme.palette.mode === 'light'
+                  ? 'rgba(255, 255, 255, 0.9)'
+                  : 'rgba(30, 41, 59, 0.9)',
+                border: theme.palette.mode === 'light'
+                  ? '1px solid #BBDEFB'
+                  : '1px solid rgba(59, 130, 246, 0.5)',
                 '& fieldset': {
                   borderColor: 'transparent',
                 },
@@ -828,14 +882,20 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                     borderRadius: '10px',
                     background: isActive
                       ? itemColor
-                      : 'rgba(255, 255, 255, 0.5)',
+                      : (theme.palette.mode === 'light'
+                        ? 'rgba(255, 255, 255, 0.5)'
+                        : 'rgba(30, 41, 59, 0.5)'),
                     backdropFilter: 'blur(16px)',
                     border: isActive
                       ? '1px solid rgba(255, 255, 255, 0.8)'
-                      : '1px solid rgba(255, 255, 255, 0.6)',
+                      : (theme.palette.mode === 'light'
+                        ? '1px solid rgba(255, 255, 255, 0.6)'
+                        : '1px solid rgba(255, 255, 255, 0.1)'),
                     boxShadow: isActive
                       ? `0 4px 12px ${itemColor}30`
-                      : '0 1px 4px rgba(0, 0, 0, 0.04)',
+                      : (theme.palette.mode === 'light'
+                        ? '0 1px 4px rgba(0, 0, 0, 0.04)'
+                        : '0 1px 4px rgba(0, 0, 0, 0.2)'),
                     mb: 0.5,
                     mx: 1,
                     p: 0,
@@ -848,16 +908,20 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                       position: 'absolute',
                       inset: 0,
                       borderRadius: '10px',
-                      background: `radial-gradient(200px circle at ${itemMousePositions[item.id]?.x || 0}px ${itemMousePositions[item.id]?.y || 0}px, rgba(255, 255, 255, 0.3), transparent 40%)`,
+                      background: `radial-gradient(200px circle at ${itemMousePositions[item.id]?.x || 0}px ${itemMousePositions[item.id]?.y || 0}px, ${theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}, transparent 40%)`,
                       pointerEvents: 'none',
                       opacity: 0.6,
                     },
                     '&:hover': {
                       background: isActive
                         ? itemColor
-                        : 'rgba(255, 255, 255, 0.8)',
+                        : (theme.palette.mode === 'light'
+                          ? 'rgba(255, 255, 255, 0.8)'
+                          : 'rgba(30, 41, 59, 0.8)'),
                       transform: 'translateX(2px)',
-                      boxShadow: '0 2px 8px rgba(0, 0, 0, 0.06)',
+                      boxShadow: theme.palette.mode === 'light'
+                        ? '0 2px 8px rgba(0, 0, 0, 0.06)'
+                        : '0 2px 8px rgba(0, 0, 0, 0.3)',
                     },
                   }}
                 >
@@ -888,7 +952,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                       <Typography sx={{
                         fontWeight: 600,
                         fontSize: '0.8rem',
-                        color: isActive ? '#FFFFFF' : '#475569',
+                        color: isActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#475569' : '#CBD5E1'),
                         letterSpacing: '-0.01em',
                       }}>
                         {item.label}
@@ -898,7 +962,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                     {/* Expand Icon */}
                     {hasSubMenu && (
                       <Box sx={{
-                        color: isActive ? '#FFFFFF' : '#94A3B8',
+                        color: isActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#94A3B8' : '#64748B'),
                         transition: 'transform 0.3s ease',
                         transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
                       }}>
@@ -944,14 +1008,20 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                                 borderRadius: '8px',
                                 background: isSubActive
                                   ? subColor
-                                  : 'rgba(255, 255, 255, 0.4)',
+                                  : (theme.palette.mode === 'light'
+                                    ? 'rgba(255, 255, 255, 0.4)'
+                                    : 'rgba(30, 41, 59, 0.4)'),
                                 backdropFilter: 'blur(12px)',
                                 border: isSubActive
                                   ? '1px solid rgba(255, 255, 255, 0.8)'
-                                  : '1px solid rgba(255, 255, 255, 0.5)',
+                                  : (theme.palette.mode === 'light'
+                                    ? '1px solid rgba(255, 255, 255, 0.5)'
+                                    : '1px solid rgba(255, 255, 255, 0.1)'),
                                 boxShadow: isSubActive
                                   ? `0 2px 6px ${subColor}25`
-                                  : '0 1px 3px rgba(0, 0, 0, 0.03)',
+                                  : (theme.palette.mode === 'light'
+                                    ? '0 1px 3px rgba(0, 0, 0, 0.03)'
+                                    : '0 1px 3px rgba(0, 0, 0, 0.2)'),
                                 mb: 0.25,
                                 ml: 0.5, // Indentation
                                 mr: 0.25,
@@ -965,13 +1035,15 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                                   position: 'absolute',
                                   inset: 0,
                                   borderRadius: '8px',
-                                  background: `radial-gradient(150px circle at ${itemMousePositions[subItem.id]?.x || 0}px ${itemMousePositions[subItem.id]?.y || 0}px, rgba(255, 255, 255, 0.25), transparent 40%)`,
+                                  background: `radial-gradient(150px circle at ${itemMousePositions[subItem.id]?.x || 0}px ${itemMousePositions[subItem.id]?.y || 0}px, ${theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)'}, transparent 40%)`,
                                   pointerEvents: 'none',
                                 },
                                 '&:hover': {
                                   background: isSubActive
                                     ? subColor
-                                    : 'rgba(255, 255, 255, 0.7)',
+                                    : (theme.palette.mode === 'light'
+                                      ? 'rgba(255, 255, 255, 0.7)'
+                                      : 'rgba(30, 41, 59, 0.7)'),
                                   transform: 'translateX(2px)',
                                 },
                               }}
@@ -996,7 +1068,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                                 <Typography sx={{
                                   fontWeight: 600,
                                   fontSize: '0.75rem',
-                                  color: isSubActive ? '#FFFFFF' : '#475569',
+                                  color: isSubActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#475569' : '#CBD5E1'),
                                 }}>
                                   {subItem.label}
                                 </Typography>
@@ -1014,24 +1086,36 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
       </Box>
 
       {/* Glassmorphism User Profile Section */}
-      <Box sx={{ px: 1, pb: 1, pt: 0.5, borderTop: '1px solid rgba(0, 0, 0, 0.06)', position: 'relative', zIndex: 1 }}>
+      <Box sx={{ px: 1, pb: 1, pt: 0.5, borderTop: theme.palette.mode === 'light' ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.08)', position: 'relative', zIndex: 1 }}>
         <Box
           sx={{
-            bgcolor: 'rgba(255, 255, 255, 0.5)',
+            bgcolor: theme.palette.mode === 'light'
+              ? 'rgba(255, 255, 255, 0.5)'
+              : 'rgba(30, 41, 59, 0.5)',
             backdropFilter: 'blur(12px)',
             borderRadius: '8px',
-            border: '1px solid rgba(255, 255, 255, 0.6)',
+            border: theme.palette.mode === 'light'
+              ? '1px solid rgba(255, 255, 255, 0.6)'
+              : '1px solid rgba(255, 255, 255, 0.1)',
             p: 0.75,
             display: 'flex',
             alignItems: 'center',
             gap: 0.75,
             cursor: 'pointer',
-            boxShadow: '0 2px 8px rgba(0, 0, 0, 0.04)',
+            boxShadow: theme.palette.mode === 'light'
+              ? '0 2px 8px rgba(0, 0, 0, 0.04)'
+              : '0 2px 8px rgba(0, 0, 0, 0.2)',
             '&:hover': {
-              bgcolor: 'rgba(255, 255, 255, 0.8)',
-              border: '1px solid rgba(255, 255, 255, 0.8)',
+              bgcolor: theme.palette.mode === 'light'
+                ? 'rgba(255, 255, 255, 0.8)'
+                : 'rgba(30, 41, 59, 0.8)',
+              border: theme.palette.mode === 'light'
+                ? '1px solid rgba(255, 255, 255, 0.8)'
+                : '1px solid rgba(255, 255, 255, 0.15)',
               transform: 'translateY(-1px)',
-              boxShadow: '0 3px 10px rgba(0, 0, 0, 0.06)',
+              boxShadow: theme.palette.mode === 'light'
+                ? '0 3px 10px rgba(0, 0, 0, 0.06)'
+                : '0 3px 10px rgba(0, 0, 0, 0.3)',
             },
             transition: 'all 0.2s ease',
           }}
@@ -1041,11 +1125,15 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
             sx={{
               width: 28,
               height: 28,
-              bgcolor: 'linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%)',
-              color: '#1565C0',
+              bgcolor: theme.palette.mode === 'light'
+                ? 'linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%)'
+                : 'linear-gradient(135deg, #1E40AF 0%, #1E3A8A 100%)',
+              color: theme.palette.mode === 'light' ? '#1565C0' : '#60A5FA',
               fontWeight: 700,
               fontSize: '0.75rem',
-              boxShadow: '0 2px 6px rgba(187, 222, 251, 0.4)',
+              boxShadow: theme.palette.mode === 'light'
+                ? '0 2px 6px rgba(187, 222, 251, 0.4)'
+                : '0 2px 6px rgba(30, 64, 175, 0.4)',
             }}
           >
             {authUser?.fullName?.[0]?.toUpperCase() || 'U'}
@@ -1055,7 +1143,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
               variant="body2"
               sx={{
                 fontWeight: 600,
-                color: '#1E293B',
+                color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9',
                 fontSize: '0.75rem',
                 lineHeight: 1.2,
                 overflow: 'hidden',
@@ -1068,7 +1156,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
             <Typography
               variant="caption"
               sx={{
-                color: '#64748B',
+                color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8',
                 fontSize: '0.65rem',
                 display: 'block',
                 overflow: 'hidden',
@@ -1084,10 +1172,10 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
             sx={{
               width: 24,
               height: 24,
-              color: '#64748B',
+              color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8',
               '&:hover': {
-                bgcolor: 'rgba(0, 0, 0, 0.04)',
-                color: '#1E293B',
+                bgcolor: theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.1)',
+                color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9',
               },
             }}
           >
@@ -1105,32 +1193,38 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
               mt: 0.5,
               minWidth: 160,
               borderRadius: '8px',
-              border: '1px solid rgba(255, 255, 255, 0.8)',
-              boxShadow: '0 8px 24px rgba(0, 0, 0, 0.1)',
-              background: 'rgba(255, 255, 255, 0.95)',
+              border: theme.palette.mode === 'light'
+                ? '1px solid rgba(255, 255, 255, 0.8)'
+                : '1px solid rgba(255, 255, 255, 0.1)',
+              boxShadow: theme.palette.mode === 'light'
+                ? '0 8px 24px rgba(0, 0, 0, 0.1)'
+                : '0 8px 24px rgba(0, 0, 0, 0.4)',
+              background: theme.palette.mode === 'light'
+                ? 'rgba(255, 255, 255, 0.95)'
+                : 'rgba(30, 41, 59, 0.95)',
               backdropFilter: 'blur(16px)',
             },
           }}
         >
           <MenuItem onClick={handleUserMenuClose} sx={{ py: 0.5 }}>
             <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.75, width: '100%' }}>
-              <Avatar sx={{ width: 24, height: 24, bgcolor: 'linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%)', fontSize: '0.65rem', color: '#1565C0' }}>
+              <Avatar sx={{ width: 24, height: 24, bgcolor: theme.palette.mode === 'light' ? 'linear-gradient(135deg, #BBDEFB 0%, #90CAF9 100%)' : 'linear-gradient(135deg, #1E40AF 0%, #1E3A8A 100%)', fontSize: '0.65rem', color: theme.palette.mode === 'light' ? '#1565C0' : '#60A5FA' }}>
                 {authUser?.fullName?.[0]?.toUpperCase() || 'U'}
               </Avatar>
               <Box>
-                <Typography variant="body2" fontWeight={600} sx={{ color: '#1E293B', fontSize: '0.8rem' }}>
+                <Typography variant="body2" fontWeight={600} sx={{ color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9', fontSize: '0.8rem' }}>
                   {authUser?.fullName || 'Kullanıcı'}
                 </Typography>
-                <Typography variant="caption" sx={{ color: '#64748B', fontSize: '0.65rem' }}>
+                <Typography variant="caption" sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8', fontSize: '0.65rem' }}>
                   {authUser?.email || authUser?.role || 'Bilgi yok'}
                 </Typography>
               </Box>
             </Box>
           </MenuItem>
-          <Divider sx={{ my: 0.25, borderColor: 'rgba(0, 0, 0, 0.06)' }} />
-          <MenuItem onClick={handleUserMenuClose} sx={{ py: 0.5, '&:hover': { bgcolor: 'rgba(0, 0, 0, 0.04)' } }}>
-            <Settings sx={{ mr: 1, fontSize: 16, color: '#64748B' }} />
-            <Typography variant="body2" sx={{ color: '#1E293B', fontWeight: 600, fontSize: '0.8rem' }}>Ayarlar</Typography>
+          <Divider sx={{ my: 0.25, borderColor: theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.06)' : 'rgba(255, 255, 255, 0.08)' }} />
+          <MenuItem onClick={handleUserMenuClose} sx={{ py: 0.5, '&:hover': { bgcolor: theme.palette.mode === 'light' ? 'rgba(0, 0, 0, 0.04)' : 'rgba(255, 255, 255, 0.1)' } }}>
+            <Settings sx={{ mr: 1, fontSize: 16, color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8' }} />
+            <Typography variant="body2" sx={{ color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9', fontWeight: 600, fontSize: '0.8rem' }}>Ayarlar</Typography>
           </MenuItem>
           <MenuItem onClick={handleLogout} sx={{ py: 0.5, color: '#EF4444', '&:hover': { bgcolor: 'rgba(239, 68, 68, 0.08)' } }}>
             <Logout sx={{ mr: 1, fontSize: 16 }} />
