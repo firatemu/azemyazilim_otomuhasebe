@@ -85,3 +85,6 @@ pre-migration-backup.tar.gz
 legacy-archive.tar.gz
 /tmp/
 build.log
+
+# Infrastructure data (PostgreSQL etc)
+infra/data/
