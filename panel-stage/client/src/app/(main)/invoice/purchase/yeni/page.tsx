@@ -36,6 +36,7 @@ import {
   useTheme,
   Tabs,
   Tab,
+  Popover,
 } from '@mui/material';
 import {
   Delete, Save, ArrowBack, ToggleOn, ToggleOff, LocalShipping, Description,
@@ -82,6 +83,21 @@ const TEVKIFAT_KODLARI = [
   { kod: '612', ad: 'Turistik Mağazalar (5/10)', oran: 0.5 },
   { kod: '624', ad: 'Ticari Reklam Hizmetleri (3/10)', oran: 0.3 },
 ];
+
+// Number input spinner gizleme stili
+const numberInputSx = {
+  '& input[type=number]': {
+    MozAppearance: 'textfield',
+  },
+  '& input[type=number]::-webkit-outer-spin-button': {
+    WebkitAppearance: 'none',
+    margin: 0,
+  },
+  '& input[type=number]::-webkit-inner-spin-button': {
+    WebkitAppearance: 'none',
+    margin: 0,
+  },
+};
 
 interface FaturaKalemi {
   stokId: string;
@@ -213,6 +229,11 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
     }>;
   }>({ open: false, products: [] });
 
+  // Calculator state
+  const [calculatorAnchor, setCalculatorAnchor] = useState<HTMLElement | null>(null);
+  const [calculatorRowIndex, setCalculatorRowIndex] = useState<number | null>(null);
+  const [calculatorExpression, setCalculatorExpression] = useState('');
+
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down('md'));
 
@@ -227,30 +248,57 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
     }
   }, [isMounted, isEdit, irsaliyeId, kopyalaId]);
 
-  // Mobilecard component
+  // Mobilecard component - Kompakt ve mobil dostu
   const MobileItemCard = ({ kalem, index }: { kalem: FaturaKalemi, index: number }) => (
     <Paper
       variant="outlined"
       sx={{
-        p: 2,
-        mb: 2,
+        p: 1.5,
+        mb: 1.5,
         borderRadius: 'var(--radius-md)',
         border: '1px solid var(--border)',
         position: 'relative',
         bgcolor: 'var(--card)',
       }}
     >
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-        <Box sx={{ flex: 1 }}>
+      {/* Satır Toplamı - En üstte belirgin */}
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        mb: 1.5,
+        pb: 1,
+        borderBottom: '1px solid var(--border)',
+      }}>
+        <Typography variant="caption" color="var(--muted-foreground)">Satır Toplamı:</Typography>
+        <Typography variant="subtitle1" fontWeight="700" color="var(--primary)">
+          {formatCurrency(calculateKalemTutar(kalem))}
+        </Typography>
+      </Box>
+
+      {/* Checkbox ve Stok Seçimi */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
           <Autocomplete
             size="small"
             open={autocompleteOpenStates[index] || false}
             onOpen={() => setAutocompleteOpenStates(prev => ({ ...prev, [index]: true }))}
             onClose={() => setAutocompleteOpenStates(prev => ({ ...prev, [index]: false }))}
+            slotProps={{
+              popper: {
+                sx: {
+                  '& .MuiAutocomplete-paper': {
+                    minWidth: 'min(560px, 92vw)',
+                  },
+                  '& .MuiAutocomplete-listbox': {
+                    minWidth: 'min(560px, 92vw)',
+                  },
+                },
+              },
+            }}
             value={stoklar.find(s => s.id === kalem.stokId) || null}
             onChange={(_, newValue) => {
               handleKalemChange(index, 'stokId', newValue?.id || '');
-              setAutocompleteOpenStates(prev => ({ ...prev, [index]: false }));
             }}
             options={stoklar}
             getOptionLabel={(option) => `${option.stokKodu} - ${option.stokAdi}`}
@@ -264,54 +312,113 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
             isOptionEqualToValue={(option, value) => option.id === value.id}
           />
         </Box>
-        <Checkbox
-          checked={selectedRows.includes(index)}
-          onChange={() => handleToggleRow(index)}
-          size="small"
-          sx={{ ml: 1, mt: 0.5 }}
-        />
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexShrink: 0 }}>
+          <Checkbox
+            checked={selectedRows.includes(index)}
+            onChange={() => handleToggleRow(index)}
+            size="small"
+            sx={{ ml: 0.5, mt: 0.5 }}
+          />
+          <IconButton
+            size="small"
+            color="error"
+            onClick={() => handleRemoveKalem(index)}
+            sx={{ ml: 0.5 }}
+          >
+            <Delete fontSize="small" />
+          </IconButton>
+        </Box>
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+      {/* Miktar ve Birim Fiyat - Daha büyük touch target */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
         <TextField
           label="Miktar"
           type="number"
           size="small"
           value={kalem.miktar}
           onChange={(e) => handleKalemChange(index, 'miktar', e.target.value)}
-          inputProps={{ min: 1 }}
+          inputProps={{ min: 1, style: { height: 44 } }}
+          sx={numberInputSx}
         />
-        <TextField
-          label="Birim Fiyat"
-          type="number"
-          size="small"
-          value={kalem.birimFiyat}
-          onChange={(e) => handleKalemChange(index, 'birimFiyat', e.target.value)}
-          inputProps={{ min: 0, step: 0.01 }}
-        />
+        <Box sx={{ position: 'relative' }}>
+          <TextField
+            label="Birim Fiyat"
+            type="number"
+            size="small"
+            value={kalem.birimFiyat}
+            onChange={(e) => handleKalemChange(index, 'birimFiyat', e.target.value)}
+            onKeyDown={(e) => {
+              if (['+', '-', '*', '/'].includes(e.key)) {
+                e.preventDefault();
+                setCalculatorRowIndex(index);
+                setCalculatorExpression(kalem.birimFiyat?.toString() || '0');
+                setCalculatorAnchor(e.currentTarget);
+              }
+            }}
+            inputProps={{ min: 0, step: 0.01, style: { height: 44 } }}
+            sx={numberInputSx}
+          />
+          <IconButton
+            size="small"
+            onClick={(e) => {
+              setCalculatorRowIndex(index);
+              setCalculatorExpression(kalem.birimFiyat?.toString() || '0');
+              setCalculatorAnchor(e.currentTarget);
+            }}
+            sx={{
+              position: 'absolute',
+              right: 4,
+              top: 4,
+              width: 36,
+              height: 36,
+              bgcolor: 'var(--muted)',
+              '&:hover': { bgcolor: 'var(--primary)' }
+            }}
+          >
+            🧮
+          </IconButton>
+        </Box>
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+      {/* KDV ve Birim */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
         <TextField
           label="KDV %"
           type="number"
           size="small"
           value={kalem.kdvOrani}
           onChange={(e) => handleKalemChange(index, 'kdvOrani', e.target.value)}
+          inputProps={{ style: { height: 44 } }}
+          sx={numberInputSx}
         />
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-          <Typography variant="caption" color="text.secondary">Çoklu İskonto:</Typography>
-          <IconButton
-            size="small"
-            onClick={() => handleKalemChange(index, 'cokluIskonto', !kalem.cokluIskonto)}
-            sx={{ color: kalem.cokluIskonto ? 'var(--primary)' : 'var(--muted-foreground)' }}
+        <FormControl fullWidth size="small">
+          <InputLabel>Birim</InputLabel>
+          <Select
+            value={kalem.birim || ''}
+            onChange={(e) => handleKalemChange(index, 'birim', e.target.value)}
+            label="Birim"
+            className="form-control-select"
           >
-            {kalem.cokluIskonto ? <ToggleOn /> : <ToggleOff />}
-          </IconButton>
-        </Box>
+            <MenuItem value={kalem.birim || 'ADET'}>{kalem.birim || 'ADET'}</MenuItem>
+          </Select>
+        </FormControl>
       </Box>
 
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+      {/* Çoklu İskonto Toggle */}
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, p: 1, bgcolor: 'var(--muted)', borderRadius: 1 }}>
+        <Typography variant="caption" color="text.secondary">Çoklu İskonto</Typography>
+        <IconButton
+          size="small"
+          onClick={() => handleKalemChange(index, 'cokluIskonto', !kalem.cokluIskonto)}
+          sx={{ color: kalem.cokluIskonto ? 'var(--primary)' : 'var(--muted-foreground)' }}
+        >
+          {kalem.cokluIskonto ? <ToggleOn /> : <ToggleOff />}
+        </IconButton>
+      </Box>
+
+      {/* İskonto Alanları */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
         {kalem.cokluIskonto ? (
           <TextField
             label="İskonto Oranı (10+5)"
@@ -319,6 +426,7 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
             value={kalem.iskontoFormula || ''}
             onChange={(e) => /^[\d+]*$/.test(e.target.value) && handleKalemChange(index, 'iskontoFormula', e.target.value)}
             helperText={kalem.iskontoOran > 0 ? `Eff: %${kalem.iskontoOran.toFixed(2)}` : ''}
+            inputProps={{ style: { height: 44 } }}
           />
         ) : (
           <TextField
@@ -327,6 +435,8 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
             size="small"
             value={kalem.iskontoOran || ''}
             onChange={(e) => handleKalemChange(index, 'iskontoOran', e.target.value)}
+            inputProps={{ style: { height: 44 } }}
+            sx={numberInputSx}
           />
         )}
         <TextField
@@ -336,15 +446,21 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
           value={kalem.iskontoTutar || ''}
           onChange={(e) => handleKalemChange(index, 'iskontoTutar', e.target.value)}
           disabled={kalem.cokluIskonto}
+          inputProps={{ style: { height: 44 } }}
+          sx={numberInputSx}
         />
       </Box>
-      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+
+      {/* ÖTV ve Tevkifat - Purchase invoice için ek alanlar */}
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
         <TextField
           label="ÖTV %"
           type="number"
           size="small"
           value={kalem.otvOran || 0}
           onChange={(e) => handleKalemChange(index, 'otvOran', e.target.value)}
+          inputProps={{ style: { height: 44 } }}
+          sx={numberInputSx}
         />
         <FormControl fullWidth size="small">
           <InputLabel>Tevkifat</InputLabel>
@@ -362,20 +478,6 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
             ))}
           </Select>
         </FormControl>
-      </Box>
-
-      <Box sx={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        pt: 1.5,
-        borderTop: '1px dashed var(--border)',
-        mt: 1
-      }}>
-        <Typography variant="subtitle2" color="var(--muted-foreground)">Satır Toplamı:</Typography>
-        <Typography variant="subtitle1" fontWeight="700" color="var(--primary)">
-          {formatCurrency(calculateKalemTutar(kalem))}
-        </Typography>
       </Box>
     </Paper>
   );
@@ -1975,6 +2077,88 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
               )}
             </Box>
 
+            {/* Calculator Popover */}
+            <Popover
+              open={calculatorAnchor !== null}
+              anchorEl={calculatorAnchor}
+              onClose={() => {
+                setCalculatorAnchor(null);
+                setCalculatorRowIndex(null);
+                setCalculatorExpression('');
+              }}
+              anchorOrigin={{
+                vertical: 'bottom',
+                horizontal: 'left',
+              }}
+              transformOrigin={{
+                vertical: 'top',
+                horizontal: 'left',
+              }}
+            >
+              <Box sx={{ p: 2, width: 280 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>
+                  🧮 Hesap Makinesi
+                </Typography>
+                <TextField
+                  fullWidth
+                  size="small"
+                  value={calculatorExpression}
+                  onChange={(e) => setCalculatorExpression(e.target.value)}
+                  placeholder="Örn: 100+10 veya 100*0.9"
+                  sx={{ mb: 1 }}
+                  helperText="Toplama (+), Çıkarma (-), Çarpma (*), Bölme (/)"
+                />
+                <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>
+                  Sonuç: {
+                    calculatorExpression ? (() => {
+                      try {
+                        const result = new Function('return ' + calculatorExpression)();
+                        return typeof result === 'number' && !isNaN(result) ? result.toFixed(2) : 'Geçersiz';
+                      } catch {
+                        return 'Geçersiz';
+                      }
+                    })() : '...'
+                  }
+                </Typography>
+                <Box sx={{ display: 'flex', gap: 1 }}>
+                  <Button
+                    size="small"
+                    variant="outlined"
+                    onClick={() => {
+                      setCalculatorExpression('');
+                      setCalculatorAnchor(null);
+                    }}
+                    fullWidth
+                  >
+                    İptal
+                  </Button>
+                  <Button
+                    size="small"
+                    variant="contained"
+                    onClick={() => {
+                      if (calculatorRowIndex !== null) {
+                        try {
+                          const result = new Function('return ' + calculatorExpression)();
+                          if (typeof result === 'number' && !isNaN(result)) {
+                            handleKalemChange(calculatorRowIndex, 'birimFiyat', result);
+                            setCalculatorAnchor(null);
+                            setCalculatorRowIndex(null);
+                            setCalculatorExpression('');
+                          }
+                        } catch {
+                          // Invalid expression
+                        }
+                      }
+                    }}
+                    fullWidth
+                    disabled={!calculatorExpression || calculatorExpression === '0'}
+                  >
+                    Uygula
+                  </Button>
+                </Box>
+              </Box>
+            </Popover>
+
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
               <TextField
                 type="number"
@@ -2025,29 +2209,34 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
             </Box>
 
 
-            <Box>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                className="form-control-textfield"
-                label="Açıklama / Notlar"
-                value={formData.aciklama}
-                onChange={(e) => setFormData(prev => ({ ...prev, aciklama: e.target.value }))}
-              />
-            </Box>
+            {/* Açıklama ve Fatura Özeti - Yan Yana */}
+            <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 2 }}>
+              {/* Açıklama */}
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  className="form-control-textfield"
+                  label="Açıklama / Notlar"
+                  value={formData.aciklama}
+                  onChange={(e) => setFormData(prev => ({ ...prev, aciklama: e.target.value }))}
+                />
+              </Box>
 
-            <Paper
-              variant="outlined"
-              sx={{
-                p: isMobile ? 2 : 3,
-                bgcolor: 'var(--card)',
-                borderRadius: 'var(--radius)',
-                borderColor: 'var(--border)',
-                borderWidth: '1px',
-                boxShadow: 'var(--shadow-sm)',
-              }}
-            >
+              {/* Toplam Bilgileri */}
+              <Paper
+                variant="outlined"
+                sx={{
+                  flex: 1,
+                  p: isMobile ? 2 : 3,
+                  bgcolor: 'var(--card)',
+                  borderRadius: 'var(--radius)',
+                  borderColor: 'var(--border)',
+                  borderWidth: '1px',
+                  boxShadow: 'var(--shadow-sm)',
+                }}
+              >
               <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: isMobile ? 1 : 2 }}>
                 <Typography
                   variant="h6"
@@ -2136,6 +2325,7 @@ export function AlisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: 
                 </Box>
               </Box>
             </Paper>
+            </Box>
 
             <Box>
               <Box sx={{

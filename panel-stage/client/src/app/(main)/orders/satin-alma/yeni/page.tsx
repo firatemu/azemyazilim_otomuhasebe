@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, Suspense } from 'react';
 import {
   Box,
   Typography,
@@ -16,14 +16,38 @@ import {
   IconButton,
   Snackbar,
   Alert,
+  Select,
+  MenuItem,
+  FormControl,
+  InputLabel,
   Divider,
+  InputAdornment,
   Stack,
   Autocomplete,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  DialogContentText,
+  Chip,
+  CircularProgress,
+  Checkbox,
+  useMediaQuery,
+  useTheme,
+  Tabs,
+  Tab,
+  Popover,
 } from '@mui/material';
-import { Delete, Save, ArrowBack, ToggleOn, ToggleOff } from '@mui/icons-material';
+import {
+  Delete, Save, ArrowBack, ToggleOn, ToggleOff, LocalShipping, Description,
+  AccountBalanceWallet,
+  QrCodeScanner,
+  Add,
+} from '@mui/icons-material';
 import MainLayout from '@/components/Layout/MainLayout';
 import axios from '@/lib/axios';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
+import { useTabStore } from '@/stores/tabStore';
 
 interface Cari {
   id: string;
@@ -37,9 +61,44 @@ interface Stok {
   id: string;
   stokKodu: string;
   stokAdi: string;
+  birim: string;
+  satisFiyati: number;
   alisFiyati: number;
   kdvOrani: number;
+  barkod?: string;
+  miktar: number;
 }
+
+const TEVKIFAT_KODLARI = [
+  { kod: '601', ad: 'Yapım İşleri (2/10)', oran: 0.2 },
+  { kod: '602', ad: 'Etüt, Plan-Proje (9/10)', oran: 0.9 },
+  { kod: '603', ad: 'Makine Bakım Onarım (7/10)', oran: 0.7 },
+  { kod: '604', ad: 'Yemek Servis (5/10)', oran: 0.5 },
+  { kod: '605', ad: 'Danışmanlık (9/10)', oran: 0.9 },
+  { kod: '606', ad: 'Temizlik Hizmetleri (7/10)', oran: 0.7 },
+  { kod: '607', ad: 'Güvenlik Hizmetleri (7/10)', oran: 0.7 },
+  { kod: '608', ad: 'Taşımacılık Hizmetleri (2/10)', oran: 0.2 },
+  { kod: '609', ad: 'İşgücü Temini (9/10)', oran: 0.9 },
+  { kod: '610', ad: 'Yapı Denetim (9/10)', oran: 0.9 },
+  { kod: '611', ad: 'Fason Tekstil (5/10)', oran: 0.5 },
+  { kod: '612', ad: 'Turistik Mağazalar (5/10)', oran: 0.5 },
+  { kod: '624', ad: 'Ticari Reklam Hizmetleri (3/10)', oran: 0.3 },
+];
+
+// Number input spinner gizleme stili
+const numberInputSx = {
+  '& input[type=number]': {
+    MozAppearance: 'textfield',
+  },
+  '& input[type=number]::-webkit-outer-spin-button': {
+    WebkitAppearance: 'none',
+    margin: 0,
+  },
+  '& input[type=number]::-webkit-inner-spin-button': {
+    WebkitAppearance: 'none',
+    margin: 0,
+  },
+};
 
 interface SiparisKalemi {
   stokId: string;
@@ -51,53 +110,244 @@ interface SiparisKalemi {
   iskontoTutar: number;
   cokluIskonto?: boolean;
   iskontoFormula?: string;
+  tevkifatKodu?: string;
+  tevkifatOran?: number;
+  otvOran?: number;
+  kdvIstisnaNedeni?: string;
+  birim?: string;
+  isSpecialPrice?: boolean;
 }
 
-export default function YeniSatinAlmaSiparisiPage() {
+interface OdemePlaniItem {
+  vade: string;
+  tutar: number;
+  odemeTipi: string;
+  aciklama: string;
+  odendi: boolean;
+}
+
+interface TabPanelProps {
+  children?: React.ReactNode;
+  index: number;
+  value: number;
+}
+
+function TabPanel(props: TabPanelProps) {
+  const { children, value, index, ...other } = props;
+
+  return (
+    <div
+      role="tabpanel"
+      hidden={value !== index}
+      id={`siparis-tabpanel-${index}`}
+      aria-labelledby={`siparis-tab-${index}`}
+      {...other}
+    >
+      {value === index && (
+        <Box sx={{ pt: 2 }}>
+          {children}
+        </Box>
+      )}
+    </div>
+  );
+}
+
+type DurumType = 'BEKLEMEDE' | 'ONAYLANDI' | 'IPTAL';
+
+export function SatinAlmaSiparisForm({ siparisId: editSiparisId, onBack }: { siparisId?: string; onBack?: () => void }) {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  const isEdit = Boolean(editSiparisId);
+  const { addTab, removeTab, setActiveTab } = useTabStore();
+
+  const [isMounted, setIsMounted] = useState(false);
   const [cariler, setCariler] = useState<Cari[]>([]);
   const [stoklar, setStoklar] = useState<Stok[]>([]);
+  const [warehouses, setWarehouses] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingSiparis, setLoadingSiparis] = useState(isEdit);
+  const [saving, setSaving] = useState(false);
 
   const [formData, setFormData] = useState({
     siparisNo: '',
+    siparisTipi: 'SATIN_ALMA' as 'SATIS' | 'SATIN_ALMA',
     cariId: '',
+    warehouseId: '',
     tarih: new Date().toISOString().split('T')[0],
     vade: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-    durum: 'BEKLEMEDE' as 'BEKLEMEDE',
+    durum: 'BEKLEMEDE' as DurumType,
     genelIskontoOran: 0,
     genelIskontoTutar: 0,
     aciklama: '',
     kalemler: [] as SiparisKalemi[],
+    // e-Dönüşüm alanları
+    eScenario: 'SATIN_ALMA' as string,
+    eInvoiceType: 'SATIN_ALMA' as string,
+    gibAlias: '',
+    gonderimSekli: 'ELEKTRONIK' as string,
+    odemePlani: [] as OdemePlaniItem[],
   });
 
+  const [tabValue, setTabValue] = useState(0);
+
   const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
+  const [autocompleteOpenStates, setAutocompleteOpenStates] = useState<Record<number, boolean>>({});
+  const [warehousesFetched, setWarehousesFetched] = useState(false);
+  const [openOdemePlaniDialog, setOpenOdemePlaniDialog] = useState(false);
+  const [taksitSayisi, setTaksitSayisi] = useState(1);
+  const [barcode, setBarcode] = useState('');
+  const [selectedRows, setSelectedRows] = useState<number[]>([]);
+
+  // Calculator state
+  const [calculatorAnchor, setCalculatorAnchor] = useState<HTMLElement | null>(null);
+  const [calculatorRowIndex, setCalculatorRowIndex] = useState<number | null>(null);
+  const [calculatorExpression, setCalculatorExpression] = useState('');
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('md'));
+
+  useEffect(() => {
+    setIsMounted(true);
+    if (!isEdit) {
+      addTab({
+        id: 'order-purchase-yeni',
+        label: 'Yeni Satın Alma Siparişi',
+        path: '/orders/satin-alma/yeni'
+      });
+      setActiveTab('order-purchase-yeni');
+    }
+  }, []);
 
   useEffect(() => {
     fetchCariler();
     fetchStoklar();
+    fetchWarehouses();
+
+    if (isEdit && editSiparisId) {
+      fetchSiparis();
+      return;
+    }
+
     generateSiparisNo();
-  }, []);
+  }, [editSiparisId, isEdit]);
 
   const fetchCariler = async () => {
     try {
       const response = await axios.get('/account', {
         params: { limit: 1000 },
       });
-      setCariler(response.data.data || []);
+      console.log('Cari response:', response.data);
+      const mappedCariler = (response.data.data || []).map((c: any) => ({
+        ...c,
+        cariKodu: c.code,
+        unvan: c.title,
+        vadeSuresi: c.dueDays || c.paymentTermDays || 0,
+      }));
+      setCariler(mappedCariler);
     } catch (error) {
       console.error('Cariler yüklenirken hata:', error);
+    }
+  };
+
+  const fetchWarehouses = async () => {
+    try {
+      const response = await axios.get('/warehouses?active=true');
+      const warehouseList = response.data || [];
+      setWarehouses(warehouseList);
+      setWarehousesFetched(true);
+
+      if (warehouseList.length === 0) {
+        showSnackbar('Sistemde tanımlı ambar bulunamadı! Lütfen önce bir ambar tanımlayın.', 'error');
+        return;
+      }
+
+      if (isEdit) return;
+
+      const defaultWarehouse = warehouseList.find((w: any) => w.isDefault);
+      if (defaultWarehouse && !formData.warehouseId) {
+        setFormData(prev => ({ ...prev, warehouseId: defaultWarehouse.id }));
+      } else if (warehouseList.length === 1 && !formData.warehouseId) {
+        setFormData(prev => ({ ...prev, warehouseId: warehouseList[0].id }));
+      }
+    } catch (error) {
+      console.error('Ambar listesi alınamadı:', error);
+      setWarehousesFetched(true);
+      showSnackbar('Ambar listesi alınamadı', 'error');
     }
   };
 
   const fetchStoklar = async () => {
     try {
       const response = await axios.get('/products', {
-        params: { limit: 1000 },
+        params: { limit: 2000 },
       });
-      setStoklar(response.data.data || []);
+      const mappedStoklar = (response.data.data || []).map((s: any) => ({
+        ...s,
+        stokKodu: s.code,
+        stokAdi: s.name,
+        barkod: s.barcode,
+        miktar: s.quantity ?? 0,
+        kdvOrani: s.vatRate || 20,
+        birim: s.unit || 'ADET',
+      }));
+      setStoklar(mappedStoklar);
     } catch (error) {
       console.error('Stoklar yüklenirken hata:', error);
+    }
+  };
+
+  const fetchSiparis = async () => {
+    if (!editSiparisId) return;
+    try {
+      setLoadingSiparis(true);
+      const response = await axios.get(`/purchase-orders/${editSiparisId}`);
+      const siparis = response.data;
+      const durumValue = (siparis.durum || 'BEKLEMEDE') as DurumType;
+
+      const safeDateToISO = (dateValue: any, fallbackDate: string): string => {
+        if (!dateValue) return fallbackDate || new Date().toISOString().split('T')[0];
+        const date = new Date(dateValue);
+        return isNaN(date.getTime()) ? fallbackDate || new Date().toISOString().split('T')[0] : date.toISOString().split('T')[0];
+      };
+
+      setFormData(prev => ({
+        ...prev,
+        siparisNo: siparis.siparisNo,
+        siparisTipi: siparis.siparisTipi,
+        cariId: siparis.cariId,
+        warehouseId: String(siparis.warehouseId || ''),
+        tarih: safeDateToISO(siparis.tarih, prev.tarih),
+        vade: siparis.vade ? safeDateToISO(siparis.vade, prev.tarih) : '',
+        durum: durumValue,
+        genelIskontoOran: 0,
+        genelIskontoTutar: Number(siparis.iskonto) || 0,
+        aciklama: siparis.aciklama || '',
+        kalemler: (siparis.kalemler || []).map((k: any) => ({
+          stokId: k.stokId,
+          stok: k.stok ? {
+            id: k.stok.id,
+            stokKodu: k.stok.stokKodu,
+            stokAdi: k.stok.stokAdi,
+            satisFiyati: Number(k.stok.satisFiyati) || 0,
+            kdvOrani: Number(k.stok.kdvOrani),
+            birim: k.stok.birim || 'ADET',
+            alisFiyati: Number(k.stok.alisFiyati) || 0,
+          } : undefined,
+          miktar: Number(k.miktar) || 1,
+          birimFiyat: Number(k.birimFiyat) || 0,
+          kdvOrani: Number(k.kdvOrani) || 0,
+          iskontoOran: Number(k.iskontoOrani) || 0,
+          iskontoTutar: Number(k.iskontoTutari) || 0,
+          cokluIskonto: Boolean(k.cokluIskonto),
+          iskontoFormula: k.iskontoFormula || '',
+          birim: k.birim || '',
+        })),
+      }));
+    } catch (error: any) {
+      showSnackbar(error.response?.data?.message || 'Sipariş yüklenirken hata oluştu', 'error');
+      onBack?.();
+    } finally {
+      setLoadingSiparis(false);
     }
   };
 
@@ -116,7 +366,6 @@ export default function YeniSatinAlmaSiparisiPage() {
       }));
     } catch (error) {
       console.error('Sipariş numarası oluşturulurken hata:', error);
-      // Hata durumunda varsayılan numara
       setFormData(prev => ({
         ...prev,
         siparisNo: `SAS-${new Date().getFullYear()}-001`,
@@ -129,7 +378,6 @@ export default function YeniSatinAlmaSiparisiPage() {
   };
 
   const calculateMultiDiscount = (baseAmount: number, formula: string): { finalAmount: number; totalDiscount: number; effectiveRate: number } => {
-    // Formula: "10+5" veya "10+5+3"
     const discounts = formula.split('+').map(d => parseFloat(d.trim())).filter(d => !isNaN(d) && d > 0);
 
     if (discounts.length === 0) {
@@ -162,6 +410,7 @@ export default function YeniSatinAlmaSiparisiPage() {
         iskontoTutar: 0,
         cokluIskonto: false,
         iskontoFormula: '',
+        birim: 'ADET',
       }],
     }));
   };
@@ -182,8 +431,9 @@ export default function YeniSatinAlmaSiparisiPage() {
         const stok = stoklar.find(s => s.id === value);
         if (stok) {
           kalem.stokId = value;
-          kalem.birimFiyat = stok.alisFiyati;
+          kalem.birimFiyat = stok.alisFiyati || stok.satisFiyati;
           kalem.kdvOrani = stok.kdvOrani;
+          kalem.birim = stok.birim || 'ADET';
         }
       } else if (field === 'cokluIskonto') {
         kalem.cokluIskonto = value;
@@ -284,6 +534,84 @@ export default function YeniSatinAlmaSiparisiPage() {
     setFormData(prev => ({ ...prev, genelIskontoOran: oran, genelIskontoTutar: tutar }));
   };
 
+  const handleTaksitHesapla = () => {
+    const toplam = totals.genelToplam;
+    if (toplam <= 0 || taksitSayisi <= 0) return;
+
+    const taksitTutari = Math.floor((toplam / taksitSayisi) * 100) / 100;
+    const fark = Math.round((toplam - (taksitTutari * taksitSayisi)) * 100) / 100;
+
+    const yeniPlan: OdemePlaniItem[] = [];
+    let currentVade = new Date(formData.tarih);
+
+    for (let i = 0; i < taksitSayisi; i++) {
+      currentVade = new Date(currentVade);
+      currentVade.setMonth(currentVade.getMonth() + 1);
+
+      yeniPlan.push({
+        vade: currentVade.toISOString().split('T')[0],
+        tutar: i === taksitSayisi - 1 ? taksitTutari + fark : taksitTutari,
+        odemeTipi: 'HAVALE',
+        aciklama: `${i + 1}. Taksit`,
+        odendi: false,
+      });
+    }
+
+    setFormData(prev => ({ ...prev, odemePlani: yeniPlan }));
+  };
+
+  const handleBarcodeSubmit = (barkod: string) => {
+    if (!barkod) return;
+    const stok = stoklar.find(s => (s.barkod || '') === barkod.trim());
+    if (stok) {
+      const existingIndex = formData.kalemler.findIndex(k => k.stokId === stok.id);
+      if (existingIndex > -1) {
+        const newKalemler = [...formData.kalemler];
+        newKalemler[existingIndex].miktar += 1;
+        setFormData(prev => ({ ...prev, kalemler: newKalemler }));
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          kalemler: [...prev.kalemler, {
+            stokId: stok.id,
+            stok: stok,
+            miktar: 1,
+            birimFiyat: Number(stok.alisFiyati) || 0,
+            kdvOrani: stok.kdvOrani || 20,
+            iskontoOran: 0,
+            iskontoTutar: 0,
+            birim: stok.birim || 'ADET',
+          }]
+        }));
+      }
+      setBarcode('');
+      showSnackbar(`${stok.stokAdi} eklendi`, 'success');
+    } else {
+      showSnackbar('Barkod bulunamadı', 'error');
+    }
+  };
+
+  const handleToggleRow = (index: number) => {
+    setSelectedRows(prev =>
+      prev.includes(index) ? prev.filter(i => i !== index) : [...prev, index]
+    );
+  };
+
+  const handleToggleAll = () => {
+    if (selectedRows.length === formData.kalemler.length) {
+      setSelectedRows([]);
+    } else {
+      setSelectedRows(formData.kalemler.map((_, i) => i));
+    }
+  };
+
+  const handleBulkDelete = () => {
+    const newKalemler = formData.kalemler.filter((_, i) => !selectedRows.includes(i));
+    setFormData(prev => ({ ...prev, kalemler: newKalemler }));
+    setSelectedRows([]);
+    showSnackbar('Seçilen kalemler silindi', 'info');
+  };
+
   const handleSave = async () => {
     try {
       if (!formData.cariId) {
@@ -291,50 +619,61 @@ export default function YeniSatinAlmaSiparisiPage() {
         return;
       }
 
-      if (formData.kalemler.length === 0) {
+      const validKalemler = formData.kalemler.filter(k => k.stokId && k.stokId.trim() !== '');
+
+      if (validKalemler.length === 0) {
         showSnackbar('En az bir kalem eklemelisiniz', 'error');
         return;
+      }
+
+      const removedCount = formData.kalemler.length - validKalemler.length;
+      if (removedCount > 0) {
+        showSnackbar(`${removedCount} adet boş satır otomatik olarak kaldırıldı`, 'info');
       }
 
       setLoading(true);
       const response = await axios.post('/purchase-orders', {
         siparisNo: formData.siparisNo,
+        siparisTipi: formData.siparisTipi,
         cariId: formData.cariId,
+        warehouseId: formData.warehouseId || null,
         tarih: new Date(formData.tarih).toISOString(),
         vade: formData.vade ? new Date(formData.vade).toISOString() : null,
         iskonto: Number(formData.genelIskontoTutar) || 0,
         aciklama: formData.aciklama || null,
         durum: formData.durum,
-        kalemler: formData.kalemler.map(k => ({
+        kalemler: validKalemler.map(k => ({
           stokId: k.stokId,
           miktar: Number(k.miktar),
           birimFiyat: Number(k.birimFiyat),
           kdvOrani: Number(k.kdvOrani),
           iskontoOrani: Number(k.iskontoOran) || 0,
           iskontoTutari: Number(k.iskontoTutar) || 0,
+          birim: k.birim || null,
         })),
       });
 
       showSnackbar('Satın alma siparişi başarıyla oluşturuldu', 'success');
 
-      // Sipariş ID'sini al
       const siparisId = response.data?.id || response.data?.data?.id;
       if (siparisId) {
         setTimeout(() => {
+          removeTab('order-purchase-yeni');
           router.push(`/orders/satin-alma/detay/${siparisId}`);
         }, 1500);
       } else {
         setTimeout(() => {
+          removeTab('order-purchase-yeni');
           router.push('/orders/satin-alma');
         }, 1500);
       }
     } catch (error: any) {
       console.error('Satın alma sipariş kaydetme hatası:', error);
-      console.error('Hata detayı:', error.response?.data);
       const errorMessage = error.response?.data?.message || error.message || 'İşlem sırasında hata oluştu';
       showSnackbar(errorMessage, 'error');
     } finally {
       setLoading(false);
+      setSaving(false);
     }
   };
 
@@ -347,448 +686,327 @@ export default function YeniSatinAlmaSiparisiPage() {
 
   const totals = calculateTotals();
 
+  // MobileItemCard component
+  const MobileItemCard = ({ kalem, index }: { kalem: SiparisKalemi, index: number }) => (
+    <Paper
+      variant="outlined"
+      sx={{
+        p: 1.5,
+        mb: 1.5,
+        borderRadius: 'var(--radius-md)',
+        border: '1px solid var(--border)',
+        position: 'relative',
+        bgcolor: 'var(--card)',
+      }}
+    >
+      <Box sx={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        mb: 1.5,
+        pb: 1,
+        borderBottom: '1px solid var(--border)',
+      }}>
+        <Typography variant="caption" color="var(--muted-foreground)">Satır Toplamı:</Typography>
+        <Typography variant="subtitle1" fontWeight="700" color="var(--primary)">
+          {formatCurrency(calculateKalemTutar(kalem))}
+        </Typography>
+      </Box>
+
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
+        <Box sx={{ flex: 1, minWidth: 0 }}>
+          <Autocomplete
+            size="small"
+            open={autocompleteOpenStates[index] || false}
+            onOpen={() => setAutocompleteOpenStates(prev => ({ ...prev, [index]: true }))}
+            onClose={() => setAutocompleteOpenStates(prev => ({ ...prev, [index]: false }))}
+            slotProps={{
+              popper: {
+                sx: {
+                  '& .MuiAutocomplete-paper': { minWidth: 'min(560px, 92vw)' },
+                  '& .MuiAutocomplete-listbox': { minWidth: 'min(560px, 92vw)' },
+                },
+              },
+            }}
+            value={stoklar.find(s => s.id === kalem.stokId) || null}
+            onChange={(_, newValue) => { handleKalemChange(index, 'stokId', newValue?.id || ''); }}
+            options={stoklar}
+            getOptionLabel={(option) => `${option.stokKodu} - ${option.stokAdi}`}
+            renderInput={(params) => <TextField {...params} label="Stok / Hizmet" placeholder="Kod veya ad ile ara" />}
+            isOptionEqualToValue={(option, value) => option.id === value.id}
+          />
+        </Box>
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5, flexShrink: 0 }}>
+          <Checkbox checked={selectedRows.includes(index)} onChange={() => handleToggleRow(index)} size="small" sx={{ ml: 0.5, mt: 0.5 }} />
+          <IconButton size="small" color="error" onClick={() => handleRemoveKalem(index)} sx={{ ml: 0.5 }}>
+            <Delete fontSize="small" />
+          </IconButton>
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
+        <TextField label="Miktar" type="number" size="small" value={kalem.miktar} onChange={(e) => handleKalemChange(index, 'miktar', e.target.value)} inputProps={{ min: 1, style: { height: 44 } }} sx={numberInputSx} />
+        <Box sx={{ position: 'relative' }}>
+          <TextField label="Birim Fiyat" type="number" size="small" value={kalem.birimFiyat} onChange={(e) => handleKalemChange(index, 'birimFiyat', e.target.value)} onKeyDown={(e) => { if (['+', '-', '*', '/'].includes(e.key)) { e.preventDefault(); setCalculatorRowIndex(index); setCalculatorExpression(kalem.birimFiyat?.toString() || '0'); setCalculatorAnchor(e.currentTarget); } }} inputProps={{ min: 0, step: 0.01, style: { height: 44 } }} sx={numberInputSx} />
+          <IconButton size="small" onClick={(e) => { setCalculatorRowIndex(index); setCalculatorExpression(kalem.birimFiyat?.toString() || '0'); setCalculatorAnchor(e.currentTarget); }} sx={{ position: 'absolute', right: 4, top: 4, width: 36, height: 36, bgcolor: 'var(--muted)', '&:hover': { bgcolor: 'var(--primary)' } }}>🧮</IconButton>
+        </Box>
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
+        <TextField label="KDV %" type="number" size="small" value={kalem.kdvOrani} onChange={(e) => handleKalemChange(index, 'kdvOrani', e.target.value)} inputProps={{ style: { height: 44 } }} sx={numberInputSx} />
+        <FormControl fullWidth size="small">
+          <InputLabel>Birim</InputLabel>
+          <Select value={kalem.birim || ''} onChange={(e) => handleKalemChange(index, 'birim', e.target.value)} label="Birim" className="form-control-select">
+            <MenuItem value={kalem.birim || 'ADET'}>{kalem.birim || 'ADET'}</MenuItem>
+          </Select>
+        </FormControl>
+      </Box>
+
+      <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, p: 1, bgcolor: 'var(--muted)', borderRadius: 1 }}>
+        <Typography variant="caption" color="text.secondary">Çoklu İskonto</Typography>
+        <IconButton size="small" onClick={() => handleKalemChange(index, 'cokluIskonto', !kalem.cokluIskonto)} sx={{ color: kalem.cokluIskonto ? 'var(--primary)' : 'var(--muted-foreground)' }}>
+          {kalem.cokluIskonto ? <ToggleOn /> : <ToggleOff />}
+        </IconButton>
+      </Box>
+
+      <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
+        {kalem.cokluIskonto ? (
+          <TextField label="İskonto Oranı (10+5)" size="small" value={kalem.iskontoFormula || ''} onChange={(e) => /^[\d+]*$/.test(e.target.value) && handleKalemChange(index, 'iskontoFormula', e.target.value)} helperText={kalem.iskontoOran > 0 ? `Eff: %${kalem.iskontoOran.toFixed(2)}` : ''} inputProps={{ style: { height: 44 } }} />
+        ) : (
+          <TextField label="İskonto Oranı %" type="number" size="small" value={kalem.iskontoOran || ''} onChange={(e) => handleKalemChange(index, 'iskontoOran', e.target.value)} inputProps={{ style: { height: 44 } }} sx={numberInputSx} />
+        )}
+        <TextField label="İskonto Tutarı" type="number" size="small" value={kalem.iskontoTutar || ''} onChange={(e) => handleKalemChange(index, 'iskontoTutar', e.target.value)} disabled={kalem.cokluIskonto} inputProps={{ style: { height: 44 } }} sx={numberInputSx} />
+      </Box>
+    </Paper>
+  );
+
+  if (isEdit && loadingSiparis) {
+    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress size={48} /><Typography variant="body1" sx={{ ml: 2 }}>Sipariş yükleniyor...</Typography></Box>;
+  }
+
+  if (!isMounted) {
+    return <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}><CircularProgress size={48} /><Typography variant="body1" sx={{ ml: 2 }}>Yükleniyor...</Typography></Box>;
+  }
+
   return (
     <MainLayout>
-      <Box sx={{ mb: 3 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 2 }}>
-          <IconButton
-            onClick={() => router.push('/orders/satin-alma')}
-            sx={{
-              bgcolor: '#f3f4f6',
-              '&:hover': { bgcolor: '#e5e7eb' }
-            }}
-          >
-            <ArrowBack />
-          </IconButton>
+      <Box sx={{ mb: isMobile ? 2 : 3 }}>
+        <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', alignItems: isMobile ? 'flex-start' : 'center', gap: 2, mb: 2 }}>
           <Box>
-            <Typography variant="h4" fontWeight="bold" sx={{
-              background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
-              WebkitBackgroundClip: 'text',
-              WebkitTextFillColor: 'transparent',
-            }}>
-              Yeni Satın Alma Siparişi
+            <Typography variant={isMobile ? "h5" : "h4"} fontWeight="800" sx={{ color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
+              {isEdit ? 'Satın Alma Siparişi Düzenle' : 'Yeni Satın Alma Siparişi'}
             </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Satın alma siparişi oluşturun
+            <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
+              {isEdit ? formData.siparisNo : 'Satın alma siparişi oluşturun'}
             </Typography>
           </Box>
         </Box>
       </Box>
 
-      <Paper sx={{ p: 3, borderRadius: 2 }}>
+      <Paper sx={{ p: 3, borderRadius: 'var(--radius)', boxShadow: 'var(--shadow-sm)', bgcolor: 'var(--card)' }}>
         <Stack spacing={3}>
-          {/* Sipariş Bilgileri */}
-          <Box>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-              Sipariş Bilgileri
-            </Typography>
-            <Divider sx={{ mb: 2 }} />
+          <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
+            <Tabs value={tabValue} onChange={(_, newValue) => setTabValue(newValue)} sx={{ '& .MuiTab-root': { textTransform: 'none', fontWeight: 600, fontSize: '1rem' } }}>
+              <Tab label="Genel Bilgiler" />
+              <Tab label="e-Dönüşüm Ayarları" />
+            </Tabs>
           </Box>
 
-          <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
-            <TextField
-              sx={{ flex: '1 1 200px' }}
-              label="Sipariş No"
-              value={formData.siparisNo}
-              onChange={(e) => setFormData(prev => ({ ...prev, siparisNo: e.target.value }))}
-              required
-            />
-            <TextField
-              sx={{ flex: '1 1 200px' }}
-              type="date"
-              label="Tarih"
-              value={formData.tarih}
-              onChange={(e) => setFormData(prev => ({ ...prev, tarih: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-              required
-            />
-            <TextField
-              sx={{ flex: '1 1 200px' }}
-              type="date"
-              label="Vade"
-              value={formData.vade}
-              onChange={(e) => setFormData(prev => ({ ...prev, vade: e.target.value }))}
-              InputLabelProps={{ shrink: true }}
-            />
-          </Box>
-
-          <Box>
-            <Autocomplete
-              fullWidth
-              value={cariler.find(c => c.id === formData.cariId) || null}
-              onChange={(_, newValue) => {
-                setFormData(prev => {
-                  const updated = { ...prev, cariId: newValue?.id || '' };
-
-                  if (newValue?.vadeSuresi && newValue.vadeSuresi > 0) {
-                    const siparisDate = new Date(prev.tarih);
-                    const vadeDate = new Date(siparisDate);
-                    vadeDate.setDate(vadeDate.getDate() + newValue.vadeSuresi);
-                    updated.vade = vadeDate.toISOString().split('T')[0];
-                  }
-
-                  return updated;
-                });
-              }}
-              options={cariler}
-              getOptionLabel={(option) => `${option.cariKodu} - ${option.unvan}`}
-              renderOption={(props, option) => {
-                const { key, ...otherProps } = props;
-                return (
-                  <Box component="li" key={key} {...otherProps}>
-                    <Box>
-                      <Typography variant="body1" fontWeight="600">
-                        {option.unvan}
-                      </Typography>
-                      <Typography variant="caption" color="text.secondary">
-                        {option.cariKodu} - {option.tip === 'MUSTERI' ? 'Müşteri' : option.tip === 'TEDARIKCI' ? 'Tedarikçi' : 'Her İkisi'}
-                      </Typography>
-                    </Box>
-                  </Box>
-                );
-              }}
-              renderInput={(params) => (
-                <TextField
-                  {...params}
-                  label="Cari Seçiniz"
-                  placeholder="Cari kodu veya ünvanı ile ara..."
-                  required
-                />
-              )}
-              noOptionsText="Cari bulunamadı"
-              isOptionEqualToValue={(option, value) => option.id === value.id}
-            />
-          </Box>
-
-          {/* Kalemler */}
-          <Box>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6" fontWeight="bold">Sipariş Kalemleri</Typography>
-              <Button
-                variant="contained"
-                onClick={handleAddKalem}
-                sx={{
-                  background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
-                }}
-              >
-                + Yeni Kalem Ekle
-              </Button>
+          <TabPanel value={tabValue} index={0}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2 }}>
+              <TextField className="form-control-textfield" label="Sipariş No" value={formData.siparisNo} onChange={(e) => setFormData(prev => ({ ...prev, siparisNo: e.target.value }))} required fullWidth />
+              <TextField className="form-control-textfield" type="date" label="Tarih" value={formData.tarih} onChange={(e) => setFormData(prev => ({ ...prev, tarih: e.target.value }))} InputLabelProps={{ shrink: true }} required fullWidth />
+              <TextField className="form-control-textfield" type="date" label="Vade" value={formData.vade} onChange={(e) => setFormData(prev => ({ ...prev, vade: e.target.value }))} InputLabelProps={{ shrink: true }} fullWidth />
+              <FormControl className="form-control-select" required fullWidth>
+                <InputLabel>Ambar</InputLabel>
+                <Select value={formData.warehouseId} onChange={(e) => setFormData(prev => ({ ...prev, warehouseId: e.target.value }))} label="Ambar">
+                  {warehouses.map((warehouse) => <MenuItem key={warehouse.id} value={warehouse.id}>{warehouse.name}</MenuItem>)}
+                </Select>
+              </FormControl>
             </Box>
-            <Divider sx={{ mb: 2 }} />
 
-            <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400 }}>
-              <Table stickyHeader size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell width="25%" sx={{ fontWeight: 600 }}>Stok</TableCell>
-                    <TableCell width="8%" sx={{ fontWeight: 600 }}>Miktar</TableCell>
-                    <TableCell width="10%" sx={{ fontWeight: 600 }}>Birim Fiyat</TableCell>
-                    <TableCell width="8%" sx={{ fontWeight: 600 }}>KDV %</TableCell>
-                    <TableCell width="3%" sx={{ fontWeight: 600 }} title="Çoklu İskonto">Ç.İ.</TableCell>
-                    <TableCell width="10%" sx={{ fontWeight: 600 }}>İsk. Oran %</TableCell>
-                    <TableCell width="12%" sx={{ fontWeight: 600 }}>İsk. Tutar</TableCell>
-                    <TableCell width="12%" align="right" sx={{ fontWeight: 600 }}>Toplam</TableCell>
-                    <TableCell width="5%" align="center" sx={{ fontWeight: 600 }}>Sil</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {formData.kalemler.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={9} align="center" sx={{ py: 4 }}>
-                        <Typography variant="body2" color="text.secondary">
-                          Henüz kalem eklenmedi. Yukarıdaki butonu kullanarak kalem ekleyin.
-                        </Typography>
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    formData.kalemler.map((kalem, index) => (
-                      <TableRow key={index}>
-                        <TableCell>
-                          <Autocomplete
-                            size="small"
-                            value={stoklar.find(s => s.id === kalem.stokId) || null}
-                            onChange={(_, newValue) => {
-                              handleKalemChange(index, 'stokId', newValue?.id || '');
-                            }}
-                            options={stoklar}
-                            getOptionLabel={(option) => `${option.stokKodu} - ${option.stokAdi}`}
-                            renderOption={(props, option) => {
-                              const { key, ...otherProps } = props;
-                              return (
-                                <Box component="li" key={key} {...otherProps}>
-                                  <Box>
-                                    <Typography variant="body2" fontWeight="600">
-                                      {option.stokAdi}
-                                    </Typography>
-                                    <Typography variant="caption" color="text.secondary">
-                                      {option.stokKodu}
-                                    </Typography>
-                                  </Box>
-                                </Box>
-                              );
-                            }}
-                            renderInput={(params) => (
-                              <TextField
-                                {...params}
-                                placeholder="Stok kodu veya adı ile ara..."
-                              />
-                            )}
-                            noOptionsText="Stok bulunamadı"
-                            isOptionEqualToValue={(option, value) => option.id === value.id}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            size="small"
-                            value={kalem.miktar}
-                            onChange={(e) => handleKalemChange(index, 'miktar', e.target.value)}
-                            inputProps={{ min: 1, step: 1 }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            size="small"
-                            value={kalem.birimFiyat}
-                            onChange={(e) => handleKalemChange(index, 'birimFiyat', e.target.value)}
-                            inputProps={{ min: 0, step: 0.01 }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            size="small"
-                            value={kalem.kdvOrani}
-                            onChange={(e) => handleKalemChange(index, 'kdvOrani', e.target.value)}
-                            inputProps={{ min: 0, max: 100 }}
-                          />
-                        </TableCell>
-                        <TableCell align="center">
-                          <IconButton
-                            size="small"
-                            onClick={() => handleKalemChange(index, 'cokluIskonto', !kalem.cokluIskonto)}
-                            title={kalem.cokluIskonto ? 'Çoklu İskonto: Açık (10+5 formatı)' : 'Çoklu İskonto: Kapalı (Tek oran)'}
-                            sx={{
-                              color: kalem.cokluIskonto ? '#10b981' : '#9ca3af',
-                              '&:hover': {
-                                bgcolor: kalem.cokluIskonto ? '#ecfdf5' : '#f3f4f6',
-                              }
-                            }}
-                          >
-                            {kalem.cokluIskonto ? <ToggleOn fontSize="small" /> : <ToggleOff fontSize="small" />}
-                          </IconButton>
-                        </TableCell>
-                        <TableCell>
-                          {kalem.cokluIskonto ? (
-                            <TextField
-                              fullWidth
-                              size="small"
-                              value={kalem.iskontoFormula || ''}
-                              onChange={(e) => {
-                                const value = e.target.value;
-                                if (/^[\d+]*$/.test(value)) {
-                                  handleKalemChange(index, 'iskontoFormula', value);
-                                }
-                              }}
-                              placeholder="10+5"
-                              helperText={kalem.iskontoOran > 0 ? `Efektif: %${kalem.iskontoOran.toFixed(2)}` : ''}
-                              sx={{
-                                '& .MuiInputBase-input': {
-                                  fontFamily: 'monospace',
-                                  fontWeight: 600,
-                                  color: '#10b981',
-                                },
-                                '& .MuiFormHelperText-root': {
-                                  fontSize: '0.65rem',
-                                  mt: 0.5,
-                                }
-                              }}
-                            />
-                          ) : (
-                            <TextField
-                              fullWidth
-                              type="number"
-                              size="small"
-                              value={kalem.iskontoOran || ''}
-                              onChange={(e) => handleKalemChange(index, 'iskontoOran', e.target.value)}
-                              inputProps={{
-                                min: 0,
-                                max: 100,
-                                step: 0.01,
-                              }}
-                            />
-                          )}
-                        </TableCell>
-                        <TableCell>
-                          <TextField
-                            fullWidth
-                            type="number"
-                            size="small"
-                            value={kalem.iskontoTutar || ''}
-                            onChange={(e) => handleKalemChange(index, 'iskontoTutar', e.target.value)}
-                            disabled={kalem.cokluIskonto}
-                            inputProps={{
-                              min: 0,
-                              step: 0.01,
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" fontWeight="bold" color="primary">
-                            {formatCurrency(calculateKalemTutar(kalem))}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="center">
-                          <IconButton
-                            size="small"
-                            color="error"
-                            onClick={() => handleRemoveKalem(index)}
-                          >
-                            <Delete fontSize="small" />
-                          </IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Box>
-
-          {/* Genel İskonto */}
-          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
-            <TextField
-              type="number"
-              label="Genel İskonto %"
-              value={formData.genelIskontoOran || ''}
-              onChange={(e) => handleGenelIskontoOranChange(e.target.value)}
-              inputProps={{ min: 0, max: 100, step: 0.01 }}
-              helperText="İskonto oranı"
-              sx={{ width: { xs: '100%', sm: '200px' } }}
-            />
-            <TextField
-              type="number"
-              label="Genel İskonto (₺)"
-              value={formData.genelIskontoTutar || ''}
-              onChange={(e) => handleGenelIskontoTutarChange(e.target.value)}
-              inputProps={{ min: 0, step: 0.01 }}
-              helperText="İskonto tutarı"
-              sx={{ width: { xs: '100%', sm: '200px' } }}
-            />
-          </Box>
-
-          {/* Açıklama */}
-          <Box>
-            <TextField
-              fullWidth
-              multiline
-              rows={2}
-              label="Açıklama / Notlar"
-              value={formData.aciklama}
-              onChange={(e) => setFormData(prev => ({ ...prev, aciklama: e.target.value }))}
-            />
-          </Box>
-
-          {/* Toplam Bilgileri */}
-          <Paper variant="outlined" sx={{ p: 3, bgcolor: '#f9fafb' }}>
-            <Typography variant="h6" fontWeight="bold" sx={{ mb: 2 }}>
-              Sipariş Özeti
-            </Typography>
-            <Box sx={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-              <Box sx={{ flex: '1 1 300px' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1">Ara Toplam:</Typography>
-                  <Typography variant="body1" fontWeight="600">{formatCurrency(totals.araToplam)}</Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1">Kalem İndirimleri:</Typography>
-                  <Typography variant="body1" fontWeight="600" color={totals.toplamKalemIskontosu > 0 ? "error" : "inherit"}>
-                    {totals.toplamKalemIskontosu > 0 ? '- ' : ''}{formatCurrency(totals.toplamKalemIskontosu)}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1">Genel İskonto:</Typography>
-                  <Typography variant="body1" fontWeight="600" color={totals.genelIskonto > 0 ? "error" : "inherit"}>
-                    {totals.genelIskonto > 0 ? '- ' : ''}{formatCurrency(totals.genelIskonto)}
-                  </Typography>
-                </Box>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row', mt: 2 }}>
+              <Box sx={{ flex: isMobile ? '1 1 100%' : '2 1 400px' }}>
+                <Autocomplete fullWidth value={cariler.find(c => c.id === formData.cariId) || null} onChange={(_, newValue) => { setFormData(prev => { const updated = { ...prev, cariId: newValue?.id || '' }; if (newValue?.vadeSuresi && newValue.vadeSuresi > 0) { const faturaDate = new Date(prev.tarih); const vadeDate = new Date(faturaDate); vadeDate.setDate(vadeDate.getDate() + newValue.vadeSuresi); updated.vade = vadeDate.toISOString().split('T')[0]; } return updated; }); }} options={cariler} getOptionLabel={(option) => `${option.cariKodu} - ${option.unvan}`} renderOption={(props, option) => { const { key, ...otherProps } = props; return (<Box component="li" key={key} {...otherProps}><Box><Typography variant="body1" fontWeight="600" sx={{ color: 'var(--foreground)' }}>{option.unvan}</Typography><Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>{option.cariKodu} - {option.tip === 'MUSTERI' ? 'Müşteri' : 'Tedarikçi'}</Typography></Box></Box>); }} renderInput={(params) => <TextField {...params} className="form-control-textfield" label="Cari Seçiniz" placeholder="Cari kodu veya ünvanı ile ara..." required />} noOptionsText="Cari bulunamadı" isOptionEqualToValue={(option, value) => option.id === value.id} />
               </Box>
-              <Box sx={{ flex: '1 1 300px' }}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1" fontWeight="bold">Toplam İndirim:</Typography>
-                  <Typography variant="body1" fontWeight="bold" color={totals.toplamIskonto > 0 ? "error" : "inherit"}>
-                    {totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}
-                  </Typography>
-                </Box>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 1 }}>
-                  <Typography variant="body1">KDV Toplamı:</Typography>
-                  <Typography variant="body1" fontWeight="600">{formatCurrency(totals.toplamKdv)}</Typography>
-                </Box>
-                <Divider sx={{ my: 1 }} />
-                <Box sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
-                  <Typography
-                    variant="h6"
-                    fontWeight="bold"
-                    sx={{
-                      color: '#0891b2',
-                    }}
-                  >
-                    {formatCurrency(totals.genelToplam)}
-                  </Typography>
+            </Box>
+          </TabPanel>
+
+          <TabPanel value={tabValue} index={1}>
+            <Box sx={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))', gap: 2 }}>
+              <FormControl className="form-control-select" fullWidth>
+                <InputLabel>Senaryo</InputLabel>
+                <Select value={formData.eScenario} onChange={(e) => setFormData(prev => ({ ...prev, eScenario: e.target.value }))} label="Senaryo">
+                  <MenuItem value="SATIN_ALMA">Satın Alma</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl className="form-control-select" fullWidth>
+                <InputLabel>Fatura Türü</InputLabel>
+                <Select value={formData.eInvoiceType} onChange={(e) => setFormData(prev => ({ ...prev, eInvoiceType: e.target.value }))} label="Fatura Türü">
+                  <MenuItem value="SATIN_ALMA">Satın Alma</MenuItem>
+                </Select>
+              </FormControl>
+              <FormControl className="form-control-select" fullWidth>
+                <InputLabel>Gönderim Şekli</InputLabel>
+                <Select value={formData.gonderimSekli} onChange={(e) => setFormData(prev => ({ ...prev, gonderimSekli: e.target.value }))} label="Gönderim Şekli">
+                  <MenuItem value="ELEKTRONIK">Elektronik (e-Sipariş)</MenuItem>
+                  <MenuItem value="KAGIT">Kağıt</MenuItem>
+                </Select>
+              </FormControl>
+              <TextField className="form-control-textfield" label="GIB Alias (e-Sipariş Adresi)" value={formData.gibAlias} onChange={(e) => setFormData(prev => ({ ...prev, gibAlias: e.target.value }))} placeholder="urn:mail:firmaalias@urn.ettn.tr" helperText="Tedarikçinin GIB sistemindeki e-sipariş adresi" fullWidth />
+            </Box>
+          </TabPanel>
+
+          <Box>
+            <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', justifyContent: 'space-between', alignItems: isMobile ? 'flex-start' : 'center', gap: 2, mb: 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>Sipariş Kalemleri</Typography>
+              <Box sx={{ display: 'flex', gap: 1.5, alignItems: 'center', flexWrap: 'wrap', width: isMobile ? '100%' : 'auto' }}>
+                <TextField size="small" label="Barkod Okut" value={barcode} onChange={(e) => setBarcode(e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { handleBarcodeSubmit(barcode); } }} InputProps={{ startAdornment: (<InputAdornment position="start"><QrCodeScanner sx={{ color: 'var(--muted-foreground)' }} /></InputAdornment>) }} sx={{ width: isMobile ? '100%' : 220 }} placeholder="Barkodu okutun..." />
+                <Button variant="outlined" size="small" startIcon={<AccountBalanceWallet />} onClick={() => setOpenOdemePlaniDialog(true)} fullWidth={isMobile} sx={{ textTransform: 'none', fontWeight: 600, height: 40, borderColor: 'var(--border)', color: 'var(--foreground)' }}>Ödeme Planı {formData.odemePlani.length > 0 && `(${formData.odemePlani.length})`}</Button>
+                <Button variant="contained" onClick={handleAddKalem} startIcon={<Add />} size="small" fullWidth={isMobile} sx={{ height: 40, bgcolor: 'var(--primary)', color: 'var(--primary-foreground)', textTransform: 'none', fontWeight: 600, '&:hover': { bgcolor: 'var(--primary-hover)', transform: 'translateY(-1px)', boxShadow: 'var(--shadow-md)' }, transition: 'all 0.2s ease' }}>Satır Ekle</Button>
+                {selectedRows.length > 0 && <Button variant="contained" color="error" size="small" fullWidth={isMobile} onClick={handleBulkDelete} startIcon={<Delete />} sx={{ height: 40, textTransform: 'none', fontWeight: 600 }}>Seçilenleri Sil ({selectedRows.length})</Button>}
+              </Box>
+            </Box>
+            <Divider sx={{ mb: 2, borderColor: 'var(--border)' }} />
+
+            {isMobile ? (
+              <Box sx={{ mb: 3 }}>
+                {formData.kalemler.length === 0 ? <Paper variant="outlined" sx={{ p: 4, textAlign: 'center', bgcolor: 'var(--muted)', borderRadius: 'var(--radius)' }}><Typography variant="body2" color="text.secondary">Henüz kalem eklenmedi.</Typography></Paper> : formData.kalemler.map((kalem, index) => <MobileItemCard key={index} index={index} kalem={kalem} />)}
+              </Box>
+            ) : (
+              <TableContainer component={Paper} variant="outlined" sx={{ maxHeight: 400, borderRadius: 'var(--radius)', borderColor: 'var(--border)', bgcolor: 'var(--card)', overflowX: 'auto' }}>
+                <Table stickyHeader size="small" sx={{ minWidth: 1400 }}>
+                  <TableHead>
+                    <TableRow sx={{ bgcolor: 'var(--muted)' }}>
+                      <TableCell padding="checkbox" sx={{ minWidth: 50 }}><Checkbox indeterminate={selectedRows.length > 0 && selectedRows.length < formData.kalemler.length} checked={formData.kalemler.length > 0 && selectedRows.length === formData.kalemler.length} onChange={handleToggleAll} size="small" /></TableCell>
+                      <TableCell sx={{ fontWeight: 600, color: 'var(--muted-foreground)', minWidth: 280 }}>Stok Adı / Ürün</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 100 }}>Miktar</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 100 }}>Birim</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 130 }}>Birim Fiyat</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 90 }}>KDV %</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 60 }} title="Çoklu İskonto">Ç.İ.</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 130 }}>İsk. Oran %</TableCell>
+                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 140 }}>İsk. Tutar</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 140 }}>Toplam</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {formData.kalemler.length === 0 ? <TableRow><TableCell colSpan={10} align="center" sx={{ py: 4 }}><Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>Henüz kalem eklenedi.</Typography></TableCell></TableRow> : formData.kalemler.map((kalem, index) => (
+                      <TableRow key={index} hover selected={selectedRows.includes(index)} sx={{ bgcolor: 'var(--background)', '&:hover': { bgcolor: 'var(--muted) !important' }, borderBottom: '1px solid var(--border)' }}>
+                        <TableCell padding="checkbox"><Checkbox checked={selectedRows.includes(index)} onChange={() => handleToggleRow(index)} size="small" /></TableCell>
+                        <TableCell><Autocomplete size="small" open={autocompleteOpenStates[index] || false} onOpen={() => setAutocompleteOpenStates(prev => ({ ...prev, [index]: true }))} onClose={() => setAutocompleteOpenStates(prev => ({ ...prev, [index]: false }))} value={stoklar.find(s => s.id === kalem.stokId) || null} onChange={(_, newValue) => { handleKalemChange(index, 'stokId', newValue?.id || ''); setAutocompleteOpenStates(prev => ({ ...prev, [index]: false })); }} options={stoklar} getOptionLabel={(option) => `${option.stokKodu} - ${option.stokAdi}`} filterOptions={(options, params) => { const { inputValue } = params; if (!inputValue) return options; const lowerInput = inputValue.toLowerCase(); return options.filter(option => option.stokKodu.toLowerCase().includes(lowerInput) || option.stokAdi.toLowerCase().includes(lowerInput) || (option.barkod && option.barkod.toLowerCase().includes(lowerInput))); }} renderOption={(props, option) => { const { key, ...otherProps } = props; let stockColor = 'var(--success)'; if (option.miktar <= 0) stockColor = 'var(--destructive)'; else if (option.miktar < 10) stockColor = 'var(--warning)'; return (<Box component="li" key={key} {...otherProps}><Box sx={{ width: '100%' }}><Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}><Typography variant="body2" fontWeight="600">{option.stokAdi}</Typography><Chip label={`Stok: ${option.miktar}`} size="small" sx={{ height: 20, fontSize: '0.7rem', bgcolor: `color-mix(in srgb, ${stockColor} 10%, transparent)`, color: stockColor, border: `1px solid ${stockColor}` }} /></Box><Box sx={{ display: 'flex', gap: 1, mt: 0.5 }}><Typography variant="caption" color="text.secondary">Kod: {option.stokKodu}</Typography>{option.barkod && <Typography variant="caption" color="text.secondary">| Barkod: {option.barkod}</Typography>}</Box></Box></Box>); }} renderInput={(params) => <TextField {...params} className="form-control-textfield" placeholder="Stok kodu, adı veya barkod ile ara..." onKeyDown={(e) => { if (e.key === 'Enter' && !(autocompleteOpenStates[index])) { e.preventDefault(); handleAddKalem(); } }} />} noOptionsText="Stok bulunamadı" isOptionEqualToValue={(option, value) => option.id === value.id} /></TableCell>
+                        <TableCell sx={{ minWidth: 100 }}><TextField fullWidth type="number" size="small" className="form-control-textfield" value={kalem.miktar} onChange={(e) => handleKalemChange(index, 'miktar', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddKalem(); } }} inputProps={{ min: 1, step: 1 }} /></TableCell>
+                        <TableCell sx={{ minWidth: 100 }}><TextField fullWidth size="small" className="form-control-textfield" value={kalem.birim || ''} onChange={(e) => handleKalemChange(index, 'birim', e.target.value)} placeholder="Birim" /></TableCell>
+                        <TableCell sx={{ minWidth: 130 }}><TextField fullWidth type="number" size="small" className="form-control-textfield" value={kalem.birimFiyat} onChange={(e) => handleKalemChange(index, 'birimFiyat', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddKalem(); } }} inputProps={{ min: 0, step: 0.01 }} /></TableCell>
+                        <TableCell sx={{ minWidth: 90 }}><TextField fullWidth type="number" size="small" className="form-control-textfield" value={kalem.kdvOrani} onChange={(e) => handleKalemChange(index, 'kdvOrani', e.target.value)} onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleAddKalem(); } }} inputProps={{ min: 0, max: 100 }} /></TableCell>
+                        <TableCell align="center" sx={{ minWidth: 60 }}><IconButton size="small" onClick={() => handleKalemChange(index, 'cokluIskonto', !kalem.cokluIskonto)} title={kalem.cokluIskonto ? 'Çoklu İskonto: Açık (10+5 formatı)' : 'Çoklu İskonto: Kapalı (Tek oran)'} sx={{ color: kalem.cokluIskonto ? 'var(--chart-2)' : 'var(--muted-foreground)', '&:hover': { bgcolor: kalem.cokluIskonto ? 'color-mix(in srgb, var(--chart-2) 10%, transparent)' : 'var(--muted)' } }}>{kalem.cokluIskonto ? <ToggleOn fontSize="small" /> : <ToggleOff fontSize="small" />}</IconButton></TableCell>
+                        <TableCell sx={{ minWidth: 130 }}>{kalem.cokluIskonto ? <TextField fullWidth size="small" className="form-control-textfield" value={kalem.iskontoFormula || ''} onChange={(e) => handleKalemChange(index, 'iskontoFormula', e.target.value)} placeholder="10+5" /> : <TextField fullWidth type="number" size="small" className="form-control-textfield" value={kalem.iskontoOran} onChange={(e) => handleKalemChange(index, 'iskontoOran', e.target.value)} inputProps={{ min: 0, max: 100, step: 0.01 }} />}</TableCell>
+                        <TableCell sx={{ minWidth: 140 }}><TextField fullWidth type="number" size="small" className="form-control-textfield" value={kalem.iskontoTutar} onChange={(e) => handleKalemChange(index, 'iskontoTutar', e.target.value)} inputProps={{ min: 0, step: 0.01 }} /></TableCell>
+                        <TableCell align="right" sx={{ minWidth: 140, fontWeight: 700 }}>{formatCurrency(calculateKalemTutar(kalem))}</TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )}
+          </Box>
+
+          <Popover open={calculatorAnchor !== null} anchorEl={calculatorAnchor} onClose={() => { setCalculatorAnchor(null); setCalculatorRowIndex(null); setCalculatorExpression(''); }} anchorOrigin={{ vertical: 'bottom', horizontal: 'left' }} transformOrigin={{ vertical: 'top', horizontal: 'left' }}>
+            <Box sx={{ p: 2, width: 280 }}>
+              <Typography variant="subtitle2" sx={{ mb: 1, fontWeight: 600 }}>🧮 Hesap Makinesi</Typography>
+              <TextField fullWidth size="small" value={calculatorExpression} onChange={(e) => setCalculatorExpression(e.target.value)} placeholder="Örn: 100+10 veya 100*0.9" sx={{ mb: 1 }} helperText="Toplama (+), Çıkarma (-), Çarpma (*), Bölme (/)" />
+              <Typography variant="caption" color="text.secondary" sx={{ display: 'block', mb: 1 }}>Sonuç: {calculatorExpression ? (() => { try { const result = new Function('return ' + calculatorExpression)(); return typeof result === 'number' && !isNaN(result) ? result.toFixed(2) : 'Geçersiz'; } catch { return 'Geçersiz'; } })() : '...'}</Typography>
+              <Box sx={{ display: 'flex', gap: 1 }}>
+                <Button size="small" variant="outlined" onClick={() => { setCalculatorExpression(''); setCalculatorAnchor(null); }} fullWidth>İptal</Button>
+                <Button size="small" variant="contained" onClick={() => { if (calculatorRowIndex !== null) { try { const result = new Function('return ' + calculatorExpression)(); if (typeof result === 'number' && !isNaN(result)) { handleKalemChange(calculatorRowIndex, 'birimFiyat', result); setCalculatorAnchor(null); setCalculatorRowIndex(null); setCalculatorExpression(''); } } catch { } } }} fullWidth disabled={!calculatorExpression || calculatorExpression === '0'}>Uygula</Button>
+              </Box>
+            </Box>
+          </Popover>
+
+          <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 2 }}>
+            <TextField type="number" label="Genel İskonto %" className="form-control-textfield" value={formData.genelIskontoOran || ''} onChange={(e) => handleGenelIskontoOranChange(e.target.value)} inputProps={{ min: 0, max: 100, step: 0.01 }} helperText="İskonto oranı" sx={{ width: { xs: '100%', sm: '200px' }, '& input[type=number]': { MozAppearance: 'textfield' }, '& input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 }, '& input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 } }} />
+            <TextField type="number" label="Genel İskonto (₺)" className="form-control-textfield" value={formData.genelIskontoTutar || ''} onChange={(e) => handleGenelIskontoTutarChange(e.target.value)} inputProps={{ min: 0, step: 0.01 }} helperText="İskonto tutarı" sx={{ width: { xs: '100%', sm: '200px' }, '& input[type=number]': { MozAppearance: 'textfield' }, '& input[type=number]::-webkit-outer-spin-button': { WebkitAppearance: 'none', margin: 0 }, '& input[type=number]::-webkit-inner-spin-button': { WebkitAppearance: 'none', margin: 0 } }} />
+          </Box>
+
+          {/* Açıklama ve Sipariş Özeti - Yan Yana */}
+          <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 2 }}>
+            {/* Açıklama */}
+            <Box sx={{ flex: 1 }}><TextField fullWidth multiline rows={2} className="form-control-textfield" label="Açıklama / Notlar" value={formData.aciklama} onChange={(e) => setFormData(prev => ({ ...prev, aciklama: e.target.value }))} /></Box>
+
+            {/* Toplam Bilgileri */}
+            <Paper variant="outlined" sx={{ flex: 1, p: isMobile ? 2 : 3, bgcolor: 'var(--card)', borderRadius: 'var(--radius)', borderColor: 'var(--border)', borderWidth: '1px', boxShadow: 'var(--shadow-sm)' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: isMobile ? 1 : 2 }}>
+              <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>Sipariş Özeti</Typography>
+            </Box>
+            <Divider sx={{ mb: isMobile ? 1.5 : 2, borderColor: 'var(--border)' }} />
+            <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: isMobile ? 1 : 4 }}>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}><Typography variant={isMobile ? "body2" : "body1"} sx={{ color: 'var(--muted-foreground)' }}>Ara Toplam:</Typography><Typography variant={isMobile ? "body2" : "body1"} fontWeight="600" sx={{ color: 'var(--foreground)' }}>{formatCurrency(totals.araToplam)}</Typography></Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}><Typography variant={isMobile ? "body2" : "body1"} sx={{ color: 'var(--muted-foreground)' }}>Kalem İndirimleri:</Typography><Typography variant={isMobile ? "body2" : "body1"} fontWeight="600" sx={{ color: totals.toplamKalemIskontosu > 0 ? 'var(--destructive)' : 'var(--foreground)' }}>{totals.toplamKalemIskontosu > 0 ? '- ' : ''}{formatCurrency(totals.toplamKalemIskontosu)}</Typography></Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}><Typography variant={isMobile ? "body2" : "body1"} sx={{ color: 'var(--muted-foreground)' }}>Genel İskonto:</Typography><Typography variant={isMobile ? "body2" : "body1"} fontWeight="600" sx={{ color: totals.genelIskonto > 0 ? 'var(--destructive)' : 'var(--foreground)' }}>{totals.genelIskonto > 0 ? '- ' : ''}{formatCurrency(totals.genelIskonto)}</Typography></Box>
+              </Box>
+              <Box sx={{ flex: 1 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}><Typography variant={isMobile ? "body2" : "body1"} fontWeight="bold" sx={{ color: 'var(--foreground)' }}>Toplam İndirim:</Typography><Typography variant={isMobile ? "body2" : "body1"} fontWeight="bold" sx={{ color: totals.toplamIskonto > 0 ? 'var(--destructive)' : 'var(--foreground)' }}>{totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}</Typography></Box>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}><Typography variant={isMobile ? "body2" : "body1"} sx={{ color: 'var(--muted-foreground)' }}>KDV Toplamı:</Typography><Typography variant={isMobile ? "body2" : "body1"} fontWeight="600" sx={{ color: 'var(--foreground)' }}>{formatCurrency(totals.toplamKdv)}</Typography></Box>
+                <Divider sx={{ my: isMobile ? 1 : 2, borderColor: 'var(--border)' }} />
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', pt: 0.5, pb: 0.5 }}>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.01em' }}>Genel Toplam:</Typography>
+                  <Typography variant={isMobile ? "subtitle1" : "h6"} sx={{ fontWeight: 700, color: 'var(--primary)', letterSpacing: '-0.01em' }}>{formatCurrency(totals.genelToplam)}</Typography>
                 </Box>
               </Box>
             </Box>
           </Paper>
+          </Box>
 
-          {/* Action Buttons */}
           <Box>
-            <Box sx={{ display: 'flex', gap: 2, justifyContent: 'flex-end' }}>
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={() => router.push('/orders/satin-alma')}
-              >
-                İptal
-              </Button>
-              <Button
-                variant="contained"
-                size="large"
-                startIcon={<Save />}
-                onClick={handleSave}
-                disabled={loading}
-                sx={{
-                  background: 'linear-gradient(135deg, #0891b2 0%, #06b6d4 100%)',
-                  minWidth: 150,
-                }}
-              >
-                {loading ? 'Kaydediliyor...' : 'Siparişi Kaydet'}
-              </Button>
+            <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column-reverse' : 'row', gap: 2, justifyContent: 'flex-end' }}>
+              <Button variant="outlined" size="large" fullWidth={isMobile} onClick={() => { if (isEdit && onBack) onBack(); else router.push('/orders/satin-alma'); }} sx={{ textTransform: 'none', fontWeight: 600, borderColor: 'var(--border)', color: 'var(--foreground)', '&:hover': { borderColor: 'var(--primary)', bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)' } }}>İptal</Button>
+              <Button variant="contained" size="large" fullWidth={isMobile} startIcon={<Save />} onClick={handleSave} disabled={loading || saving} sx={{ bgcolor: 'var(--primary)', color: 'var(--primary-foreground)', textTransform: 'none', fontWeight: 600, minWidth: isMobile ? '100%' : 150, boxShadow: 'var(--shadow-sm)', '&:hover': { bgcolor: 'var(--primary-hover)', boxShadow: 'var(--shadow-md)', transform: 'translateY(-1px)' }, transition: 'all 0.2s ease' }}>{(loading || saving) ? 'Kaydediliyor...' : (isEdit ? 'Değişiklikleri Kaydet' : 'Siparişi Kaydet')}</Button>
             </Box>
           </Box>
         </Stack>
       </Paper>
 
-      {/* Snackbar */}
-      <Snackbar
-        open={snackbar.open}
-        autoHideDuration={6000}
-        onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-      >
-        <Alert
-          onClose={() => setSnackbar(prev => ({ ...prev, open: false }))}
-          severity={snackbar.severity}
-          sx={{ width: '100%' }}
-        >
-          {snackbar.message}
-        </Alert>
+      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
+        <Alert onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} severity={snackbar.severity} sx={{ width: '100%' }}>{snackbar.message}</Alert>
       </Snackbar>
+
+      <Dialog open={openOdemePlaniDialog} onClose={() => setOpenOdemePlaniDialog(false)} maxWidth="md" fullWidth>
+        <DialogTitle>Ödeme Planı / Taksitlendirme</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mb: 3, mt: 1, display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+            <TextField type="number" label="Taksit Sayısı" value={taksitSayisi} onChange={(e) => setTaksitSayisi(parseInt(e.target.value) || 1)} inputProps={{ min: 1, max: 24 }} sx={{ width: 120 }} />
+            <Button variant="contained" onClick={handleTaksitHesapla} sx={{ height: 40 }}>Hesapla</Button>
+          </Box>
+          <TableContainer component={Paper} variant="outlined">
+            <Table size="small">
+              <TableHead><TableRow><TableCell>Vade</TableCell><TableCell>Tutar</TableCell><TableCell>Ödeme Tipi</TableCell><TableCell>Açıklama</TableCell></TableRow></TableHead>
+              <TableBody>
+                {formData.odemePlani.length === 0 ? <TableRow><TableCell colSpan={4} align="center">Henüz ödeme planı oluşturulmadı.</TableCell></TableRow> : formData.odemePlani.map((item, index) => (
+                  <TableRow key={index}>
+                    <TableCell><TextField type="date" size="small" value={item.vade} onChange={(e) => { const newPlan = [...formData.odemePlani]; newPlan[index].vade = e.target.value; setFormData(prev => ({ ...prev, odemePlani: newPlan })); }} /></TableCell>
+                    <TableCell><TextField type="number" size="small" value={item.tutar} onChange={(e) => { const newPlan = [...formData.odemePlani]; newPlan[index].tutar = parseFloat(e.target.value) || 0; setFormData(prev => ({ ...prev, odemePlani: newPlan })); }} /></TableCell>
+                    <TableCell><TextField select size="small" value={item.odemeTipi} onChange={(e) => { const newPlan = [...formData.odemePlani]; newPlan[index].odemeTipi = e.target.value; setFormData(prev => ({ ...prev, odemePlani: newPlan })); }} SelectProps={{ native: true }}><option value="HAVALE">Havale/EFT</option><option value="NAKIT">Nakit</option></TextField></TableCell>
+                    <TableCell><TextField size="small" value={item.aciklama} onChange={(e) => { const newPlan = [...formData.odemePlani]; newPlan[index].aciklama = e.target.value; setFormData(prev => ({ ...prev, odemePlani: newPlan })); }} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setOpenOdemePlaniDialog(false)}>Kapat</Button>
+          <Button variant="contained" color="primary" onClick={() => setOpenOdemePlaniDialog(false)}>Tamam</Button>
+        </DialogActions>
+      </Dialog>
     </MainLayout>
   );
 }
 
+export default function YeniSatinAlmaSiparisiPage() {
+  return (
+    <Suspense fallback={<Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}><CircularProgress /></Box>}>
+      <SatinAlmaSiparisForm />
+    </Suspense>
+  );
+}

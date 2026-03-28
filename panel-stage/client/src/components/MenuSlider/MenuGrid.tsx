@@ -4,17 +4,21 @@ import React, { useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
-  Grid,
   TextField,
   InputAdornment,
   Container,
   useTheme,
+  Typography,
+  Tooltip,
+  IconButton,
+  Grid,
 } from '@mui/material';
-import { Search } from '@mui/icons-material';
+import { Search, GridView, ViewList } from '@mui/icons-material';
 import { MenuItem } from './types';
 import SubMenuDialog from './SubMenuDialog';
 import SearchResultsList from './SearchResultsList';
 import MenuCard from './MenuCard';
+import { useTabStore } from '@/stores/tabStore';
 
 interface SearchResult {
   item: MenuItem;
@@ -36,25 +40,40 @@ export default function MenuGrid({
 }: MenuGridProps) {
   const router = useRouter();
   const theme = useTheme();
+  const { addTab, setActiveTab } = useTabStore();
   const [selectedSubMenu, setSelectedSubMenu] = useState<MenuItem | null>(null);
+  const [menuHistory, setMenuHistory] = useState<MenuItem[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
 
-  // Generate search results for list (real-time) - ONLY sub-items
+  // Recursively search through all menu items (main, sub, and nested sub-items)
   const searchResults = useMemo(() => {
     if (!searchTerm) return [];
 
     const searchLower = searchTerm.toLowerCase();
     const results: SearchResult[] = [];
 
-    menuItems.forEach((item) => {
-      // Only search in subItems
-      if (item.subItems) {
-        item.subItems.forEach((subItem) => {
-          if (subItem.label.toLowerCase().includes(searchLower)) {
-            results.push({ item: subItem, type: 'sub', parentItem: item });
-          }
+    // Recursive function to search through nested subItems
+    const searchRecursive = (item: MenuItem, parentItem?: MenuItem, depth = 0) => {
+      // Check if this item matches the search
+      if (item.label && item.label.toLowerCase().includes(searchLower)) {
+        results.push({
+          item,
+          type: depth === 0 ? 'main' : 'sub',
+          parentItem: depth === 0 ? undefined : parentItem,
         });
       }
+
+      // Recursively search in subItems
+      if (item.subItems) {
+        item.subItems.forEach((subItem) => {
+          searchRecursive(subItem, item, depth + 1);
+        });
+      }
+    };
+
+    // Search through all top-level menu items
+    menuItems.forEach((item) => {
+      searchRecursive(item);
     });
 
     return results;
@@ -70,11 +89,18 @@ export default function MenuGrid({
     // If item has subItems, open submenu dialog
     if (item.subItems && item.subItems.length > 0) {
       setSelectedSubMenu(item);
+      setMenuHistory([item]);
       return;
     }
 
     // Otherwise navigate to path
     if (item.path) {
+      addTab({
+        id: item.id,
+        label: item.label,
+        path: item.path,
+      });
+      setActiveTab(item.id);
       router.push(item.path);
     }
   };
@@ -84,11 +110,41 @@ export default function MenuGrid({
       onSubItemClick(selectedSubMenu!, subItem);
     }
 
-    if (subItem.path) {
-      router.push(subItem.path);
+    // If subItem has its own subItems, "drill down" by updating the selected menu
+    if (subItem.subItems && subItem.subItems.length > 0) {
+      setSelectedSubMenu(subItem);
+      setMenuHistory(prev => [...prev, subItem]);
+      return;
     }
 
+    // Otherwise navigate to path if it exists
+    if (subItem.path) {
+      addTab({
+        id: subItem.id,
+        label: subItem.label,
+        path: subItem.path,
+      });
+      setActiveTab(subItem.id);
+      router.push(subItem.path);
+      handleCloseDialog();
+    }
+  };
+
+  const handleBack = () => {
+    if (menuHistory.length > 1) {
+      const newHistory = [...menuHistory];
+      newHistory.pop(); // Remove current
+      const previous = newHistory[newHistory.length - 1];
+      setMenuHistory(newHistory);
+      setSelectedSubMenu(previous);
+    } else {
+      handleCloseDialog();
+    }
+  };
+
+  const handleCloseDialog = () => {
     setSelectedSubMenu(null);
+    setMenuHistory([]);
   };
 
   return (
@@ -276,7 +332,7 @@ export default function MenuGrid({
           ) : (
             <Grid
               container
-              spacing={{ xs: 3, sm: 4, md: 5 }}
+              spacing={{ xs: 2, sm: 3, md: 4, lg: 5 }}
               columns={{ xs: 4, sm: 8, md: 12, lg: 15 }}
             >
               {menuItems.map((item) => (
@@ -296,9 +352,10 @@ export default function MenuGrid({
       {selectedSubMenu && (
         <SubMenuDialog
           open={!!selectedSubMenu}
-          onClose={() => setSelectedSubMenu(null)}
+          onClose={handleCloseDialog}
           parentItem={selectedSubMenu}
           onSubItemClick={handleSubItemClick}
+          onBack={menuHistory.length > 1 ? handleBack : undefined}
         />
       )}
     </Box>

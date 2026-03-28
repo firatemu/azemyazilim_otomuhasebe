@@ -546,12 +546,18 @@ export class InvoiceService {
         id: invoiceData.accountId,
         ...buildTenantWhereClause(tenantId ?? undefined),
       },
-      select: { id: true, salesAgentId: true, title: true, balance: true, creditLimit: true }
+      select: { id: true, salesAgentId: true, title: true, balance: true, creditLimit: true, efaturaPostaKutusu: true }
     });
 
     if (!account) {
       throw new NotFoundException(`Account not found: ${invoiceData.accountId}`);
     }
+
+    // Eğer frontend'den gibAlias gelmezse, cari hesaptan al
+    const finalGibAlias = gibAlias || account.efaturaPostaKutusu || null;
+
+    // Satış faturası için fatura türü her zaman SATIS olmalı
+    const finalEInvoiceType = (invoiceData.type === InvoiceType.SALE) ? 'SATIS' : (eInvoiceType || null);
 
     // Validate quantities for unit divisibility
     const products = await this.prisma.product.findMany({
@@ -991,7 +997,8 @@ export class InvoiceService {
           salesAgentId: salesAgentId || null,
           eScenario: eScenario || null,
           eInvoiceType: eInvoiceType || null,
-          gibAlias: gibAlias || null,
+          gibAlias: finalGibAlias,
+          eInvoiceType: finalEInvoiceType,
           deliveryMethod: shippingType || null,
           items: {
             create: itemsWithCalculations.map((k) => ({
@@ -1140,11 +1147,25 @@ export class InvoiceService {
         }
       }
 
+      // Eğer DTO'dan gibAlias gelmezse, cari hesaptan al
+      let finalGibAlias = updateData.gibAlias;
+      if (!finalGibAlias) {
+        const account = await this.prisma.account.findFirst({
+          where: {
+            id: invoice.accountId,
+            ...buildTenantWhereClause(invoice.tenantId ?? undefined),
+          },
+          select: { efaturaPostaKutusu: true }
+        });
+        finalGibAlias = account?.efaturaPostaKutusu || null;
+      }
+
       const tenantId = invoice.tenantId ?? undefined;
       const updated = await this.prisma.invoice.update({
         where: { id },
         data: {
           ...updateData,
+          gibAlias: finalGibAlias,
           updatedBy: userId,
           salesAgentId,
           ...(updateInvoiceDto.warehouseId !== undefined && { warehouseId: updateInvoiceDto.warehouseId || null }),
@@ -1261,6 +1282,19 @@ export class InvoiceService {
     totalAmount -= discount;
     const grandTotal = totalAmount + vatAmount;
 
+    // Eğer DTO'dan gibAlias gelmezse, cari hesaptan al
+    let finalGibAlias = invoiceData.gibAlias;
+    if (!finalGibAlias) {
+      const account = await this.prisma.account.findFirst({
+        where: {
+          id: invoice.accountId,
+          ...buildTenantWhereClause(invoice.tenantId ?? undefined),
+        },
+        select: { efaturaPostaKutusu: true }
+      });
+      finalGibAlias = account?.efaturaPostaKutusu || null;
+    }
+
     // Currency calculation (Update)
     let { currency, exchangeRate } = updateInvoiceDto;
     if (!currency && invoice.currency) currency = invoice.currency;
@@ -1301,6 +1335,7 @@ export class InvoiceService {
           where: { id },
           data: {
             ...invoiceData,
+            gibAlias: finalGibAlias,
             status: invoice.invoiceType === InvoiceType.SALE ? InvoiceStatus.APPROVED : (updateInvoiceDto.status || invoice.status),
             currency: currency || 'TRY',
             exchangeRate: exchangeRate ? new Decimal(exchangeRate) : new Decimal(1),

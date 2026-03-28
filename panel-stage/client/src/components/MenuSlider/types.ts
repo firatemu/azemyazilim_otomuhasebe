@@ -57,4 +57,5 @@ export interface SubMenuDialogProps {
   onClose: () => void;
   parentItem: MenuItem;
   onSubItemClick: (subItem: MenuItem) => void;
+  onBack?: () => void;
 }

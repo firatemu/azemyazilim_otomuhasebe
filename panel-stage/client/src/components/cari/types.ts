@@ -70,6 +70,10 @@ export interface CariFormData {
     ozelKod1: string;
     ozelKod2: string;
 
+    // E-Dönüşüm Bilgileri
+    efaturaPostaKutusu?: string;
+    efaturaGondericiBirim?: string;
+
     // İlişkiler
     yetkililer: CariYetkili[];
     ekAdresler: CariAdres[];
@@ -112,6 +116,9 @@ export const initialCariFormData: CariFormData = {
     sektor: '',
     ozelKod1: '',
     ozelKod2: '',
+
+    efaturaPostaKutusu: '',
+    efaturaGondericiBirim: '',
 
     yetkililer: [],
     ekAdresler: [],

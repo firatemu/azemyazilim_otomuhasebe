@@ -1,22 +1,25 @@
 'use client';
 
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Box,
   Stack,
   Fade,
+  useTheme,
 } from '@mui/material';
 import { MenuSliderProps, MenuItem } from './types';
 import MenuCard from './MenuCard';
 import SlideControls from './SlideControls';
 import SubMenuDialog from './SubMenuDialog';
+import { useTabStore } from '@/stores/tabStore';
 
 export default function MenuSlider({
   menuItems,
   autoRotate = true,
   autoRotateInterval = 5000,
   enableSubItems = true,
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   variant = 'full',
   showBackground = true,
   onMenuClick,
@@ -24,11 +27,13 @@ export default function MenuSlider({
   ariaLabel = 'Menü slider',
 }: MenuSliderProps) {
   const router = useRouter();
+  const theme = useTheme();
+  const { addTab, setActiveTab } = useTabStore();
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [direction, setDirection] = useState<'next' | 'prev'>('next');
-  const [isPaused, setIsPaused] = useState(false);
   const [selectedSubMenu, setSelectedSubMenu] = useState<MenuItem | null>(null);
+  const [menuHistory, setMenuHistory] = useState<MenuItem[]>([]);
   const [mounted, setMounted] = useState(false);
+  const [isPaused, setIsPaused] = useState(false);
 
   // Touch state for swipe gestures
   const [touchStart, setTouchStart] = useState(0);
@@ -36,6 +41,18 @@ export default function MenuSlider({
 
   useEffect(() => {
     setMounted(true);
+  }, []);
+
+  const nextSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev + 1) % menuItems.length);
+  }, [menuItems.length]);
+
+  const prevSlide = useCallback(() => {
+    setCurrentSlide((prev) => (prev - 1 + menuItems.length) % menuItems.length);
+  }, [menuItems.length]);
+
+  const goToSlide = useCallback((index: number) => {
+    setCurrentSlide(index);
   }, []);
 
   // Auto-rotate slides
@@ -47,7 +64,7 @@ export default function MenuSlider({
     }, autoRotateInterval);
 
     return () => clearInterval(timer);
-  }, [autoRotate, autoRotateInterval, isPaused, mounted, currentSlide]);
+  }, [autoRotate, autoRotateInterval, isPaused, mounted, nextSlide]);
 
   // Keyboard navigation
   useEffect(() => {
@@ -61,22 +78,8 @@ export default function MenuSlider({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentSlide, menuItems]);
-
-  const nextSlide = useCallback(() => {
-    setDirection('next');
-    setCurrentSlide((prev) => (prev + 1) % menuItems.length);
-  }, [menuItems.length]);
-
-  const prevSlide = useCallback(() => {
-    setDirection('prev');
-    setCurrentSlide((prev) => (prev - 1 + menuItems.length) % menuItems.length);
-  }, [menuItems.length]);
-
-  const goToSlide = useCallback((index: number) => {
-    setDirection(index > currentSlide ? 'next' : 'prev');
-    setCurrentSlide(index);
-  }, [currentSlide]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentSlide, menuItems, nextSlide, prevSlide]);
 
   // Touch handlers for swipe
   const handleTouchStart = (e: React.TouchEvent) => {
@@ -94,33 +97,70 @@ export default function MenuSlider({
     if (touchEnd - touchStart > threshold) prevSlide();
   };
 
-  const handleMenuClick = (item: typeof menuItems[0]) => {
+  const handleMenuClick = (item: MenuItem) => {
     if (onMenuClick) {
       onMenuClick(item);
     }
 
     // If item has subItems, open submenu dialog
-    if (enableSubItems && item.subItems && item.subItems.length > 0) {
+    if (item.subItems && item.subItems.length > 0) {
       setSelectedSubMenu(item);
+      setMenuHistory([item]);
       return;
     }
 
     // Otherwise navigate to path
     if (item.path) {
+      addTab({
+        id: item.id,
+        label: item.label,
+        path: item.path,
+      });
+      setActiveTab(item.id);
       router.push(item.path);
     }
   };
 
-  const handleSubItemClick = (subItem: typeof menuItems[0]) => {
+  const handleSubItemClick = (subItem: MenuItem) => {
     if (onSubItemClick) {
       onSubItemClick(selectedSubMenu!, subItem);
     }
 
-    if (subItem.path) {
-      router.push(subItem.path);
+    // If subItem has its own subItems, "drill down" by updating the selected menu
+    if (subItem.subItems && subItem.subItems.length > 0) {
+      setSelectedSubMenu(subItem);
+      setMenuHistory(prev => [...prev, subItem]);
+      return;
     }
 
+    // Otherwise navigate to path if it exists
+    if (subItem.path) {
+      addTab({
+        id: subItem.id,
+        label: subItem.label,
+        path: subItem.path,
+      });
+      setActiveTab(subItem.id);
+      router.push(subItem.path);
+      handleCloseDialog();
+    }
+  };
+
+  const handleBack = () => {
+    if (menuHistory.length > 1) {
+      const newHistory = [...menuHistory];
+      newHistory.pop();
+      const previous = newHistory[newHistory.length - 1];
+      setMenuHistory(newHistory);
+      setSelectedSubMenu(previous);
+    } else {
+      handleCloseDialog();
+    }
+  };
+
+  const handleCloseDialog = () => {
     setSelectedSubMenu(null);
+    setMenuHistory([]);
   };
 
   if (!menuItems || menuItems.length === 0) {
@@ -136,7 +176,9 @@ export default function MenuSlider({
       sx={{
         position: 'relative',
         minHeight: '100vh',
-        bgcolor: 'rgb(30, 58, 138)',
+        background: theme.palette.mode === 'light'
+          ? 'linear-gradient(135deg, #F5F7FA 0%, #E8EEF5 50%, #F0F4F8 100%)'
+          : 'linear-gradient(135deg, #0F172A 0%, #1E293B 50%, #1E293B 100%)',
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'center',
@@ -160,15 +202,24 @@ export default function MenuSlider({
               inset: 0,
               zIndex: 0,
               pointerEvents: 'none',
-              background: `
-                radial-gradient(at 40% 20%, hsla(228, 89%, 56%, 0.25) 0px, transparent 50%),
-                radial-gradient(at 80% 0%, hsla(189, 100%, 56%, 0.25) 0px, transparent 50%),
-                radial-gradient(at 0% 50%, hsla(355, 85%, 63%, 0.15) 0px, transparent 50%),
-                radial-gradient(at 80% 50%, hsla(340, 100%, 76%, 0.15) 0px, transparent 50%),
-                radial-gradient(at 0% 100%, hsla(269, 100%, 77%, 0.25) 0px, transparent 50%),
-                radial-gradient(at 80% 100%, hsla(225, 100%, 77%, 0.25) 0px, transparent 50%)
-              `,
-              animation: 'meshMove 20s linear infinite',
+              background: theme.palette.mode === 'light'
+                ? `
+                  radial-gradient(at 40% 20%, rgba(227, 242, 253, 0.6) 0px, transparent 50%),
+                  radial-gradient(at 80% 0%, rgba(224, 242, 241, 0.5) 0px, transparent 50%),
+                  radial-gradient(at 0% 50%, rgba(252, 228, 236, 0.4) 0px, transparent 50%),
+                  radial-gradient(at 80% 50%, rgba(243, 229, 245, 0.5) 0px, transparent 50%),
+                  radial-gradient(at 0% 100%, rgba(255, 253, 231, 0.4) 0px, transparent 50%),
+                  radial-gradient(at 80% 100%, rgba(232, 245, 233, 0.5) 0px, transparent 50%)
+                `
+                : `
+                  radial-gradient(at 40% 20%, rgba(30, 41, 59, 0.4) 0px, transparent 50%),
+                  radial-gradient(at 80% 0%, rgba(15, 23, 42, 0.3) 0px, transparent 50%),
+                  radial-gradient(at 0% 50%, rgba(51, 65, 85, 0.35) 0px, transparent 50%),
+                  radial-gradient(at 80% 50%, rgba(30, 41, 59, 0.3) 0px, transparent 50%),
+                  radial-gradient(at 0% 100%, rgba(15, 23, 42, 0.25) 0px, transparent 50%),
+                  radial-gradient(at 80% 100%, rgba(30, 41, 59, 0.3) 0px, transparent 50%)
+                `,
+              animation: 'meshMove 25s linear infinite',
               '@keyframes meshMove': {
                 '0%': { backgroundPosition: '0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%, 0% 0%' },
                 '50%': { backgroundPosition: '100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%' },
@@ -262,9 +313,10 @@ export default function MenuSlider({
       {selectedSubMenu && (
         <SubMenuDialog
           open={!!selectedSubMenu}
-          onClose={() => setSelectedSubMenu(null)}
+          onClose={handleCloseDialog}
           parentItem={selectedSubMenu}
           onSubItemClick={handleSubItemClick}
+          onBack={menuHistory.length > 1 ? handleBack : undefined}
         />
       )}
     </Box>

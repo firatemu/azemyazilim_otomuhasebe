@@ -109,6 +109,8 @@ interface Cari {
   yetkililer?: CariYetkili[];
   ekAdresler?: CariAdres[];
   tedarikciBankalar?: CariBanka[];
+  efaturaPostaKutusu?: string;
+  efaturaGondericiBirim?: string;
 }
 
 interface Product {
@@ -504,6 +506,7 @@ export default function CariDetayPage() {
           <Tab label="Genel Bakış" />
           <Tab label="Hareketler" />
           <Tab label="Profil & İletişim" />
+          <Tab label="E-Dönüşüm Bilgileri" />
         </Tabs>
       </Box>
 
@@ -862,6 +865,107 @@ export default function CariDetayPage() {
                 )}
               </Paper>
             </Box>
+          </Box>
+        )}
+      </TabPanel>
+
+      {/* E-DÖNÜŞÜM BİLGİLERİ TAB */}
+      <TabPanel value={tabValue} index={3}>
+        {!cari ? (
+          <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: 200 }}>
+            <CircularProgress />
+          </Box>
+        ) : (
+          <Box sx={{ maxWidth: 800, mx: 'auto' }}>
+            <Paper variant="outlined" sx={{
+              p: 4,
+              borderRadius: 'var(--radius-lg)',
+              bgcolor: 'var(--card)',
+              border: '1px solid var(--border)',
+            }}>
+              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 3 }}>
+                <Box sx={{
+                  width: 48,
+                  height: 48,
+                  borderRadius: '12px',
+                  bgcolor: 'var(--primary)',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Email sx={{ color: 'white', fontSize: 24 }} />
+                </Box>
+                <Box>
+                  <Typography variant="h6" fontWeight="bold" sx={{ color: 'var(--foreground)' }}>
+                    E-Fatura Bilgileri
+                  </Typography>
+                  <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
+                    e-Fatura kullanıcıları için posta kutusu ve gönderici birim bilgileri
+                  </Typography>
+                </Box>
+              </Box>
+
+              <Divider sx={{ mb: 3 }} />
+
+              <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+                {/* Posta Kutusu Etiketi */}
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1.5, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span style={{ fontSize: '1.2rem' }}>📮</span> Posta Kutusu Etiketi
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1, color: 'var(--muted-foreground)' }}>
+                    e-Fatura adresi (örn: urn:mail:firmaalias@urn.ettn.tr)
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={cari.efaturaPostaKutusu || ''}
+                    placeholder="urn:mail:firmaalias@urn.ettn.tr"
+                    disabled
+                    size="small"
+                    sx={{
+                      '& .MuiInputBase-root.Mui-disabled': {
+                        bgcolor: 'var(--muted)',
+                      },
+                    }}
+                    helperText="Bu bilgi cari kartı düzenleme ekranından güncellenebilir"
+                  />
+                </Box>
+
+                {/* Gönderici Birim Etiketi */}
+                <Box>
+                  <Typography variant="subtitle2" fontWeight="600" sx={{ mb: 1.5, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <span style={{ fontSize: '1.2rem' }}>🏢</span> Gönderici Birim Etiketi
+                  </Typography>
+                  <Typography variant="body2" sx={{ mb: 1, color: 'var(--muted-foreground)' }}>
+                    GİB sistemine kayıtlı gönderici birim kodu
+                  </Typography>
+                  <TextField
+                    fullWidth
+                    value={cari.efaturaGondericiBirim || ''}
+                    placeholder="Örn: 1234567890"
+                    disabled
+                    size="small"
+                    sx={{
+                      '& .MuiInputBase-root.Mui-disabled': {
+                        bgcolor: 'var(--muted)',
+                      },
+                    }}
+                    helperText="Bu bilgi cari kartı düzenleme ekranından güncellenebilir"
+                  />
+                </Box>
+
+                {/* Bilgi Kutusu */}
+                <Alert severity="info" sx={{
+                  borderRadius: 'var(--radius-md)',
+                  bgcolor: 'color-mix(in srgb, var(--info) 10%, transparent)',
+                  border: '1px solid color-mix(in srgb, var(--info) 20%, transparent)',
+                }}>
+                  <Typography variant="body2" fontWeight="500">
+                    Bu bilgileri düzenlemek için cari kartı düzenleme ekranını kullanın.
+                  </Typography>
+                </Alert>
+              </Box>
+            </Paper>
           </Box>
         )}
       </TabPanel>

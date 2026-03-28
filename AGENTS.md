@@ -140,3 +140,28 @@ Yeni bir tablo eklendiğinde aşağıdaki kurallar uygulanır:
 - Renkler tokenlarla dark/light uyumlu mu?
 - Üstte tabloyla uyumlu 3-4 KPI kart var mı?
 
+## 8) Özelleştirilmiş AI Rolleri (Skills)
+
+Proje kapsamında AI'nın (Antigravity) daha spesifik konularda uzmanlaşmış "Alt-Agent" gibi çalışması için aşağıdaki roller/yetenekler tanımlanmıştır. Bir özellik geliştirirken veya inceleme yaparken bu yeteneklerin `SKILL.md` dosyalarındaki talimatlara başvurulmalıdır:
+
+| Rol (Skill) | Dizin Pası | Temel Uzmanlık |
+| :--- | :--- | :--- |
+| **Frontend Design** | `skills/frontend_design/` | MUI v7 Uygulama, Modern Tasarım Standartları |
+| **Skill Creator** | `skills/skill_creator/` | Yeni Rol & Yetenek Yapılandırma |
+| **Senior Frontend** | `skills/senior_frontend/` | Next.js App Router, SSR/CSR, Zustand |
+| **Code Reviewer** | `skills/code_reviewer/` | Tenant Güvenliği, İş Kuralları Denetimi |
+| **Senior Backend** | `skills/senior_backend/` | NestJS 11, Prisma, BullMQ, Redis |
+| **Senior Architect** | `skills/senior_architect/` | Sistem Tasarımı, Veritabanı Stratejisi |
+| **Webapp Testing** | `skills/webapp_testing/` | Jest, Puppeteer, Uçtan Uca Doğrulama |
+| **Git Commit Helper** | `skills/git_commit_helper/` | Sementik Commit Mesajları & Raporlama |
+| **Ui Ux Pro Max** | `skills/ui_ux_pro_max/` | "Wow" Faktörü ve Mikro-Animasyonlar |
+| **Arch. Decisions** | `skills/architecture_decisions/` | ADR Yakalama ve Standart Dökümantasyon |
+| **Bug Hunter** | `skills/bug_hunter/` | Karmaşık Hata Tanılama ve Düzeltme |
+| **Coding Agent** | `skills/coding_agent/` | Ajan Orkestrasyonu ve Feature Build |
+| **Financial Auditor** | `skills/financial_auditor/` | Finansal Denetim ve ERP Hesap Takibi |
+| **Inventory Spec.** | `skills/inventory_specialist/` | Stok Bütünlüğü ve WMS Uzmanlığı |
+| **Learning Memory** | `skills/learning_memory/` | Proje Tarihçesi ve Gotcha Takibi |
+| **Research Expert** | `skills/research_expert/` | Kapsamlı Bilgi Toplama ve Analiz |
+
+> [!NOTE]
+> Herhangi bir modül geliştirilirken, ilgili disiplindeki (Backend, Frontend, UX vb.) `SKILL.md` kurallarının bu ana `AGENTS.md` standartlarıyla birlikte uygulanması zorunludur.

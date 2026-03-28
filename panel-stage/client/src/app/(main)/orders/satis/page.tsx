@@ -1,65 +1,110 @@
 'use client';
 
-import React, { useState, useEffect, useMemo } from 'react';
+import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { useEffect, useState, useMemo } from 'react';
+import axios from '@/lib/axios';
+import { useTabStore } from '@/stores/tabStore';
 import {
+  Add,
+  Assessment,
+  Close,
+  Delete,
+  Edit,
+  Print,
+  Search,
+  Visibility,
+  Cancel,
+  Download,
+  RefreshOutlined,
+  ArrowDownward,
+  ArrowUpward,
+  FilterList,
+  ExpandMore,
+  Description,
+  MoreVert,
+  Receipt,
+  ShoppingCart,
+  Assignment,
+  LocalShipping,
+  Inventory,
+  ContentCopy,
+  CheckCircle,
+} from '@mui/icons-material';
+import {
+  Alert,
   Box,
-  Typography,
+  Button,
+  Accordion,
+  AccordionSummary,
+  AccordionDetails,
+  Checkbox,
+  Chip,
+  CircularProgress,
+  Collapse,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  DialogContentText,
+  Divider,
+  FormControl,
+  Grid,
+  IconButton,
+  InputLabel,
+  ListItemIcon,
+  Autocomplete,
+  Link as MuiLink,
+  Menu,
+  MenuItem,
   Paper,
+  Popover,
+  Select,
+  Snackbar,
+  TextField,
+  Tooltip,
+  Typography,
   Table,
   TableBody,
   TableCell,
   TableContainer,
   TableHead,
   TableRow,
-  Button,
-  Chip,
-  TextField,
-  IconButton,
-  Snackbar,
-  Alert,
-  Menu,
-  MenuItem,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  DialogContentText,
-  Grid,
-  Card,
-  CardContent,
-  Skeleton,
-  Divider,
-  ListItemIcon,
+  Stack,
+  LinearProgress,
 } from '@mui/material';
-import { Add, Assessment, Delete, Edit, Visibility, Print as PrintIcon, MoreVert, Inventory, LocalShipping, Receipt, Send } from '@mui/icons-material';
-import { GridColDef, GridPaginationModel, GridSortModel, GridFilterModel } from '@mui/x-data-grid';
-import MainLayout from '@/components/Layout/MainLayout';
+import { GridColDef, GridRenderCellParams, GridPaginationModel, GridSortModel, GridFilterModel } from '@mui/x-data-grid';
+import KPIHeader from '@/components/Fatura/KPIHeader';
 import InvoiceDataGrid from '@/components/Fatura/InvoiceDataGrid';
-import axios from '@/lib/axios';
-import { useRouter } from 'next/navigation';
-import { useTabStore } from '@/stores/tabStore';
+import StatusBadge from '@/components/Fatura/StatusBadge';
+import { StandardCard, StandardPage } from '@/components/common';
 
 interface Cari {
   id: string;
-  cariKodu: string;
-  unvan: string;
-  tip: string;
+  accountCode: string;
+  title: string;
+  type: string;
+}
+
+interface Product {
+  id: string;
+  code: string;
+  name: string;
+  satisFiyati: number;
+  kdvOrani: number;
 }
 
 interface SiparisKalemi {
-  id: string;
-  stokId: string;
-  miktar: number;
+  productId: string;
+  product?: Product;
+  quantity: number;
+  unitPrice: number;
+  vatRate: number;
+  discountRate: number;
+  discountAmount: number;
+  amount?: number;
+  vatAmount?: number;
   sevkEdilenMiktar?: number;
-  birimFiyat: number;
-  kdvOrani: number;
-  stok?: { id: string; stokKodu: string; stokAdi: string };
-}
-
-interface SatisIrsaliyesi {
-  id: string;
-  irsaliyeNo: string;
-  durum: string;
 }
 
 interface Siparis {
@@ -68,111 +113,203 @@ interface Siparis {
   siparisTipi: 'SATIS' | 'SATIN_ALMA';
   tarih: string;
   vade: string | null;
-  cari: Cari;
+  account: Cari;
   toplamTutar: number;
   kdvTutar: number;
   genelToplam: number;
-  durum: 'BEKLEMEDE' | 'HAZIRLANIYOR' | 'HAZIRLANDI' | 'SEVK_EDILDI' | 'KISMI_SEVK' | 'FATURALANDI' | 'IPTAL';
+  durum: 'BEKLEMEDE' | 'ONAYLANDI' | 'KISMI_IHALE' | 'TAMAMLANDI' | 'IPTAL';
   iskonto?: number;
   aciklama?: string;
   faturaNo?: string | null;
   deliveryNoteId?: string | null;
-  kaynakIrsaliyeleri?: SatisIrsaliyesi[];
+  deliveryNote?: {
+    id: string;
+    deliveryNoteNo: string;
+  };
   kalemler?: SiparisKalemi[];
+  createdByUser?: { fullName?: string; username?: string };
+  createdAt?: string;
+  updatedByUser?: { fullName?: string; username?: string };
+  updatedAt?: string;
+  logs?: Array<{ createdAt: string; message: string; actionType?: string; user?: any }>;
 }
 
-const durumRenkleri: Record<string, 'default' | 'warning' | 'info' | 'success' | 'error'> = {
-  BEKLEMEDE: 'default',
-  HAZIRLANIYOR: 'warning',
-  HAZIRLANDI: 'info',
-  SEVK_EDILDI: 'success',
-  KISMI_SEVK: 'warning',
-  FATURALANDI: 'success',
-  IPTAL: 'error',
+interface OrderStats {
+  monthlyOrders: { totalAmount: number; count: number };
+  pendingOrders: { totalAmount: number; count: number };
+  completedOrders: { totalAmount: number; count: number };
+}
+
+const orderStatusConfig: Record<string, { label: string; color: string; bgColor: string; icon: React.ReactElement }> = {
+  BEKLEMEDE: {
+    label: 'Beklemede',
+    color: '#d97706',
+    bgColor: 'color-mix(in srgb, #d97706 15%, transparent)',
+    icon: <Assignment sx={{ fontSize: 16 }} />,
+  },
+  ONAYLANDI: {
+    label: 'Onaylandı',
+    color: '#2563eb',
+    bgColor: 'color-mix(in srgb, #2563eb 15%, transparent)',
+    icon: <CheckCircle sx={{ fontSize: 16 }} />,
+  },
+  KISMI_IHALE: {
+    label: 'Kısmi İhalet',
+    color: '#0891b2',
+    bgColor: 'color-mix(in srgb, #0891b2 15%, transparent)',
+    icon: <LocalShipping sx={{ fontSize: 16 }} />,
+  },
+  TAMAMLANDI: {
+    label: 'Tamamlandı',
+    color: '#059669',
+    bgColor: 'color-mix(in srgb, #059669 15%, transparent)',
+    icon: <CheckCircle sx={{ fontSize: 16 }} />,
+  },
+  IPTAL: {
+    label: 'İptal',
+    color: '#dc2626',
+    bgColor: 'color-mix(in srgb, #dc2626 15%, transparent)',
+    icon: <Cancel sx={{ fontSize: 16 }} />,
+  },
 };
 
-const durumMetinleri: Record<string, string> = {
-  BEKLEMEDE: 'Beklemede',
-  HAZIRLANIYOR: 'Hazırlanıyor',
-  HAZIRLANDI: 'Hazırlandı',
-  SEVK_EDILDI: 'Sevk Edildi',
-  KISMI_SEVK: 'Kısmi Sevk',
-  FATURALANDI: 'Faturalandı',
-  IPTAL: 'İptal',
-};
+function OrderStatusBadge({ status }: { status: string }) {
+  const config = orderStatusConfig[status] || {
+    label: status,
+    color: '#4b5563',
+    bgColor: 'var(--muted)',
+    icon: <Assignment sx={{ fontSize: 16 }} />,
+  };
 
-interface SiparisStats {
-  total: number;
-  bekleyen: number;
-  faturalandi: number;
-  iptal: number;
+  return (
+    <Chip
+      label={config.label}
+      icon={config.icon}
+      size="small"
+      sx={{
+        fontWeight: 600,
+        fontSize: '0.75rem',
+        color: config.color,
+        bgcolor: config.bgColor,
+        border: '1px solid',
+        borderColor: `${config.color}30`,
+        borderRadius: '6px',
+        '& .MuiChip-icon': {
+          color: 'inherit',
+          ml: 0.5,
+        },
+      }}
+    />
+  );
 }
 
 export default function SatisSiparisleriPage() {
-  const router = useRouter();
   const { addTab, setActiveTab } = useTabStore();
+  const router = useRouter();
   const [searchTerm, setSearchTerm] = useState('');
+
   const [siparisler, setSiparisler] = useState<Siparis[]>([]);
+  const [cariler, setCariler] = useState<Cari[]>([]);
+  const [stoklar, setStoklar] = useState<Product[]>([]);
   const [loading, setLoading] = useState(false);
-  const [stats, setStats] = useState<SiparisStats | null>(null);
-  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({ page: 0, pageSize: 25 });
-  const [sortModel, setSortModel] = useState<GridSortModel>([{ field: 'createdAt', sort: 'desc' }]);
-  const [filterModel, setFilterModel] = useState<GridFilterModel>({ items: [] });
+
+  const [paginationModel, setPaginationModel] = useState<GridPaginationModel>({
+    page: 0,
+    pageSize: 25,
+  });
+  const [sortModel, setSortModel] = useState<GridSortModel>([
+    { field: 'createdAt', sort: 'desc' },
+  ]);
+  const [filterModel, setFilterModel] = useState<GridFilterModel>({
+    items: [],
+  });
   const [rowCount, setRowCount] = useState(0);
-  const [filterDurum, setFilterDurum] = useState<string>('');
 
-  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
-  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
-  const [selectedSiparis, setSelectedSiparis] = useState<Siparis | null>(null);
+  // Dialog states
   const [openView, setOpenView] = useState(false);
-  const [openSevkDialog, setOpenSevkDialog] = useState(false);
-  const [sevkKalemler, setSevkKalemler] = useState<Array<{ kalemId: string; sevkMiktar: number }>>([]);
-  const [fullSiparis, setFullSiparis] = useState<Siparis | null>(null);
+  const [openDelete, setOpenDelete] = useState(false);
+  const [openIptal, setOpenIptal] = useState(false);
+  const [selectedSiparis, setSelectedSiparis] = useState<Siparis | null>(null);
+
+  // Snackbar
+  const [snackbar, setSnackbar] = useState({ open: false, message: '', severity: 'success' as 'success' | 'error' | 'info' });
+
+  // Açılır menü state
+  const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
+  const [menuSiparisId, setMenuSiparisId] = useState<string | null>(null);
+
+  // Summary Cards stats
+  const [stats, setStats] = useState<OrderStats | null>(null);
+
+  // Advanced Filters
+  const [showFilters, setShowFilters] = useState(false);
+  const [filterStartDate, setFilterStartDate] = useState('');
+  const [filterEndDate, setFilterEndDate] = useState('');
+  const [filterDurum, setFilterDurum] = useState<string[]>([]);
+  const [filterCariId, setFilterCariId] = useState('');
 
   useEffect(() => {
+    addTab({
+      id: 'orders-sales',
+      label: 'Satış Siparişleri',
+      path: '/orders/satis',
+    });
     fetchSiparisler();
-  }, [paginationModel, sortModel, filterModel, filterDurum]);
-
-  useEffect(() => {
+    fetchCariler();
+    fetchStoklar();
     fetchStats();
-  }, []);
-
-  const fetchStats = async () => {
-    try {
-      const [allRes, faturalandiRes, iptalRes] = await Promise.all([
-        axios.get('/orders', { params: { siparisTipi: 'SATIS', limit: 1 } }),
-        axios.get('/orders', { params: { siparisTipi: 'SATIS', limit: 1, durum: 'FATURALANDI' } }).catch(() => ({ data: { meta: { total: 0 } } })),
-        axios.get('/orders', { params: { siparisTipi: 'SATIS', limit: 1, durum: 'IPTAL' } }).catch(() => ({ data: { meta: { total: 0 } } })),
-      ]);
-      const total = allRes.data?.meta?.total ?? 0;
-      const faturalandi = faturalandiRes.data?.meta?.total ?? 0;
-      const iptal = iptalRes.data?.meta?.total ?? 0;
-      const bekleyen = Math.max(0, total - faturalandi - iptal);
-      setStats({ total, bekleyen, faturalandi, iptal });
-    } catch {
-      setStats({ total: 0, bekleyen: 0, faturalandi: 0, iptal: 0 });
-    }
-  };
+  }, [paginationModel, sortModel, filterModel, filterCariId, filterStartDate, filterEndDate, filterDurum]);
 
   const fetchSiparisler = async () => {
     try {
       setLoading(true);
       const params: Record<string, any> = {
         siparisTipi: 'SATIS',
-        search: searchTerm || undefined,
+        search: searchTerm,
         page: paginationModel.page + 1,
         limit: paginationModel.pageSize,
+        sortBy: sortModel[0]?.field || 'createdAt',
+        sortOrder: sortModel[0]?.sort || 'desc',
       };
-      if (filterDurum) params.durum = filterDurum;
+
+      if (filterStartDate) params.startDate = filterStartDate;
+      if (filterEndDate) params.endDate = filterEndDate;
+      if (filterDurum.length > 0) params.durum = filterDurum.join(',');
+      if (filterCariId) params.accountId = filterCariId;
+
       const response = await axios.get('/orders', { params });
-      const data = response.data?.data || [];
-      const total = response.data?.meta?.total ?? data.length;
-      setSiparisler(data);
-      setRowCount(total);
+
+      const siparisData = response.data?.data || [];
+      const totalCount = response.data?.meta?.total || response.data?.total || siparisData.length;
+
+      setSiparisler(siparisData);
+      setRowCount(totalCount);
     } catch (error: any) {
-      setSnackbar({ open: true, message: error.response?.data?.message || 'Siparişler yüklenirken hata oluştu', severity: 'error' });
+      showSnackbar(error.response?.data?.message || 'Siparişler yüklenirken hata oluştu', 'error');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const fetchCariler = async () => {
+    try {
+      const response = await axios.get('/account', {
+        params: { limit: 1000 },
+      });
+      setCariler(response.data.data || []);
+    } catch (error) {
+      console.error('Cariler yüklenirken hata:', error);
+    }
+  };
+
+  const fetchStoklar = async () => {
+    try {
+      const response = await axios.get('/products', {
+        params: { limit: 1000 },
+      });
+      setStoklar(response.data.data || []);
+    } catch (error) {
+      console.error('Stoklar yüklenirken hata:', error);
     }
   };
 
@@ -180,26 +317,68 @@ export default function SatisSiparisleriPage() {
     setSnackbar({ open: true, message, severity });
   };
 
-  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, siparis: Siparis) => {
+  const handleMenuOpen = (event: React.MouseEvent<HTMLElement>, siparisId: string) => {
     setAnchorEl(event.currentTarget);
-    setSelectedSiparis(siparis);
+    setMenuSiparisId(siparisId);
   };
 
   const handleMenuClose = () => {
     setAnchorEl(null);
-    setSelectedSiparis(null);
+    setMenuSiparisId(null);
+  };
+
+  // Excel Export
+  const handleExportExcel = async () => {
+    try {
+      const params: Record<string, string> = { siparisTipi: 'SATIS' };
+      if (searchTerm) params.search = searchTerm;
+      if (filterStartDate) params.startDate = filterStartDate;
+      if (filterEndDate) params.endDate = filterEndDate;
+      if (filterDurum.length > 0) params.durum = filterDurum.join(',');
+      if (filterCariId) params.accountId = filterCariId;
+
+      const response = await axios.get('/orders/export/excel', {
+        params,
+        responseType: 'blob',
+      });
+
+      const url = window.URL.createObjectURL(new Blob([response.data]));
+      const link = document.createElement('a');
+      link.href = url;
+      link.setAttribute('download', `satis_siparisler_${new Date().toISOString().split('T')[0]}.xlsx`);
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      window.URL.revokeObjectURL(url);
+      showSnackbar('Excel dosyası indirildi', 'success');
+    } catch (error: any) {
+      showSnackbar('Excel aktarımı başarısız', 'error');
+    }
+  };
+
+  // Clear filters
+  const handleClearFilters = () => {
+    setFilterStartDate('');
+    setFilterEndDate('');
+    setFilterDurum([]);
+    setFilterCariId('');
+    setSearchTerm('');
   };
 
   const handleEdit = (row: Siparis) => {
-    const tabId = `siparis-satis-duzenle-${row.id}`;
-    addTab({ id: tabId, label: `Düzenle: ${row.siparisNo}`, path: `/orders/satis/duzenle/${row.id}` });
+    const tabId = `orders-sales-edit-${row.id}`;
+    addTab({
+      id: tabId,
+      label: `Düzenle: ${row.siparisNo}`,
+      path: `/orders/satis/duzenle/${row.id}`,
+    });
     setActiveTab(tabId);
     router.push(`/orders/satis/duzenle/${row.id}`);
   };
 
   const handleCreate = () => {
-    addTab({ id: 'siparis-satis-yeni', label: 'Yeni Satış Siparişi', path: '/orders/satis/yeni' });
-    setActiveTab('siparis-satis-yeni');
+    addTab({ id: 'orders-sales-yeni', label: 'Yeni Satış Siparişi', path: '/orders/satis/yeni' });
+    setActiveTab('orders-sales-yeni');
     router.push('/orders/satis/yeni');
   };
 
@@ -221,65 +400,6 @@ export default function SatisSiparisleriPage() {
     router.push(`/orders/satis/hazirlama/${siparis.id}`);
   };
 
-  const handleSevkClick = async (siparis: Siparis) => {
-    try {
-      setLoading(true);
-      const response = await axios.get(`/orders/${siparis.id}`);
-      const siparisDetay = response.data;
-      setFullSiparis(siparisDetay);
-      setSevkKalemler((siparisDetay.kalemler || []).map((k: SiparisKalemi) => ({
-        kalemId: k.id,
-        sevkMiktar: k.miktar - (k.sevkEdilenMiktar || 0),
-      })));
-      setOpenSevkDialog(true);
-    } catch (error: any) {
-      showSnackbar(error.response?.data?.message || 'Sipariş detayları yüklenirken hata oluştu', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSevkSubmit = async () => {
-    if (!fullSiparis) return;
-    const hasSevk = sevkKalemler.some(k => k.sevkMiktar > 0);
-    if (!hasSevk) {
-      showSnackbar('En az bir kalem için sevk miktarı girmelisiniz', 'error');
-      return;
-    }
-    for (const sk of sevkKalemler) {
-      if (sk.sevkMiktar > 0) {
-        const kalem = fullSiparis.kalemler?.find(k => k.id === sk.kalemId);
-        if (kalem) {
-          const kalan = kalem.miktar - (kalem.sevkEdilenMiktar || 0);
-          if (sk.sevkMiktar > kalan) {
-            showSnackbar(`${kalem.stok?.stokAdi || 'Ürün'} için sevk miktarı kalan (${kalan}) aşamaz`, 'error');
-            return;
-          }
-        }
-      }
-    }
-    try {
-      setLoading(true);
-      await axios.post(`/orders/${fullSiparis.id}/sevk-et`, {
-        kalemler: sevkKalemler.filter(k => k.sevkMiktar > 0),
-      });
-      showSnackbar('Sipariş başarıyla sevk edildi', 'success');
-      setOpenSevkDialog(false);
-      setSevkKalemler([]);
-      setFullSiparis(null);
-      fetchSiparisler();
-      fetchStats();
-    } catch (error: any) {
-      showSnackbar(error.response?.data?.message || 'Sevk işlemi başarısız', 'error');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSevkMiktarChange = (kalemId: string, value: number) => {
-    setSevkKalemler(prev => prev.map(k => k.kalemId === kalemId ? { ...k, sevkMiktar: Math.max(0, value) } : k));
-  };
-
   const handleCreateIrsaliye = async (siparis: Siparis) => {
     try {
       setLoading(true);
@@ -294,11 +414,15 @@ export default function SatisSiparisleriPage() {
     }
   };
 
+  const handleConvertToInvoice = (siparis: Siparis) => {
+    router.push(`/invoice/sales/yeni?siparisId=${siparis.id}`);
+  };
+
   const handleDurumChange = async (yeniDurum: string) => {
     if (!selectedSiparis) return;
     try {
       await axios.put(`/orders/${selectedSiparis.id}/durum`, { durum: yeniDurum });
-      showSnackbar(`Sipariş durumu "${durumMetinleri[yeniDurum]}" olarak güncellendi`, 'success');
+      showSnackbar(`Sipariş durumu "${orderStatusConfig[yeniDurum]?.label || yeniDurum}" olarak güncellendi`, 'success');
       fetchSiparisler();
       fetchStats();
     } catch (error: any) {
@@ -312,6 +436,7 @@ export default function SatisSiparisleriPage() {
     try {
       await axios.delete(`/orders/${selectedSiparis.id}`);
       showSnackbar('Sipariş başarıyla silindi', 'success');
+      setOpenDelete(false);
       fetchSiparisler();
       fetchStats();
     } catch (error: any) {
@@ -320,36 +445,121 @@ export default function SatisSiparisleriPage() {
     handleMenuClose();
   };
 
-  const formatCurrency = (value: number) =>
-    new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value);
-  const formatDate = (dateString: string) => new Date(dateString).toLocaleDateString('tr-TR');
+  const openIptalDialog = (siparis: Siparis) => {
+    setSelectedSiparis(siparis);
+    setOpenIptal(true);
+    handleMenuClose();
+  };
+
+  const openDeleteDialog = (siparis: Siparis) => {
+    setSelectedSiparis(siparis);
+    setOpenDelete(true);
+    handleMenuClose();
+  };
+
+  const handleIptal = async () => {
+    if (!selectedSiparis) return;
+    try {
+      await axios.put(`/orders/${selectedSiparis.id}/iptal`);
+      showSnackbar('Sipariş başarıyla iptal edildi', 'success');
+      setOpenIptal(false);
+      fetchSiparisler();
+      fetchStats();
+    } catch (error: any) {
+      showSnackbar(error.response?.data?.message || 'İptal işlemi başarısız', 'error');
+    }
+  };
+
+  const formatDate = (dateString: string) => {
+    const date = new Date(dateString);
+    return date.toLocaleDateString('tr-TR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('tr-TR', {
+      style: 'currency',
+      currency: 'TRY',
+    }).format(amount);
+  };
+
+  const getStatusLabel = (status: string) => {
+    return orderStatusConfig[status]?.label || status;
+  };
+
+  const kpiData = useMemo(
+    () =>
+      stats
+        ? {
+            aylikSatis: { tutar: stats.monthlyOrders?.totalAmount || 0, adet: stats.monthlyOrders?.count || 0 },
+            tahsilatBekleyen: { tutar: stats.pendingOrders?.totalAmount || 0, adet: stats.pendingOrders?.count || 0 },
+            vadesiGecmis: { tutar: stats.completedOrders?.totalAmount || 0, adet: stats.completedOrders?.count || 0 },
+          }
+        : null,
+    [stats]
+  );
+
+  const pageGrandTotal = useMemo(
+    () => siparisler.reduce((sum, s) => sum + (s.genelToplam || 0), 0),
+    [siparisler]
+  );
+
+  const fetchStats = async () => {
+    try {
+      const params: Record<string, any> = { siparisTipi: 'SATIS' };
+      if (filterStartDate) params.startDate = filterStartDate;
+      if (filterEndDate) params.endDate = filterEndDate;
+      if (filterDurum.length > 0) params.durum = filterDurum.join(',');
+      if (filterCariId) params.accountId = filterCariId;
+
+      const response = await axios.get('/orders/stats', {
+        params
+      });
+      setStats(response.data);
+    } catch (error) {
+      console.error('İstatistikler yüklenirken hata:', error);
+    }
+  };
 
   const columns: GridColDef[] = useMemo(() => [
     {
       field: 'siparisNo',
       headerName: 'Sipariş No',
       flex: 1,
-      minWidth: 130,
-      renderCell: (params) => <Typography variant="body2" fontWeight="bold">{params.value}</Typography>,
+      minWidth: 150,
+      renderCell: (params) => (
+        <Box>
+          <Typography variant="body2" fontWeight="bold">{params.value}</Typography>
+          {params.row.deliveryNote && (
+            <Chip label="İrsaliye" size="small" color="info" sx={{ height: 20, fontSize: '0.65rem', mt: 0.5 }} />
+          )}
+        </Box>
+      )
     },
     {
       field: 'tarih',
       headerName: 'Tarih',
       width: 120,
-      valueFormatter: (value) => value ? new Date(value).toLocaleDateString('tr-TR') : '-',
+      valueFormatter: (value) => new Date(value).toLocaleDateString('tr-TR'),
     },
     {
-      field: 'cari',
-      headerName: 'Cari',
+      field: 'accountCode',
+      headerName: 'Cari Kod',
+      width: 130,
+      valueGetter: (value, row) => row.account?.accountCode || '',
+    },
+    {
+      field: 'account',
+      headerName: 'Cari Ünvan',
       flex: 1.5,
       minWidth: 200,
-      valueGetter: (params: any) => params?.unvan || '',
+      valueGetter: (account: any) => account?.title || '',
       renderCell: (params) => (
-        <Box>
-          <Typography variant="body2" fontWeight="medium">{params.value}</Typography>
-          <Typography variant="caption" color="text.secondary">{params.row.cari?.cariKodu}</Typography>
-        </Box>
-      ),
+        <Typography variant="body2" fontWeight="medium">{params.value}</Typography>
+      )
     },
     {
       field: 'vade',
@@ -364,172 +574,326 @@ export default function SatisSiparisleriPage() {
       type: 'number',
       align: 'right',
       headerAlign: 'right',
-      valueFormatter: (value) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value ?? 0),
+      valueFormatter: (value) => new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(value),
       renderCell: (params) => (
-        <Typography variant="body2" fontWeight="bold" sx={{ fontFamily: 'monospace' }}>
-          {formatCurrency(params.value ?? 0)}
-        </Typography>
-      ),
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5, justifyContent: 'flex-end' }}>
+          <ArrowDownward sx={{ fontSize: 14, color: 'var(--chart-1)' }} />
+          <Typography variant="body2" fontWeight="700" sx={{ color: 'var(--chart-1)' }}>
+            {new Intl.NumberFormat('tr-TR', { style: 'currency', currency: 'TRY' }).format(params.value)}
+          </Typography>
+        </Box>
+      )
     },
     {
       field: 'durum',
       headerName: 'Durum',
       width: 140,
-      renderCell: (params) => (
-        <Chip
-          label={durumMetinleri[params.value] || params.value}
-          color={durumRenkleri[params.value] || 'default'}
-          size="small"
-          sx={{ fontWeight: 600 }}
-        />
-      ),
+      renderCell: (params) => <OrderStatusBadge status={params.value} />
     },
     {
       field: 'actions',
       type: 'actions',
       headerName: 'İşlemler',
-      width: 180,
-      getActions: (params) => {
-        const row = params.row as Siparis;
-        return [
-          <IconButton key="edit" size="small" onClick={(e) => { e.stopPropagation(); handleEdit(row); }} title="Düzenle" disabled={row.durum === 'FATURALANDI' || row.durum === 'IPTAL'}>
+      width: 160,
+      getActions: (params) => [
+        <Tooltip key="edit" title="Düzenle">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleEdit(params.row); }}>
             <Edit fontSize="small" />
-          </IconButton>,
-          <IconButton key="print" size="small" onClick={(e) => { e.stopPropagation(); handlePrint(row); }} title="Yazdır">
-            <PrintIcon fontSize="small" />
-          </IconButton>,
-          <IconButton key="view" size="small" onClick={(e) => { e.stopPropagation(); handleView(row); }} title="Detay">
+          </IconButton>
+        </Tooltip>,
+        <Tooltip key="print" title="Yazdır">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handlePrint(params.row); }}>
+            <Print fontSize="small" />
+          </IconButton>
+        </Tooltip>,
+        <Tooltip key="view" title="Detay">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleView(params.row); }}>
             <Visibility fontSize="small" />
-          </IconButton>,
-          <IconButton key="menu" size="small" onClick={(e) => { e.stopPropagation(); handleMenuOpen(e, row); }} title="Diğer İşlemler">
+          </IconButton>
+        </Tooltip>,
+        <Tooltip key="menu" title="Diğer İşlemler">
+          <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleMenuOpen(e, params.row.id); }}>
             <MoreVert fontSize="small" />
-          </IconButton>,
-        ];
-      },
+          </IconButton>
+        </Tooltip>,
+      ],
     },
   ], []);
 
   return (
-    <MainLayout>
-      <Box sx={{ p: 3 }}>
-        {/* Header - aynı fatura/satis */}
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-          <Box>
-            <Typography variant="h4" fontWeight="700" sx={{ letterSpacing: '-0.5px' }}>
-              Satış Siparişleri
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              Müşteri siparişlerinizi buradan yönetebilir, sevk ve fatura süreçlerini takip edebilirsiniz.
-            </Typography>
+    <StandardPage maxWidth={false}>
+      {/* Header & Aksiyon Butonları */}
+      <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 1.5 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+          <Box sx={{ width: 40, height: 40, borderRadius: 2, bgcolor: 'color-mix(in srgb, var(--chart-1) 12%, transparent)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <ShoppingCart sx={{ color: 'var(--chart-1)', fontSize: 20 }} />
           </Box>
-          <Box sx={{ display: 'flex', gap: 1 }}>
-            <Button variant="outlined" startIcon={<Assessment />} onClick={() => router.push('/raporlama/satis-elemani')}>
-              Raporlar
-            </Button>
-            <Button
-              variant="contained"
-              startIcon={<Add />}
-              onClick={handleCreate}
-              sx={{ bgcolor: 'var(--primary)', '&:hover': { bgcolor: 'var(--primary-hover)' } }}
-            >
-              Yeni Sipariş
-            </Button>
+          <Typography variant="h6" fontWeight="700" color="text.primary">
+            Satış Siparişleri
+          </Typography>
+        </Box>
+        <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1}>
+          <Button
+            variant="outlined"
+            size="small"
+            startIcon={<Assessment />}
+            onClick={() => router.push('/raporlama/satis-elemani')}
+            sx={{ fontWeight: 600, fontSize: '0.8rem', px: 1.5, py: 0.75, minWidth: 0, boxShadow: 'none' }}
+          >
+            Raporlar
+          </Button>
+          <Button
+            variant="contained"
+            size="small"
+            startIcon={<Add />}
+            onClick={handleCreate}
+            sx={{
+              bgcolor: 'var(--chart-1)',
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              px: 1.5,
+              py: 0.75,
+              minWidth: 0,
+              boxShadow: 'none',
+              '&:hover': { bgcolor: 'color-mix(in srgb, var(--chart-1) 85%, var(--background))', boxShadow: 'none' },
+            }}
+          >
+            Yeni Sipariş
+          </Button>
+        </Stack>
+      </Box>
+
+      {/* Loading bar */}
+      {loading && <LinearProgress sx={{ mb: 2, borderRadius: 1, height: 3 }} color="primary" />}
+
+      {/* KPI Kartları */}
+      <KPIHeader loading={loading} data={kpiData} type="SATIS" />
+
+      {/* Entegre Toolbar ve DataGrid */}
+      <StandardCard padding={0} sx={{ boxShadow: 'none', overflow: 'hidden' }}>
+        {/* Toolbar */}
+        <Box sx={{ p: 2, display: 'flex', flexWrap: 'wrap', gap: 1.5, alignItems: 'center', borderBottom: '1px solid', borderColor: 'divider', bgcolor: 'var(--card)' }}>
+          <TextField
+            size="small"
+            placeholder="Sipariş Ara (No, Cari vb.)"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            sx={{ minWidth: 250, '& .MuiOutlinedInput-root': { borderRadius: 2 } }}
+            InputProps={{
+              startAdornment: <Search sx={{ color: 'text.secondary', mr: 1, fontSize: 20 }} />,
+              endAdornment: searchTerm && (
+                <IconButton size="small" onClick={() => setSearchTerm('')}>
+                  <Close fontSize="small" />
+                </IconButton>
+              ),
+            }}
+          />
+          {/* Hızlı Tarih Çipleri */}
+          <Stack direction="row" spacing={1} sx={{ flexWrap: 'wrap' }}>
+            {['TÜMÜ', 'BUGÜN', 'BU HAFTA', 'BU AY', 'BU YIL'].map((label) => {
+              const today = new Date();
+              const toISODate = (d: Date) => d.toISOString().split('T')[0];
+              const getQuickRange = (quickLabel: string) => {
+                if (quickLabel === 'TÜMÜ') return { start: '', end: '' };
+                if (quickLabel === 'BUGÜN') return { start: toISODate(today), end: toISODate(today) };
+                if (quickLabel === 'BU HAFTA') {
+                  const day = today.getDay();
+                  const diffToMonday = (day === 0 ? -6 : 1 - day);
+                  const monday = new Date(today);
+                  monday.setDate(today.getDate() + diffToMonday);
+                  const sunday = new Date(monday);
+                  sunday.setDate(monday.getDate() + 6);
+                  return { start: toISODate(monday), end: toISODate(sunday) };
+                }
+                if (quickLabel === 'BU AY') {
+                  return { start: toISODate(new Date(today.getFullYear(), today.getMonth(), 1)), end: toISODate(today) };
+                }
+                if (quickLabel === 'BU YIL') {
+                  return { start: toISODate(new Date(today.getFullYear(), 0, 1)), end: toISODate(today) };
+                }
+                return { start: '', end: '' };
+              };
+              const range = getQuickRange(label);
+              const isSelected = label === 'TÜMÜ'
+                ? !filterStartDate && !filterEndDate
+                : filterStartDate === range.start && filterEndDate === range.end;
+              return (
+                <Chip
+                  key={label}
+                  label={label}
+                  onClick={() => {
+                    if (label === 'TÜMÜ') {
+                      setFilterStartDate('');
+                      setFilterEndDate('');
+                      return;
+                    }
+                    setFilterStartDate(range.start);
+                    setFilterEndDate(range.end);
+                  }}
+                  variant={isSelected ? 'filled' : 'outlined'}
+                  color={isSelected ? 'primary' : 'default'}
+                  sx={{ borderRadius: 2, cursor: 'pointer', fontWeight: 500, fontSize: '0.75rem' }}
+                />
+              )
+            })}
+          </Stack>
+
+          <Box sx={{ ml: 'auto', display: 'flex', gap: 0.5 }}>
+            <Tooltip title="Filtreler">
+              <IconButton size="small" onClick={() => setShowFilters(!showFilters)} color={showFilters ? 'primary' : 'default'}>
+                <FilterList fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Excel İndir">
+              <IconButton size="small" onClick={handleExportExcel}>
+                <Download fontSize="small" />
+              </IconButton>
+            </Tooltip>
+            <Tooltip title="Yenile">
+              <IconButton size="small" onClick={fetchSiparisler}>
+                <RefreshOutlined fontSize="small" />
+              </IconButton>
+            </Tooltip>
           </Box>
         </Box>
 
-        {/* KPI - fatura ile aynı stil */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          {[
-            { title: 'Toplam Sipariş', value: stats?.total ?? 0, color: '#10b981', bgColor: 'color-mix(in srgb, var(--chart-3) 15%, transparent)' },
-            { title: 'Bekleyen', value: stats?.bekleyen ?? 0, color: '#3b82f6', bgColor: 'color-mix(in srgb, var(--chart-1) 15%, transparent)' },
-            { title: 'Faturalandı', value: stats?.faturalandi ?? 0, color: '#059669', bgColor: 'color-mix(in srgb, #059669 15%, transparent)' },
-          ].map((card, index) => (
-            <Grid key={index} size={{ xs: 12, md: 4 }}>
-              <Card elevation={0} sx={{ border: '1px solid', borderColor: 'divider', borderRadius: 2, height: '100%', '&:hover': { transform: 'translateY(-2px)', boxShadow: '0 4px 12px rgba(0,0,0,0.05)' }, transition: 'transform 0.2s, box-shadow 0.2s' }}>
-                <CardContent sx={{ p: '20px !important' }}>
-                  <Box display="flex" justifyContent="space-between" alignItems="flex-start">
-                    <Box>
-                      <Typography variant="subtitle2" color="text.secondary" fontWeight={600} gutterBottom>{card.title}</Typography>
-                      {loading && !siparisler.length ? (
-                        <Skeleton width={80} height={40} />
-                      ) : (
-                        <Typography variant="h5" fontWeight="bold" sx={{ color: 'text.primary', letterSpacing: '-0.5px' }}>{card.value}</Typography>
-                      )}
-                      <Typography variant="caption" color="text.secondary" sx={{ mt: 0.5, display: 'block' }}>adet sipariş</Typography>
-                    </Box>
-                    <Box sx={{ background: card.bgColor, color: card.color, borderRadius: 2, p: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <Assessment />
-                    </Box>
-                  </Box>
-                </CardContent>
-              </Card>
+        <Collapse in={showFilters}>
+          <Box sx={{ p: 2, bgcolor: 'var(--muted)', borderBottom: '1px solid', borderColor: 'divider' }}>
+            <Grid container spacing={2}>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} >
+                <TextField
+                  fullWidth type="date" size="small" label="Başlangıç Tarihi"
+                  value={filterStartDate} onChange={(e) => setFilterStartDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} >
+                <TextField
+                  fullWidth type="date" size="small" label="Bitiş Tarihi"
+                  value={filterEndDate} onChange={(e) => setFilterEndDate(e.target.value)}
+                  InputLabelProps={{ shrink: true }}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} >
+                <FormControl fullWidth size="small">
+                  <InputLabel>Durum</InputLabel>
+                  <Select
+                    multiple
+                    value={filterDurum}
+                    onChange={(e) => setFilterDurum(typeof e.target.value === 'string' ? e.target.value.split(',') : e.target.value)}
+                    label="Durum"
+                    renderValue={(selected: any) => (selected as string[]).map(s => getStatusLabel(s)).join(', ')}
+                  >
+                    <MenuItem value="BEKLEMEDE">Beklemede</MenuItem>
+                    <MenuItem value="ONAYLANDI">Onaylandı</MenuItem>
+                    <MenuItem value="KISMI_IHALE">Kısmi İhalet</MenuItem>
+                    <MenuItem value="TAMAMLANDI">Tamamlandı</MenuItem>
+                    <MenuItem value="IPTAL">İptal</MenuItem>
+                  </Select>
+                </FormControl>
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} >
+                <Autocomplete
+                  size="small"
+                  options={cariler}
+                  getOptionLabel={(option: Cari) => `${option.accountCode} - ${option.title}`}
+                  value={cariler.find(c => c.id === filterCariId) || null}
+                  onChange={(_: any, newValue: Cari | null) => setFilterCariId(newValue?.id || '')}
+                  renderInput={(params) => <TextField {...params} label="Cari" />}
+                />
+              </Grid>
+              <Grid size={{ xs: 12, sm: 6, md: 3 }} >
+                <Button variant="outlined" color="secondary" fullWidth onClick={handleClearFilters} sx={{ height: '40px' }}>
+                  Filtreleri Temizle
+                </Button>
+              </Grid>
             </Grid>
-          ))}
-        </Grid>
-
-        {/* Filtre - durum chip'leri fatura tarzı */}
-        <Paper sx={{ p: 2, mb: 2, border: '1px solid var(--border)', borderRadius: 2 }}>
-          <TextField
-            fullWidth
-            size="small"
-            placeholder="Sipariş No, Cari Unvan veya Cari Kodu ile ara..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && fetchSiparisler()}
-            sx={{ mb: 2 }}
-          />
-          <Box sx={{ display: 'flex', gap: 1, flexWrap: 'wrap' }}>
-            {['', 'BEKLEMEDE', 'HAZIRLANIYOR', 'HAZIRLANDI', 'SEVK_EDILDI', 'KISMI_SEVK', 'FATURALANDI', 'IPTAL'].map((d) => (
-              <Chip
-                key={d || 'ALL'}
-                label={d ? durumMetinleri[d] : 'Tümü'}
-                onClick={() => setFilterDurum(d)}
-                color={filterDurum === d ? 'primary' : 'default'}
-                size="small"
-                sx={{ fontWeight: filterDurum === d ? 600 : 500 }}
-              />
-            ))}
           </Box>
-        </Paper>
+        </Collapse>
 
-        <InvoiceDataGrid
-          rows={siparisler}
-          columns={columns}
-          loading={loading}
-          rowCount={rowCount}
-          paginationModel={paginationModel}
-          onPaginationModelChange={setPaginationModel}
-          sortModel={sortModel}
-          onSortModelChange={setSortModel}
-          onFilterModelChange={setFilterModel}
-          checkboxSelection={false}
-        />
-      </Box>
+        {/* Tablo Satır Özeti */}
+        <Box sx={{ px: 2, py: 1, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <Typography variant="caption" color="text.secondary">
+            Toplam <b>{rowCount}</b> sipariş listeleniyor
+          </Typography>
+        </Box>
 
-      {/* View Dialog */}
-      <Dialog open={openView} onClose={() => setOpenView(false)} maxWidth="md" fullWidth>
-        <DialogTitle sx={{ fontWeight: 'bold' }}>Sipariş Detayı</DialogTitle>
+        {/* DataGrid */}
+        <Box sx={{ width: '100%' }}>
+          <InvoiceDataGrid
+            rows={siparisler}
+            columns={columns}
+            loading={loading}
+            rowCount={rowCount}
+            paginationModel={paginationModel}
+            onPaginationModelChange={setPaginationModel}
+            sortModel={sortModel}
+            onSortModelChange={setSortModel}
+            onFilterModelChange={setFilterModel}
+            checkboxSelection={false}
+            height={900}
+          />
+        </Box>
+        {/* Tablo footer sum */}
+        <Box
+          sx={{
+            p: 2,
+            borderTop: '1px solid var(--border)',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            flexWrap: 'wrap',
+            gap: 1,
+          }}
+        >
+          <Typography variant="caption" color="text.secondary">
+            Bu sayfadaki toplam <b>Tutar</b>:
+          </Typography>
+          <Typography variant="body2" fontWeight={800} sx={{ color: 'var(--chart-1)' }}>
+            {formatCurrency(pageGrandTotal)}
+          </Typography>
+        </Box>
+      </StandardCard>
+
+      {/* Dialogs */}
+      <Dialog
+        open={openView}
+        onClose={() => setOpenView(false)}
+        maxWidth="md"
+        fullWidth
+        PaperProps={{ sx: { borderRadius: 3 } }}
+      >
+        <DialogTitle component="div" sx={{ fontWeight: 'bold' }}>
+          Sipariş Detayı
+        </DialogTitle>
         <DialogContent>
           {selectedSiparis && (
             <Box sx={{ mt: 2 }}>
               <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" color="text.secondary">Sipariş No:</Typography>
-                  <Typography variant="body1" fontWeight="bold">{selectedSiparis.siparisNo}</Typography>
+                  <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                    <Typography variant="body1" fontWeight="bold">{selectedSiparis.siparisNo}</Typography>
+                  </Box>
                 </Box>
                 <Box sx={{ flex: 1 }}>
                   <Typography variant="body2" color="text.secondary">Tarih:</Typography>
-                  <Typography variant="body1" fontWeight="bold">{formatDate(selectedSiparis.tarih)}</Typography>
+                  <Typography variant="body1" fontWeight="bold">
+                    {formatDate(selectedSiparis.tarih)}
+                  </Typography>
                 </Box>
               </Box>
               <Box sx={{ mb: 2 }}>
                 <Typography variant="body2" color="text.secondary">Cari:</Typography>
-                <Typography variant="body1" fontWeight="bold">{selectedSiparis.cari?.unvan}</Typography>
+                <Typography variant="body1" fontWeight="bold">
+                  {selectedSiparis.account.title}
+                </Typography>
               </Box>
               <Box sx={{ mb: 2 }}>
                 <Typography variant="body2" color="text.secondary">Durum:</Typography>
-                <Chip label={durumMetinleri[selectedSiparis.durum]} color={durumRenkleri[selectedSiparis.durum]} size="small" />
+                <OrderStatusBadge status={selectedSiparis.durum} />
               </Box>
+
               {selectedSiparis.kalemler && selectedSiparis.kalemler.length > 0 && (
                 <Box sx={{ mb: 2 }}>
                   <Typography variant="subtitle2" sx={{ mb: 1 }}>Kalemler:</Typography>
@@ -540,18 +904,24 @@ export default function SatisSiparisleriPage() {
                           <TableCell sx={{ fontWeight: 600 }}>Malzeme Kodu</TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>Stok</TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>Miktar</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>Sevk Edilen</TableCell>
                           <TableCell sx={{ fontWeight: 600 }}>Birim Fiyat</TableCell>
+                          <TableCell sx={{ fontWeight: 600 }}>KDV %</TableCell>
                           <TableCell align="right" sx={{ fontWeight: 600 }}>Tutar</TableCell>
                         </TableRow>
                       </TableHead>
                       <TableBody>
-                        {selectedSiparis.kalemler.map((kalem, idx) => (
-                          <TableRow key={kalem.id || idx} hover>
-                            <TableCell>{kalem.stok?.stokKodu || '-'}</TableCell>
-                            <TableCell>{kalem.stok?.stokAdi || '-'}</TableCell>
-                            <TableCell>{kalem.miktar}</TableCell>
-                            <TableCell>{formatCurrency(kalem.birimFiyat)}</TableCell>
-                            <TableCell align="right">{formatCurrency(kalem.miktar * kalem.birimFiyat)}</TableCell>
+                        {selectedSiparis.kalemler.map((kalem: any, index: any) => (
+                          <TableRow key={index} hover>
+                            <TableCell>{kalem.product?.code || '-'}</TableCell>
+                            <TableCell>{kalem.product?.name || '-'}</TableCell>
+                            <TableCell>{kalem.quantity}</TableCell>
+                            <TableCell>{kalem.sevkEdilenMiktar || 0}</TableCell>
+                            <TableCell>{formatCurrency(kalem.unitPrice)}</TableCell>
+                            <TableCell>%{kalem.vatRate}</TableCell>
+                            <TableCell align="right">
+                              {formatCurrency((Number(kalem.amount) || 0) + (Number(kalem.vatAmount) || 0))}
+                            </TableCell>
                           </TableRow>
                         ))}
                       </TableBody>
@@ -559,10 +929,123 @@ export default function SatisSiparisleriPage() {
                   </TableContainer>
                 </Box>
               )}
-              <Box sx={{ mt: 2 }}>
-                <Typography variant="body2" color="text.secondary">Genel Toplam:</Typography>
-                <Typography variant="h6" fontWeight="bold" color="primary">{formatCurrency(selectedSiparis.genelToplam)}</Typography>
-              </Box>
+
+              <Paper variant="outlined" sx={{ p: 2, bgcolor: 'var(--muted)', borderRadius: 2, mb: 2 }}>
+                <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                    <Typography variant="body2" color="text.secondary">Ara Toplam:</Typography>
+                    <Typography variant="body2" fontWeight={500}>
+                      {formatCurrency(Number(selectedSiparis.toplamTutar || 0))}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                    <Typography variant="body2" color="text.secondary">İskonto:</Typography>
+                    <Typography variant="body2" fontWeight={500} color="error.main">
+                      -{formatCurrency(selectedSiparis.iskonto || 0)}
+                    </Typography>
+                  </Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                    <Typography variant="body2" color="text.secondary">KDV Toplamı:</Typography>
+                    <Typography variant="body2" fontWeight={500}>
+                      {formatCurrency(selectedSiparis.kdvTutar || 0)}
+                    </Typography>
+                  </Box>
+                  <Divider sx={{ width: '250px', my: 1 }} />
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', width: '250px' }}>
+                    <Typography variant="h6" fontWeight="bold">Genel Toplam:</Typography>
+                    <Typography variant="h6" fontWeight="bold" sx={{ color: 'var(--chart-1)' }}>
+                      {formatCurrency(selectedSiparis.genelToplam)}
+                    </Typography>
+                  </Box>
+                </Box>
+              </Paper>
+
+              {/* Audit Bilgileri */}
+              <Accordion variant="outlined" sx={{ bgcolor: 'color-mix(in srgb, var(--chart-1) 10%, transparent)', mt: 2, '&:before': { display: 'none' } }}>
+                <AccordionSummary
+                  expandIcon={<ExpandMore color="primary" />}
+                  sx={{
+                    minHeight: '48px',
+                    '& .MuiAccordionSummary-content': { my: 1 }
+                  }}
+                >
+                  <Typography variant="subtitle2" sx={{ fontWeight: 600, color: 'var(--chart-1)' }}>
+                    📋 Denetim Bilgileri
+                  </Typography>
+                </AccordionSummary>
+                <AccordionDetails sx={{ pt: 0, pb: 2 }}>
+                  <Box sx={{ display: 'flex', flexDirection: 'column', gap: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 2 }}>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Oluşturan:
+                        </Typography>
+                        <Typography variant="body2" fontWeight="500">
+                          {selectedSiparis.createdByUser?.fullName || 'Sistem'}
+                          <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                            ({selectedSiparis.createdByUser?.username || '-'})
+                          </Typography>
+                        </Typography>
+                      </Box>
+                      <Box sx={{ flex: 1 }}>
+                        <Typography variant="caption" color="text.secondary">
+                          Oluşturma Tarihi:
+                        </Typography>
+                        <Typography variant="body2" fontWeight="500">
+                          {selectedSiparis.createdAt
+                            ? new Date(selectedSiparis.createdAt).toLocaleString('tr-TR')
+                            : '-'}
+                        </Typography>
+                      </Box>
+                    </Box>
+
+                    {selectedSiparis.updatedByUser && (
+                      <Box sx={{ display: 'flex', gap: 2 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Son Güncelleyen:
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {selectedSiparis.updatedByUser.fullName}
+                            <Typography component="span" variant="caption" color="text.secondary" sx={{ ml: 0.5 }}>
+                              ({selectedSiparis.updatedByUser.username})
+                            </Typography>
+                          </Typography>
+                        </Box>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="caption" color="text.secondary">
+                            Son Güncelleme:
+                          </Typography>
+                          <Typography variant="body2" fontWeight="500">
+                            {selectedSiparis.updatedAt
+                              ? new Date(selectedSiparis.updatedAt).toLocaleString('tr-TR')
+                              : '-'}
+                          </Typography>
+                        </Box>
+                      </Box>
+                    )}
+
+                    {selectedSiparis.logs && selectedSiparis.logs.length > 0 && (
+                      <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid var(--border)' }}>
+                        <Typography variant="caption" color="text.secondary" sx={{ mb: 0.5, display: 'block' }}>
+                          Son İşlemler:
+                        </Typography>
+                        {selectedSiparis.logs.slice(0, 3).map((log: any, index: number) => (
+                          <Typography key={index} variant="caption" sx={{ display: 'block', fontSize: '0.7rem' }}>
+                            • {new Date(log.createdAt).toLocaleString('tr-TR', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit'
+                            })} - {log.actionType || log.message}
+                            {log.user && ` (${log.user.fullName})`}
+                          </Typography>
+                        ))}
+                      </Box>
+                    )}
+                  </Box>
+                </AccordionDetails>
+              </Accordion>
             </Box>
           )}
         </DialogContent>
@@ -571,117 +1054,160 @@ export default function SatisSiparisleriPage() {
         </DialogActions>
       </Dialog>
 
-      {/* Menü - Diğer İşlemler */}
-      <Menu anchorEl={anchorEl} open={Boolean(anchorEl)} onClose={handleMenuClose} disableAutoFocusItem>
-        {selectedSiparis && selectedSiparis.durum !== 'FATURALANDI' && selectedSiparis.durum !== 'IPTAL' && (
-          <>
-            {selectedSiparis.durum === 'BEKLEMEDE' && (
-              <MenuItem onClick={() => handleDurumChange('HAZIRLANIYOR')}>Hazırlanıyor Olarak İşaretle</MenuItem>
-            )}
-            {selectedSiparis.durum === 'HAZIRLANIYOR' && (
-              <MenuItem onClick={() => { handleMenuClose(); router.push(`/orders/satis/hazirlama/${selectedSiparis.id}`); }}>
-                <ListItemIcon><Inventory fontSize="small" /></ListItemIcon>
-                Sipariş Hazırla
-              </MenuItem>
-            )}
-            {selectedSiparis.durum === 'HAZIRLANIYOR' && (
-              <MenuItem onClick={() => handleDurumChange('HAZIRLANDI')}>Hazırlandı Olarak İşaretle</MenuItem>
-            )}
-            {selectedSiparis.durum === 'HAZIRLANDI' && (
-              <MenuItem onClick={() => { handleMenuClose(); router.push(`/fatura/satis/yeni?siparisId=${selectedSiparis.id}`); }}>
-                <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
-                Faturalandır
-              </MenuItem>
-            )}
-            {(selectedSiparis.durum === 'SEVK_EDILDI' || selectedSiparis.durum === 'KISMI_SEVK') && (
-              <MenuItem onClick={() => { handleMenuClose(); handleCreateIrsaliye(selectedSiparis); }}>
-                <ListItemIcon><LocalShipping fontSize="small" /></ListItemIcon>
-                İrsaliye Oluştur
-              </MenuItem>
-            )}
-            {(selectedSiparis.durum === 'SEVK_EDILDI' || selectedSiparis.durum === 'KISMI_SEVK') && (
-              <MenuItem onClick={() => { handleMenuClose(); router.push(`/fatura/satis/yeni?siparisId=${selectedSiparis.id}`); }}>
-                <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
-                Faturalandır
-              </MenuItem>
-            )}
-            <MenuItem onClick={() => handleDurumChange('IPTAL')} sx={{ color: 'error.main' }}>İptal Et</MenuItem>
-            <Divider />
-          </>
-        )}
-        <MenuItem onClick={() => { handleMenuClose(); if (selectedSiparis) handlePrint(selectedSiparis); }}>
-          <ListItemIcon><PrintIcon fontSize="small" /></ListItemIcon>
-          Yazdır
-        </MenuItem>
-        <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
-          <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
-          Sil
-        </MenuItem>
-      </Menu>
-
-      {/* Sevk Dialog */}
-      <Dialog open={openSevkDialog} onClose={() => { setOpenSevkDialog(false); setFullSiparis(null); setSevkKalemler([]); }} maxWidth="md" fullWidth>
-        <DialogTitle>Sipariş Sevk Et - {fullSiparis?.siparisNo}</DialogTitle>
+      <Dialog open={openDelete} onClose={() => setOpenDelete(false)} PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle component="div" sx={{ fontWeight: 'bold' }}>Sipariş Sil</DialogTitle>
         <DialogContent>
-          {fullSiparis && (
-            <Box sx={{ mt: 2 }}>
-              <DialogContentText sx={{ mb: 3 }}>Sipariş kalemlerini sevk edin. Kısmi sevk yapabilirsiniz.</DialogContentText>
-              <TableContainer component={Paper} variant="outlined">
-                <Table size="small">
-                  <TableHead>
-                    <TableRow>
-                      <TableCell sx={{ fontWeight: 600 }}>Ürün</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Sipariş Miktarı</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Sevk Edilen</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Kalan</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 600 }}>Bu Sevk Miktarı</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {fullSiparis.kalemler?.map((kalem) => {
-                      const sk = sevkKalemler.find(k => k.kalemId === kalem.id);
-                      const sevkMiktar = sk?.sevkMiktar ?? 0;
-                      const kalanMiktar = kalem.miktar - (kalem.sevkEdilenMiktar || 0);
-                      return (
-                        <TableRow key={kalem.id}>
-                          <TableCell>
-                            <Typography variant="body2" fontWeight="500">{kalem.stok?.stokAdi || 'Ürün'}</Typography>
-                            <Typography variant="caption" color="text.secondary">{kalem.stok?.stokKodu || ''}</Typography>
-                          </TableCell>
-                          <TableCell align="right">{kalem.miktar}</TableCell>
-                          <TableCell align="right">{kalem.sevkEdilenMiktar || 0}</TableCell>
-                          <TableCell align="right">{kalanMiktar}</TableCell>
-                          <TableCell align="right">
-                            <TextField
-                              type="number"
-                              size="small"
-                              value={sevkMiktar}
-                              onChange={(e) => handleSevkMiktarChange(kalem.id, parseInt(e.target.value) || 0)}
-                              inputProps={{ min: 0, max: kalanMiktar }}
-                              sx={{ width: 100 }}
-                              disabled={kalanMiktar === 0}
-                            />
-                          </TableCell>
-                        </TableRow>
-                      );
-                    })}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          )}
+          <Typography>
+            <strong>{selectedSiparis?.siparisNo}</strong> nolu siparişi silmek istediğinizden emin misiniz?
+          </Typography>
+          <Typography variant="body2" color="error" sx={{ mt: 2 }}>
+            Bu işlem geri alınamaz!
+          </Typography>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => { setOpenSevkDialog(false); setFullSiparis(null); setSevkKalemler([]); }}>İptal</Button>
-          <Button onClick={handleSevkSubmit} variant="contained" disabled={loading} sx={{ bgcolor: 'var(--primary)' }}>
-            {loading ? 'Sevk Ediliyor...' : 'Sevk Et'}
+          <Button onClick={() => setOpenDelete(false)}>İptal</Button>
+          <Button onClick={handleDelete} variant="contained" color="error">
+            Sil
           </Button>
         </DialogActions>
       </Dialog>
 
-      <Snackbar open={snackbar.open} autoHideDuration={6000} onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}>
-        <Alert onClose={() => setSnackbar(prev => ({ ...prev, open: false }))} severity={snackbar.severity} sx={{ width: '100%', borderRadius: 'var(--radius)' }}>{snackbar.message}</Alert>
+      <Dialog open={openIptal} onClose={() => setOpenIptal(false)} maxWidth="sm" fullWidth PaperProps={{ sx: { borderRadius: 3 } }}>
+        <DialogTitle component="div" sx={{
+          background: 'linear-gradient(135deg, var(--destructive) 0%, var(--destructive) 100%)',
+          color: 'var(--primary-foreground)',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          fontWeight: 'bold',
+        }}>
+          Sipariş İptal
+          <IconButton size="small" onClick={() => setOpenIptal(false)} sx={{ color: 'var(--primary-foreground)' }}>
+            <Close />
+          </IconButton>
+        </DialogTitle>
+        <DialogContent sx={{ mt: 2 }}>
+          {selectedSiparis && (
+            <Box>
+              <Alert severity="warning" sx={{ mb: 2 }}>
+                <Typography variant="body2" fontWeight="bold">
+                  Bu işlem geri alınamaz!
+                </Typography>
+              </Alert>
+              <Typography variant="body1" sx={{ mb: 2 }}>
+                <strong>{selectedSiparis.siparisNo}</strong> nolu siparişi iptal etmek istediğinizden emin misiniz?
+              </Typography>
+            </Box>
+          )}
+        </DialogContent>
+        <DialogActions sx={{ p: 2 }}>
+          <Button onClick={() => setOpenIptal(false)}>Vazgeç</Button>
+          <Button
+            onClick={handleIptal}
+            variant="contained"
+            sx={{
+              background: 'linear-gradient(135deg, var(--destructive) 0%, var(--destructive) 100%)',
+              '&:hover': {
+                background: 'linear-gradient(135deg, var(--destructive) 0%, var(--destructive) 100%)',
+              }
+            }}
+          >
+            İptal Et
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Menu
+        anchorEl={anchorEl}
+        open={Boolean(anchorEl)}
+        onClose={handleMenuClose}
+        PaperProps={{
+          elevation: 3,
+          sx: { minWidth: 220, mt: 1 }
+        }}
+        transformOrigin={{ horizontal: 'right', vertical: 'top' }}
+        anchorOrigin={{ horizontal: 'right', vertical: 'bottom' }}
+      >
+        {(() => {
+          const siparis = siparisler.find(s => s.id === menuSiparisId);
+          if (!siparis) return null;
+
+          return [
+            <MenuItem key="detail" onClick={() => { handleMenuClose(); handleView(siparis); }}>
+              <ListItemIcon><Visibility fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Detayları Görüntüle</Typography>
+            </MenuItem>,
+            <MenuItem key="edit" onClick={() => { handleMenuClose(); handleEdit(siparis); }} disabled={siparis.durum === 'TAMAMLANDI' || siparis.durum === 'IPTAL'}>
+              <ListItemIcon><Edit fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Düzenle</Typography>
+            </MenuItem>,
+            <MenuItem key="print" onClick={() => { handleMenuClose(); handlePrint(siparis); }}>
+              <ListItemIcon><Print fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Yazdır</Typography>
+            </MenuItem>,
+            <MenuItem
+              key="copy"
+              onClick={() => {
+                handleMenuClose();
+                const path = `/orders/satis/yeni?kopyala=${siparis.id}`;
+                const tabId = `siparis-satis-kopyala-${siparis.id}`;
+                addTab({ id: tabId, label: `Kopya: ${siparis.siparisNo}`, path });
+                setActiveTab(tabId);
+                router.push(path);
+              }}
+            >
+              <ListItemIcon><ContentCopy fontSize="small" /></ListItemIcon>
+              <Typography variant="body2">Kopyasını Oluştur</Typography>
+            </MenuItem>,
+            siparis.durum === 'ONAYLANDI' && (
+              <MenuItem key="prepare" onClick={() => { handleMenuClose(); handleHazirlama(siparis); }}>
+                <ListItemIcon><Inventory fontSize="small" /></ListItemIcon>
+                <Typography variant="body2">Sipariş Hazırla</Typography>
+              </MenuItem>
+            ),
+            (siparis.durum === 'ONAYLANDI' || siparis.durum === 'KISMI_IHALE') && (
+              <MenuItem key="convert-invoice" onClick={() => { handleMenuClose(); handleConvertToInvoice(siparis); }}>
+                <ListItemIcon><Receipt fontSize="small" /></ListItemIcon>
+                <Typography variant="body2">Faturaya Çevir</Typography>
+              </MenuItem>
+            ),
+            (siparis.durum === 'ONAYLANDI' || siparis.durum === 'KISMI_IHALE') && (
+              <MenuItem key="create-waybill" onClick={() => { handleMenuClose(); handleCreateIrsaliye(siparis); }}>
+                <ListItemIcon><LocalShipping fontSize="small" /></ListItemIcon>
+                <Typography variant="body2">İrsaliye Oluştur</Typography>
+              </MenuItem>
+            ),
+            <MenuItem
+              key="cancel"
+              onClick={() => openIptalDialog(siparis)}
+              disabled={siparis.durum === 'IPTAL' || siparis.durum === 'TAMAMLANDI'}
+              sx={{ color: 'error.main' }}
+            >
+              <ListItemIcon><Cancel fontSize="small" color="error" /></ListItemIcon>
+              <Typography variant="body2">İptal Et</Typography>
+            </MenuItem>,
+            <MenuItem
+              key="delete"
+              onClick={() => openDeleteDialog(siparis)}
+              disabled={siparis.durum === 'TAMAMLANDI' || siparis.durum === 'IPTAL'}
+              sx={{ color: 'error.main' }}
+            >
+              <ListItemIcon><Delete fontSize="small" color="error" /></ListItemIcon>
+              <Typography variant="body2">Sil</Typography>
+            </MenuItem>
+          ];
+        })()}
+      </Menu>
+
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={() => setSnackbar({ ...snackbar, open: false })}
+      >
+        <Alert onClose={() => setSnackbar({ ...snackbar, open: false })} severity={snackbar.severity} sx={{ width: '100%' }}>
+          {snackbar.message}
+        </Alert>
       </Snackbar>
-    </MainLayout>
+    </StandardPage>
   );
 }

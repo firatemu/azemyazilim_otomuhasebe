@@ -36,6 +36,7 @@ import {
   useTheme,
   Tabs,
   Tab,
+  Popover,
 } from '@mui/material';
 import {
   Delete, Save, ArrowBack, ToggleOn, ToggleOff, LocalShipping, Description,
@@ -143,6 +144,21 @@ function TabPanel(props: TabPanelProps) {
 
 type DurumType = 'OPEN' | 'APPROVED' | 'CANCELLED';
 
+// Sayı inputları için spinner gizleme stili
+const numberInputSx = {
+  '& input[type=number]': {
+    MozAppearance: 'textfield',
+  },
+  '& input[type=number]::-webkit-outer-spin-button': {
+    WebkitAppearance: 'none',
+    margin: 0,
+  },
+  '& input[type=number]::-webkit-inner-spin-button': {
+    WebkitAppearance: 'none',
+    margin: 0,
+  },
+};
+
 export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?: string; onBack?: () => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -188,13 +204,10 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
     genelIskontoTutar: 0,
     aciklama: '',
     satisElemaniId: '',
-    dovizCinsi: 'TRY' as 'TRY' | 'USD' | 'EUR' | 'GBP',
-    dovizKuru: 1,
     kalemler: [] as FaturaKalemi[],
     // e-Dönüşüm alanları
     eScenario: 'TICARI_FATURA' as string,
     eInvoiceType: 'SALE' as string,
-    gibAlias: '',
     gonderimSekli: 'ELEKTRONIK' as string,
     odemePlani: [] as OdemePlaniItem[],
   });
@@ -226,6 +239,11 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
       talep: number;
     }>;
   }>({ open: false, products: [] });
+
+  // Calculator state
+  const [calculatorAnchor, setCalculatorAnchor] = useState<HTMLElement | null>(null);
+  const [calculatorRowIndex, setCalculatorRowIndex] = useState<number | null>(null);
+  const [calculatorExpression, setCalculatorExpression] = useState('');
 
   const theme = useTheme();
   const isMobileMediaQuery = useMediaQuery(theme.breakpoints.down('md'));
@@ -278,8 +296,6 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
         genelIskontoTutar: toNumEdit(fatura.globalDiscountValue) || toNumEdit(fatura.discount),
         aciklama: fatura.notes || '',
         satisElemaniId: fatura.salesAgentId || '',
-        dovizCinsi: (fatura.currency || 'TRY') as 'TRY' | 'USD' | 'EUR' | 'GBP',
-        dovizKuru: toNumEdit(fatura.exchangeRate),
         kalemler: (fatura.items || []).map((k: any) => {
           const miktar = toNumEdit(k.quantity) || 1;
           const birimFiyat = toNumEdit(k.unitPrice);
@@ -571,8 +587,6 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
         vade: toInputDate(fatura.vade, prev.vade),
         aciklama: fatura.aciklama || '',
         satisElemaniId: fatura.satisElemaniId || '',
-        dovizCinsi: (fatura.dovizCinsi || 'TRY') as 'TRY' | 'USD' | 'EUR' | 'GBP',
-        dovizKuru: toNum(fatura.dovizKuru) ?? 1,
         genelIskontoOran: 0,
         genelIskontoTutar: toNum(fatura.iskonto) ?? 0,
         kalemler,
@@ -1246,29 +1260,6 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
     setFormData(prev => ({ ...prev, genelIskontoOran: oran, genelIskontoTutar: tutar }));
   };
 
-  const handleCurrencyChange = async (currency: 'TRY' | 'USD' | 'EUR' | 'GBP') => {
-    if (currency === 'TRY') {
-      setFormData(prev => ({ ...prev, dovizCinsi: currency, dovizKuru: 1 }));
-      return;
-    }
-
-    try {
-      setFormData(prev => ({ ...prev, dovizCinsi: currency }));
-      // Fetch rate
-      const response = await axios.get('/invoices/exchange-rate', {
-        params: { currency }
-      });
-
-      if (response.data.rate) {
-        setFormData(prev => ({ ...prev, dovizKuru: response.data.rate }));
-      }
-    } catch (error) {
-      console.error('Kur alınamadı:', error);
-      showSnackbar('Döviz kuru alınamadı, lütfen manuel giriniz.', 'info');
-      setFormData(prev => ({ ...prev, dovizKuru: 0 }));
-    }
-  };
-
   const handleSave = async () => {
     try {
       if (!formData.cariId) {
@@ -1300,8 +1291,6 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
           notes: formData.aciklama || null,
           warehouseId: formData.warehouseId || null,
           salesAgentId: formData.satisElemaniId || null,
-          currency: formData.dovizCinsi,
-          exchangeRate: formData.dovizKuru,
           items: validKalemler.map(k => ({
             productId: k.stokId,
             quantity: Number(k.miktar),
@@ -1349,15 +1338,12 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
         notes: formData.aciklama || null,
         salesAgentId: formData.satisElemaniId || null,
         status: formData.durum,
-        currency: formData.dovizCinsi,
-        exchangeRate: formData.dovizKuru,
         ...(siparisId && { orderId: siparisId }),
         ...(irsaliyeId && { deliveryNoteId: irsaliyeId }),
         warehouseId: formData.warehouseId || null,
         // e-Dönüşüm alanları
         eScenario: formData.eScenario || null,
         eInvoiceType: formData.eInvoiceType || null,
-        gibAlias: formData.gibAlias || null,
         shippingType: formData.gonderimSekli || null,
         items: validKalemler.map(k => ({
           productId: k.stokId,
@@ -1408,7 +1394,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('tr-TR', {
       style: 'currency',
-      currency: formData.dovizCinsi === 'TRY' ? 'TRY' : formData.dovizCinsi,
+      currency: 'TRY',
     }).format(amount);
   };
 
@@ -1432,7 +1418,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
     );
   }
 
-  // Mobilecard component
+  // Mobilecard component - Kompakt ve mobil dostu
   function MobileItemCard({ kalem, index }: { kalem: FaturaKalemi, index: number }) {
     const currentStok = stoklar.find(s => s.id === kalem.stokId);
     const availableUnits = currentStok?.unitRef?.unitSet?.units || [];
@@ -1441,16 +1427,32 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
       <Paper
         variant="outlined"
         sx={{
-          p: 2,
-          mb: 2,
+          p: 1.5,
+          mb: 1.5,
           borderRadius: 'var(--radius-md)',
           border: '1px solid var(--border)',
           position: 'relative',
           bgcolor: 'var(--card)',
         }}
       >
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 2 }}>
-          <Box sx={{ flex: 1 }}>
+        {/* Satır Toplamı - En üstte belirgin */}
+        <Box sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          mb: 1.5,
+          pb: 1,
+          borderBottom: '1px solid var(--border)',
+        }}>
+          <Typography variant="caption" color="var(--muted-foreground)">Satır Toplamı:</Typography>
+          <Typography variant="subtitle1" fontWeight="700" color="var(--primary)">
+            {formatCurrency(calculateKalemTutar(kalem))}
+          </Typography>
+        </Box>
+
+        {/* Checkbox ve Stok Seçimi */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5, gap: 1 }}>
+          <Box sx={{ flex: 1, minWidth: 0 }}>
             <Autocomplete
               size="small"
               open={autocompleteOpenStates[index] || false}
@@ -1488,36 +1490,71 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
             checked={selectedRows.includes(index)}
             onChange={() => handleToggleRow(index)}
             size="small"
-            sx={{ ml: 1, mt: 0.5 }}
+            sx={{ ml: 0.5, mt: 0.5, flexShrink: 0 }}
           />
         </Box>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+        {/* Miktar ve Birim Fiyat - Daha büyük touch target */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
           <TextField
             label="Miktar"
             type="number"
             size="small"
             value={kalem.miktar}
             onChange={(e) => handleKalemChange(index, 'miktar', e.target.value)}
-            inputProps={{ min: 1 }}
+            inputProps={{ min: 1, style: { height: 44 } }}
+            sx={numberInputSx}
           />
-          <TextField
-            label="Birim Fiyat"
-            type="number"
-            size="small"
-            value={kalem.birimFiyat}
-            onChange={(e) => handleKalemChange(index, 'birimFiyat', e.target.value)}
-            inputProps={{ min: 0, step: 0.01 }}
-          />
+          <Box sx={{ position: 'relative' }}>
+            <TextField
+              label="Birim Fiyat"
+              type="number"
+              size="small"
+              value={kalem.birimFiyat}
+              onChange={(e) => handleKalemChange(index, 'birimFiyat', e.target.value)}
+              onKeyDown={(e) => {
+                if (['+', '-', '*', '/'].includes(e.key)) {
+                  e.preventDefault();
+                  setCalculatorRowIndex(index);
+                  setCalculatorExpression(kalem.birimFiyat?.toString() || '0');
+                  setCalculatorAnchor(e.currentTarget);
+                }
+              }}
+              inputProps={{ min: 0, step: 0.01, style: { height: 44 } }}
+              sx={numberInputSx}
+            />
+            <IconButton
+              size="small"
+              onClick={(e) => {
+                setCalculatorRowIndex(index);
+                setCalculatorExpression(kalem.birimFiyat?.toString() || '0');
+                setCalculatorAnchor(e.currentTarget);
+              }}
+              sx={{
+                position: 'absolute',
+                right: 4,
+                top: 4,
+                width: 36,
+                height: 36,
+                bgcolor: 'var(--muted)',
+                '&:hover': { bgcolor: 'var(--primary)' }
+              }}
+            >
+              🧮
+            </IconButton>
+          </Box>
         </Box>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+        {/* KDV ve Birim */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5, mb: 1.5 }}>
           <TextField
             label="KDV %"
             type="number"
             size="small"
             value={kalem.kdvOrani}
             onChange={(e) => handleKalemChange(index, 'kdvOrani', e.target.value)}
+            inputProps={{ style: { height: 44 } }}
+            sx={numberInputSx}
           />
           <FormControl fullWidth size="small">
             <InputLabel>Birim</InputLabel>
@@ -1540,20 +1577,20 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
           </FormControl>
         </Box>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-            <Typography variant="caption" color="text.secondary">Çoklu İskonto:</Typography>
-            <IconButton
-              size="small"
-              onClick={() => handleKalemChange(index, 'cokluIskonto', !kalem.cokluIskonto)}
-              sx={{ color: kalem.cokluIskonto ? 'var(--primary)' : 'var(--muted-foreground)' }}
-            >
-              {kalem.cokluIskonto ? <ToggleOn /> : <ToggleOff />}
-            </IconButton>
-          </Box>
+        {/* Çoklu İskonto Toggle */}
+        <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 1.5, p: 1, bgcolor: 'var(--muted)', borderRadius: 1 }}>
+          <Typography variant="caption" color="text.secondary">Çoklu İskonto</Typography>
+          <IconButton
+            size="small"
+            onClick={() => handleKalemChange(index, 'cokluIskonto', !kalem.cokluIskonto)}
+            sx={{ color: kalem.cokluIskonto ? 'var(--primary)' : 'var(--muted-foreground)' }}
+          >
+            {kalem.cokluIskonto ? <ToggleOn /> : <ToggleOff />}
+          </IconButton>
         </Box>
 
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
+        {/* İskonto Alanları */}
+        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 1.5 }}>
           {kalem.cokluIskonto ? (
             <TextField
               label="İskonto Oranı (10+5)"
@@ -1561,6 +1598,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
               value={kalem.iskontoFormula || ''}
               onChange={(e) => /^[\d+]*$/.test(e.target.value) && handleKalemChange(index, 'iskontoFormula', e.target.value)}
               helperText={kalem.iskontoOran > 0 ? `Eff: %${kalem.iskontoOran.toFixed(2)}` : ''}
+              inputProps={{ style: { height: 44 } }}
             />
           ) : (
             <TextField
@@ -1569,6 +1607,8 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
               size="small"
               value={kalem.iskontoOran || ''}
               onChange={(e) => handleKalemChange(index, 'iskontoOran', e.target.value)}
+              inputProps={{ style: { height: 44 } }}
+              sx={numberInputSx}
             />
           )}
           <TextField
@@ -1578,46 +1618,9 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
             value={kalem.iskontoTutar || ''}
             onChange={(e) => handleKalemChange(index, 'iskontoTutar', e.target.value)}
             disabled={kalem.cokluIskonto}
+            inputProps={{ style: { height: 44 } }}
+            sx={numberInputSx}
           />
-        </Box>
-        <Box sx={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 2, mb: 2 }}>
-          <TextField
-            label="ÖTV %"
-            type="number"
-            size="small"
-            value={kalem.otvOran || 0}
-            onChange={(e) => handleKalemChange(index, 'otvOran', e.target.value)}
-          />
-          <FormControl fullWidth size="small">
-            <InputLabel>Tevkifat</InputLabel>
-            <Select
-              value={kalem.tevkifatKodu || ''}
-              onChange={(e) => handleKalemChange(index, 'tevkifatKodu', e.target.value)}
-              label="Tevkifat"
-              className="form-control-select"
-            >
-              <MenuItem value="">Yok</MenuItem>
-              {TEVKIFAT_KODLARI.map((t) => (
-                <MenuItem key={t.kod} value={t.kod}>
-                  {t.kod} - {t.ad}
-                </MenuItem>
-              ))}
-            </Select>
-          </FormControl>
-        </Box>
-
-        <Box sx={{
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center',
-          pt: 1.5,
-          borderTop: '1px dashed var(--border)',
-          mt: 1
-        }}>
-          <Typography variant="subtitle2" color="var(--muted-foreground)">Satır Toplamı:</Typography>
-          <Typography variant="subtitle1" fontWeight="700" color="var(--primary)">
-            {formatCurrency(calculateKalemTutar(kalem))}
-          </Typography>
         </Box>
       </Paper>
     );
@@ -1684,25 +1687,31 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                 </Typography>
               </Box>
             )}
-            {/* Fatura Bilgileri ve e-Dönüşüm Sekmeleri */}
-            <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
-              <Tabs
-                value={tabValue}
-                onChange={(_, newValue) => setTabValue(newValue)}
-                sx={{
-                  '& .MuiTab-root': {
-                    textTransform: 'none',
-                    fontWeight: 600,
-                    fontSize: '1rem',
-                  }
-                }}
-              >
-                <Tab label="Genel Bilgiler" />
-                <Tab label="e-Dönüşüm Ayarları" />
-              </Tabs>
-            </Box>
+            {/* Fatura Bilgileri ve e-Dönüşüm Sekmeleri - Mobilde gizli, Desktop'ta görünür */}
+            {!isMobile && (
+              <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 1 }}>
+                <Tabs
+                  value={tabValue}
+                  onChange={(_, newValue) => setTabValue(newValue)}
+                  sx={{
+                    '& .MuiTab-root': {
+                      textTransform: 'none',
+                      fontWeight: 600,
+                      fontSize: '1rem',
+                    }
+                  }}
+                >
+                  <Tab label="Genel Bilgiler" />
+                  <Tab label="e-Dönüşüm Ayarları" />
+                </Tabs>
+              </Box>
+            )}
 
-            <TabPanel value={tabValue} index={0}>
+            {/* Mobilde: Tüm alanlar tek kolonda, TabPanel olmadan */}
+            {isMobile ? (
+              <Box>
+                {/* GENEL BİLGİLER */}
+                <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, color: 'var(--foreground)' }}>Genel Bilgiler</Typography>
               <Box sx={{
                 display: 'grid',
                 gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
@@ -1750,32 +1759,191 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                     ))}
                   </Select>
                 </FormControl>
+              </Box>
 
+              <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row', mt: 2 }}>
+                <Box sx={{ flex: isMobile ? '1 1 100%' : '2 1 400px' }}>
+                  <Autocomplete
+                    fullWidth
+                    value={cariler.find(c => c.id === formData.cariId) || null}
+                    onChange={(_, newValue) => {
+                      setFormData(prev => {
+                        const updated = { ...prev, cariId: newValue?.id || '' };
+
+                        // Carinin vadeSuresi varsa otomatik vade hesapla
+                        if (newValue?.vadeSuresi && newValue.vadeSuresi > 0) {
+                          const faturaDate = new Date(prev.tarih);
+                          const vadeDate = new Date(faturaDate);
+                          vadeDate.setDate(vadeDate.getDate() + newValue.vadeSuresi);
+                          updated.vade = vadeDate.toISOString().split('T')[0];
+                        }
+
+                        // Carinin tanımlı satış elemanı varsa otomatik seç
+                        if (newValue?.satisElemaniId) {
+                          updated.satisElemaniId = newValue.satisElemaniId;
+                        } else {
+                          updated.satisElemaniId = '';
+                        }
+
+                        return updated;
+                      });
+                    }}
+                    options={cariler}
+                    getOptionLabel={(option) => `${option.cariKodu} - ${option.unvan}`}
+                    renderOption={(props, option) => {
+                      const { key, ...otherProps } = props;
+                      return (
+                        <Box component="li" key={key} {...otherProps}>
+                          <Box>
+                            <Typography variant="body1" fontWeight="600" sx={{ color: 'var(--foreground)' }}>
+                              {option.unvan}
+                            </Typography>
+                            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
+                              {option.cariKodu} - {option.tip === 'MUSTERI' ? 'Müşteri' : 'Tedarikçi'}
+                            </Typography>
+                          </Box>
+                        </Box>
+                      );
+                    }}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        className="form-control-textfield"
+                        label="Cari Seçiniz"
+                        placeholder="Cari kodu veya ünvanı ile ara..."
+                        required
+                      />
+                    )}
+                    noOptionsText="Cari bulunamadı"
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                  />
+                </Box>
+
+                <Box sx={{ flex: isMobile ? '1 1 100%' : '1 1 200px' }}>
+                  <Autocomplete
+                    fullWidth
+                    value={satisElemanlari.find(s => s.id === formData.satisElemaniId) || null}
+                    onChange={(_, newValue) => {
+                      setFormData(prev => ({ ...prev, satisElemaniId: newValue?.id || '' }));
+                    }}
+                    options={satisElemanlari}
+                    getOptionLabel={(option) => option.fullName || ''}
+                    renderInput={(params) => (
+                      <TextField
+                        {...params}
+                        className="form-control-textfield"
+                        label="Satış Elemanı"
+                        placeholder="Satış Elemanı Seçiniz"
+                      />
+                    )}
+                    renderOption={(props, option) => {
+                      const { key, ...otherProps } = props;
+                      return (
+                        <li key={option.id} {...otherProps}>
+                          <Typography variant="body2">{option.fullName}</Typography>
+                        </li>
+                      );
+                    }}
+                    noOptionsText="Satış elemanı bulunamadı"
+                    isOptionEqualToValue={(option, value) => option.id === value.id}
+                  />
+                </Box>
+              </Box>
+
+              {/* E-DÖNÜŞÜM AYARLARI - Mobilde gizli */}
+              {/* <Typography variant="subtitle1" sx={{ fontWeight: 600, mb: 2, mt: 3, color: 'var(--foreground)' }}>e-Dönüşüm Ayarları</Typography>
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: '1fr',
+                gap: 2,
+              }}>
                 <FormControl className="form-control-select" fullWidth>
-                  <InputLabel>Döviz</InputLabel>
+                  <InputLabel>Senaryo</InputLabel>
                   <Select
-                    value={formData.dovizCinsi}
-                    onChange={(e) => handleCurrencyChange(e.target.value as any)}
-                    label="Döviz"
+                    value={formData.eScenario}
+                    onChange={(e) => setFormData(prev => ({ ...prev, eScenario: e.target.value }))}
+                    label="Senaryo"
                   >
-                    <MenuItem value="TRY">Türk Lirası (₺)</MenuItem>
-                    <MenuItem value="USD">Amerikan Doları ($)</MenuItem>
-                    <MenuItem value="EUR">Euro (€)</MenuItem>
-                    <MenuItem value="GBP">İngiliz Sterlini (£)</MenuItem>
+                    <MenuItem value="TICARI_FATURA">Ticari Fatura</MenuItem>
+                    <MenuItem value="TEMEL_FATURA">Temel Fatura</MenuItem>
                   </Select>
                 </FormControl>
 
+                <FormControl className="form-control-select" fullWidth>
+                  <InputLabel>Fatura Türü</InputLabel>
+                  <Select
+                    value="SATIS"
+                    label="Fatura Türü"
+                    disabled
+                  >
+                    <MenuItem value="SATIS">Satış</MenuItem>
+                  </Select>
+                </FormControl>
+
+                <FormControl className="form-control-select" fullWidth>
+                  <InputLabel>Gönderim Şekli</InputLabel>
+                  <Select
+                    value={formData.gonderimSekli}
+                    onChange={(e) => setFormData(prev => ({ ...prev, gonderimSekli: e.target.value }))}
+                    label="Gönderim Şekli"
+                  >
+                    <MenuItem value="ELEKTRONIK">Elektronik (e-Fatura)</MenuItem>
+                    <MenuItem value="KAGIT">Kağıt (e-Arşiv)</MenuItem>
+                  </Select>
+                </FormControl>
+              </Box> */}
+              </Box>
+            ) : (
+              <>
+              {/* Desktop: TabPanel 0 - Genel Bilgiler */}
+              <TabPanel value={tabValue} index={0}>
+              <Box sx={{
+                display: 'grid',
+                gridTemplateColumns: isMobile ? '1fr' : 'repeat(auto-fit, minmax(200px, 1fr))',
+                gap: 2
+              }}>
                 <TextField
                   className="form-control-textfield"
-                  type="number"
-                  label="Döviz Kuru"
-                  value={formData.dovizKuru}
-                  onChange={(e) => setFormData(prev => ({ ...prev, dovizKuru: parseFloat(e.target.value) || 0 }))}
-                  disabled={formData.dovizCinsi === 'TRY'}
+                  label="Fatura No"
+                  value={formData.faturaNo}
+                  onChange={(e) => handleFaturaNoChange(e.target.value)}
                   required
                   fullWidth
-                  inputProps={{ step: "0.0001", min: "0" }}
                 />
+                <TextField
+                  className="form-control-textfield"
+                  type="date"
+                  label="Tarih"
+                  value={formData.tarih}
+                  onChange={(e) => setFormData(prev => ({ ...prev, tarih: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                  required
+                  fullWidth
+                />
+                <TextField
+                  className="form-control-textfield"
+                  type="date"
+                  label="Vade"
+                  value={formData.vade}
+                  onChange={(e) => setFormData(prev => ({ ...prev, vade: e.target.value }))}
+                  InputLabelProps={{ shrink: true }}
+                  fullWidth
+                />
+
+                <FormControl className="form-control-select" required fullWidth>
+                  <InputLabel>Ambar</InputLabel>
+                  <Select
+                    value={formData.warehouseId}
+                    onChange={(e) => setFormData(prev => ({ ...prev, warehouseId: e.target.value }))}
+                    label="Ambar"
+                  >
+                    {warehouses.map((warehouse) => (
+                      <MenuItem key={warehouse.id} value={warehouse.id}>
+                        {warehouse.name}
+                      </MenuItem>
+                    ))}
+                  </Select>
+                </FormControl>
               </Box>
 
               <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap', flexDirection: isMobile ? 'column' : 'row', mt: 2 }}>
@@ -1868,6 +2036,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
               </Box>
             </TabPanel>
 
+            {/* Desktop: TabPanel 1 - e-Dönüşüm Ayarları */}
             <TabPanel value={tabValue} index={1}>
               <Box sx={{
                 display: 'grid',
@@ -1883,23 +2052,17 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                   >
                     <MenuItem value="TICARI_FATURA">Ticari Fatura</MenuItem>
                     <MenuItem value="TEMEL_FATURA">Temel Fatura</MenuItem>
-                    <MenuItem value="KAMU_FATURASI">Kamu Faturası</MenuItem>
                   </Select>
                 </FormControl>
 
                 <FormControl className="form-control-select" fullWidth>
                   <InputLabel>Fatura Türü</InputLabel>
                   <Select
-                    value={formData.eInvoiceType}
-                    onChange={(e) => setFormData(prev => ({ ...prev, eInvoiceType: e.target.value }))}
+                    value="SATIS"
                     label="Fatura Türü"
+                    disabled
                   >
                     <MenuItem value="SATIS">Satış</MenuItem>
-                    <MenuItem value="IADE">İade</MenuItem>
-                    <MenuItem value="TEVKIFAT">Tevkifat</MenuItem>
-                    <MenuItem value="ISTISNA">İstisna</MenuItem>
-                    <MenuItem value="OZEL_MATRAH">Özel Matrah</MenuItem>
-                    <MenuItem value="IHRAC_KAYITLI">İhraç Kayıtlı</MenuItem>
                   </Select>
                 </FormControl>
 
@@ -1914,23 +2077,14 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                     <MenuItem value="KAGIT">Kağıt (e-Arşiv)</MenuItem>
                   </Select>
                 </FormControl>
-
-                <TextField
-                  className="form-control-textfield"
-                  label="GIB Alias (e-Fatura Adresi)"
-                  value={formData.gibAlias}
-                  onChange={(e) => setFormData(prev => ({ ...prev, gibAlias: e.target.value }))}
-                  placeholder="urn:mail:firmaalias@urn.ettn.tr"
-                  helperText="Alıcının GIB sistemindeki e-fatura adresi"
-                  fullWidth
-                />
               </Box>
             </TabPanel>
+            </>
+            )}
 
             <Box>
               <Box sx={{
                 display: 'flex',
-                flexDirection: isMobile ? 'column' : 'row',
                 justifyContent: 'space-between',
                 alignItems: isMobile ? 'flex-start' : 'center',
                 gap: 2,
@@ -2106,10 +2260,10 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                     overflowX: 'auto',
                   }}
                 >
-                  <Table stickyHeader size="small" sx={{ minWidth: 1600 }}>
+                  <Table stickyHeader size="small" sx={{ minWidth: 1300, tableLayout: 'auto' }}>
                     <TableHead>
                       <TableRow sx={{ bgcolor: 'var(--muted)' }}>
-                        <TableCell padding="checkbox" sx={{ minWidth: 50 }}>
+                        <TableCell padding="checkbox" sx={{ width: 50 }}>
                           <Checkbox
                             indeterminate={selectedRows.length > 0 && selectedRows.length < formData.kalemler.length}
                             checked={formData.kalemler.length > 0 && selectedRows.length === formData.kalemler.length}
@@ -2117,23 +2271,24 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                             size="small"
                           />
                         </TableCell>
-                        <TableCell sx={{ fontWeight: 600, color: 'var(--muted-foreground)', minWidth: 280 }}>Stok Adı / Ürün</TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 100 }}>Miktar</TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 100 }}>Birim</TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 130 }}>Birim Fiyat</TableCell>
+                        <TableCell sx={{ fontWeight: 600, color: 'var(--muted-foreground)', minWidth: 305 }}>Stok Adı / Ürün</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 5 }}>Miktar</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 120 }}>Birim</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 80 }}>Birim Fiyat</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 90 }}>KDV %</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 60 }} title="Çoklu İskonto">Ç.İ.</TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 130 }}>İsk. Oran %</TableCell>
+                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 10 }}>İsk. Oran %</TableCell>
                         <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 140 }}>İsk. Tutar</TableCell>
                         <TableCell align="right" sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 140 }}>Toplam</TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 100 }}>ÖTV %</TableCell>
-                        <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 200 }}>Tevkifat</TableCell>
+                        {/* ÖTV % and Tevkifat columns hidden for now - backend fields preserved */}
+                        {/* <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 100 }}>ÖTV %</TableCell> */}
+                        {/* <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important', minWidth: 200 }}>Tevkifat</TableCell> */}
                       </TableRow>
                     </TableHead>
                     <TableBody>
                       {formData.kalemler.length === 0 ? (
                         <TableRow>
-                          <TableCell colSpan={12} align="center" sx={{ py: 4 }}>
+                          <TableCell colSpan={10} align="center" sx={{ py: 4 }}>
                             <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
                               Henüz kalem eklenmedi. Yukarıdaki butonu kullanarak kalem ekleyin.
                             </Typography>
@@ -2256,7 +2411,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                 isOptionEqualToValue={(option, value) => option.id === value.id}
                               />
                             </TableCell>
-                            <TableCell sx={{ minWidth: 100 }}>
+                            <TableCell sx={{ minWidth: 120 }}>
                               <TextField
                                 fullWidth
                                 type="number"
@@ -2271,9 +2426,10 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                   }
                                 }}
                                 inputProps={{ min: 1, step: 1 }}
+                                sx={numberInputSx}
                               />
                             </TableCell>
-                            <TableCell sx={{ minWidth: 100 }}>
+                            <TableCell sx={{ minWidth: 120 }}>
                               <TextField
                                 fullWidth
                                 select
@@ -2299,7 +2455,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                 )}
                               </TextField>
                             </TableCell>
-                            <TableCell sx={{ minWidth: 130 }}>
+                            <TableCell sx={{ minWidth: 250 }}>
                               <Box sx={{ position: 'relative' }}>
                                 <TextField
                                   fullWidth
@@ -2312,10 +2468,35 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                     if (e.key === 'Enter') {
                                       e.preventDefault();
                                       handleAddKalem();
+                                    } else if (['+', '-', '*', '/'].includes(e.key)) {
+                                      e.preventDefault();
+                                      setCalculatorRowIndex(index);
+                                      setCalculatorExpression(kalem.birimFiyat?.toString() || '0');
+                                      setCalculatorAnchor(e.currentTarget);
                                     }
                                   }}
                                   inputProps={{ min: 0, step: 0.01 }}
+                                  sx={numberInputSx}
                                 />
+                                <IconButton
+                                  size="small"
+                                  onClick={(e) => {
+                                    setCalculatorRowIndex(index);
+                                    setCalculatorExpression(kalem.birimFiyat?.toString() || '0');
+                                    setCalculatorAnchor(e.currentTarget);
+                                  }}
+                                  sx={{
+                                    position: 'absolute',
+                                    right: 4,
+                                    top: '50%',
+                                    transform: 'translateY(-50%)',
+                                    padding: 2,
+                                    bgcolor: 'var(--muted)',
+                                    '&:hover': { bgcolor: 'var(--primary)' }
+                                  }}
+                                >
+                                  🧮
+                                </IconButton>
                                 {kalem.isSpecialPrice && (
                                   <Chip
                                     label="Özel Fiyat"
@@ -2334,6 +2515,63 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                 )}
                               </Box>
                             </TableCell>
+
+                            {/* Calculator Popover */}
+                            <Popover
+                              open={calculatorAnchor !== null && calculatorRowIndex === index}
+                              anchorEl={calculatorAnchor}
+                              onClose={() => {
+                                setCalculatorAnchor(null);
+                                setCalculatorRowIndex(null);
+                                setCalculatorExpression('');
+                              }}
+                              anchorOrigin={{
+                                vertical: 'bottom',
+                                horizontal: 'left',
+                              }}
+                              transformOrigin={{
+                                vertical: 'top',
+                                horizontal: 'left',
+                              }}
+                            >
+                                <Box sx={{ p: 2, minWidth: 280 }}>
+                                  <Typography variant="subtitle2" fontWeight="bold" sx={{ mb: 1 }}>
+                                    Hesap Makinesi
+                                  </Typography>
+                                  <TextField
+                                    fullWidth
+                                    size="small"
+                                    value={calculatorExpression}
+                                    onChange={(e) => setCalculatorExpression(e.target.value)}
+                                    onKeyDown={(e) => {
+                                      if (e.key === 'Enter') {
+                                        e.preventDefault();
+                                        try {
+                                          // Safe evaluation of math expression
+                                          const result = Function('"use strict"; return (' + calculatorExpression + ')')();
+                                          if (typeof result === 'number' && !isNaN(result)) {
+                                            handleKalemChange(index, 'birimFiyat', result.toString());
+                                            setCalculatorAnchor(null);
+                                            setCalculatorExpression('');
+                                          }
+                                        } catch (error) {
+                                          console.error('Invalid expression:', error);
+                                        }
+                                      } else if (e.key === 'Escape') {
+                                        setCalculatorAnchor(null);
+                                        setCalculatorExpression('');
+                                      }
+                                    }}
+                                    placeholder="Örn: 100+20 veya 50*1.18"
+                                    autoFocus
+                                    sx={{ mb: 2 }}
+                                  />
+                                  <Typography variant="caption" color="text.secondary">
+                                    Operatörler: + - * / | Enter: Hesapla | Esc: İptal
+                                  </Typography>
+                                </Box>
+                              </Popover>
+
                             <TableCell sx={{ minWidth: 90 }}>
                               <TextField
                                 fullWidth
@@ -2348,7 +2586,8 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                     handleAddKalem();
                                   }
                                 }}
-                                inputProps={{ min: 0, max: 100 }}
+                                inputProps={{ min: 0, max: 100, step: 1 }}
+                                sx={numberInputSx}
                               />
                             </TableCell>
                             <TableCell align="center" sx={{ minWidth: 60 }}>
@@ -2368,7 +2607,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                 {kalem.cokluIskonto ? <ToggleOn fontSize="small" /> : <ToggleOff fontSize="small" />}
                               </IconButton>
                             </TableCell>
-                            <TableCell sx={{ minWidth: 130 }}>
+                            <TableCell sx={{ minWidth: 200 }}>
                               {kalem.cokluIskonto ? (
                                 <TextField
                                   fullWidth
@@ -2387,6 +2626,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                   value={kalem.iskontoOran}
                                   onChange={(e) => handleKalemChange(index, 'iskontoOran', e.target.value)}
                                   inputProps={{ min: 0, max: 100, step: 0.01 }}
+                                  sx={numberInputSx}
                                 />
                               )}
                             </TableCell>
@@ -2399,12 +2639,14 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                 value={kalem.iskontoTutar}
                                 onChange={(e) => handleKalemChange(index, 'iskontoTutar', e.target.value)}
                                 inputProps={{ min: 0, step: 0.01 }}
+                                sx={numberInputSx}
                               />
                             </TableCell>
                             <TableCell align="right" sx={{ minWidth: 140, fontWeight: 700 }}>
                               {formatCurrency(calculateKalemTutar(kalem))}
                             </TableCell>
-                            <TableCell sx={{ minWidth: 100 }}>
+                            {/* ÖTV % and Tevkifat columns hidden for now - backend fields preserved */}
+                            {/* <TableCell sx={{ minWidth: 100 }}>
                               <TextField
                                 fullWidth
                                 type="number"
@@ -2413,6 +2655,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                 value={kalem.otvOran || 0}
                                 onChange={(e) => handleKalemChange(index, 'otvOran', e.target.value)}
                                 inputProps={{ min: 0, max: 100, step: 0.01 }}
+                                sx={numberInputSx}
                               />
                             </TableCell>
                             <TableCell sx={{ minWidth: 200 }}>
@@ -2431,7 +2674,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                                   ))}
                                 </Select>
                               </FormControl>
-                            </TableCell>
+                            </TableCell> */}
                           </TableRow>
                         ))
                       )}
@@ -2451,20 +2694,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                 onChange={(e) => handleGenelIskontoOranChange(e.target.value)}
                 inputProps={{ min: 0, max: 100, step: 0.01 }}
                 helperText="İskonto oranı"
-                sx={{
-                  width: { xs: '100%', sm: '200px' },
-                  '& input[type=number]': {
-                    MozAppearance: 'textfield',
-                  },
-                  '& input[type=number]::-webkit-outer-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0,
-                  },
-                  '& input[type=number]::-webkit-inner-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0,
-                  },
-                }}
+                sx={{ width: { xs: '100%', sm: '200px' }, ...numberInputSx }}
               />
               <TextField
                 type="number"
@@ -2474,41 +2704,30 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                 onChange={(e) => handleGenelIskontoTutarChange(e.target.value)}
                 inputProps={{ min: 0, step: 0.01 }}
                 helperText="İskonto tutarı"
-                sx={{
-                  width: { xs: '100%', sm: '200px' },
-                  '& input[type=number]': {
-                    MozAppearance: 'textfield',
-                  },
-                  '& input[type=number]::-webkit-outer-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0,
-                  },
-                  '& input[type=number]::-webkit-inner-spin-button': {
-                    WebkitAppearance: 'none',
-                    margin: 0,
-                  },
-                }}
+                sx={{ width: { xs: '100%', sm: '200px' }, ...numberInputSx }}
               />
             </Box>
 
+            {/* Açıklama ve Fatura Özeti - Yan Yana */}
+            <Box sx={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', gap: 2 }}>
+              {/* Açıklama */}
+              <Box sx={{ flex: 1 }}>
+                <TextField
+                  fullWidth
+                  multiline
+                  rows={2}
+                  className="form-control-textfield"
+                  label="Açıklama / Notlar"
+                  value={formData.aciklama}
+                  onChange={(e) => setFormData(prev => ({ ...prev, aciklama: e.target.value }))}
+                />
+              </Box>
 
-            {/* Açıklama */}
-            <Box>
-              <TextField
-                fullWidth
-                multiline
-                rows={2}
-                className="form-control-textfield"
-                label="Açıklama / Notlar"
-                value={formData.aciklama}
-                onChange={(e) => setFormData(prev => ({ ...prev, aciklama: e.target.value }))}
-              />
-            </Box>
-
-            {/* Toplam Bilgileri */}
-            <Paper
+              {/* Toplam Bilgileri */}
+              <Paper
               variant="outlined"
               sx={{
+                flex: 1,
                 p: isMobile ? 2 : 3,
                 bgcolor: 'var(--card)',
                 borderRadius: 'var(--radius)',
@@ -2560,20 +2779,22 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                       {totals.toplamIskonto > 0 ? '- ' : ''}{formatCurrency(totals.toplamIskonto)}
                     </Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}>
+                  {/* ÖTV Toplamı hidden for now - backend fields preserved */}
+                  {/* <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}>
                     <Typography variant={isMobile ? "body2" : "body1"} sx={{ color: 'var(--muted-foreground)' }}>ÖTV Toplamı:</Typography>
                     <Typography variant={isMobile ? "body2" : "body1"} fontWeight="600" sx={{ color: 'var(--foreground)' }}>{formatCurrency(totals.toplamOtv)}</Typography>
-                  </Box>
+                  </Box> */}
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}>
                     <Typography variant={isMobile ? "body2" : "body1"} sx={{ color: 'var(--muted-foreground)' }}>KDV Toplamı:</Typography>
                     <Typography variant={isMobile ? "body2" : "body1"} fontWeight="600" sx={{ color: 'var(--foreground)' }}>{formatCurrency(totals.toplamKdv)}</Typography>
                   </Box>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}>
+                  {/* Tevkifat Toplamı hidden for now - backend fields preserved */}
+                  {/* <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: isMobile ? 0.5 : 1.5 }}>
                     <Typography variant={isMobile ? "body2" : "body1"} sx={{ color: 'var(--muted-foreground)' }}>Tevkifat Toplamı:</Typography>
                     <Typography variant={isMobile ? "body2" : "body1"} fontWeight="600" sx={{ color: totals.toplamTevkifat > 0 ? 'var(--destructive)' : 'var(--foreground)' }}>
                       {totals.toplamTevkifat > 0 ? '- ' : ''}{formatCurrency(totals.toplamTevkifat)}
                     </Typography>
-                  </Box>
+                  </Box> */}
                   <Divider sx={{ my: isMobile ? 1 : 2, borderColor: 'var(--border)' }} />
                   <Box sx={{
                     display: 'flex',
@@ -2605,6 +2826,7 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
                 </Box>
               </Box>
             </Paper>
+            </Box>
 
             {/* Action Buttons */}
             <Box>
@@ -2687,83 +2909,153 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
               Bu cari hesaba ait faturalandırılmamış irsaliye bulunamadı.
             </Typography>
           ) : (
-            <TableContainer component={Paper} variant="outlined">
-              <Table size="small">
-                <TableHead>
-                  <TableRow>
-                    <TableCell padding="checkbox" sx={{ width: 50 }}></TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>İrsaliye No</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Tarih</TableCell>
-                    <TableCell sx={{ fontWeight: 600 }}>Detaylar (Kalan/Toplam)</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 600 }}>Kalan Tutar</TableCell>
-                  </TableRow>
-                </TableHead>
-                <TableBody>
-                  {irsaliyeler.map((irsaliye) => {
-                    const totalQty = irsaliye.kalemler?.reduce((sum: number, k: any) => sum + k.miktar, 0) || 0;
-                    const invoicedQty = irsaliye.kalemler?.reduce((sum: number, k: any) => sum + (k.faturalananMiktar || 0), 0) || 0;
-                    const remainingQty = totalQty - invoicedQty;
+            /* Mobil: Card Layout */
+            isMobile ? (
+              <Box>
+                {irsaliyeler.map((irsaliye) => {
+                  const totalQty = irsaliye.kalemler?.reduce((sum: number, k: any) => sum + k.miktar, 0) || 0;
+                  const invoicedQty = irsaliye.kalemler?.reduce((sum: number, k: any) => sum + (k.faturalananMiktar || 0), 0) || 0;
+                  const remainingQty = totalQty - invoicedQty;
+                  const remainingTotal = Number(irsaliye.genelToplam) * (totalQty > 0 ? remainingQty / totalQty : 0);
+                  const isSelected = selectedIrsaliyeler.includes(irsaliye.id);
 
-                    // Simple remaining total calculation (approximation for UI)
-                    const remainingTotal = Number(irsaliye.genelToplam) * (totalQty > 0 ? remainingQty / totalQty : 0);
-
-                    return (
-                      <TableRow
-                        key={irsaliye.id}
-                        hover
-                        onClick={() => {
-                          setSelectedIrsaliyeler(prev =>
-                            prev.includes(irsaliye.id)
-                              ? prev.filter(id => id !== irsaliye.id)
-                              : [...prev, irsaliye.id]
-                          );
-                        }}
-                        sx={{ cursor: 'pointer' }}
-                      >
-                        <TableCell padding="checkbox">
-                          <Checkbox
-                            checked={selectedIrsaliyeler.includes(irsaliye.id)}
-                            onChange={(e) => {
-                              e.stopPropagation();
-                              setSelectedIrsaliyeler(prev =>
-                                prev.includes(irsaliye.id)
-                                  ? prev.filter(id => id !== irsaliye.id)
-                                  : [...prev, irsaliye.id]
-                              );
-                            }}
-                          />
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2" fontWeight="500">
+                  return (
+                    <Paper
+                      key={irsaliye.id}
+                      variant="outlined"
+                      onClick={() => {
+                        setSelectedIrsaliyeler(prev =>
+                          prev.includes(irsaliye.id)
+                            ? prev.filter(id => id !== irsaliye.id)
+                            : [...prev, irsaliye.id]
+                        );
+                      }}
+                      sx={{
+                        p: 2,
+                        mb: 2,
+                        cursor: 'pointer',
+                        bgcolor: 'var(--card)',
+                        borderRadius: 'var(--radius)',
+                        border: isSelected ? '2px solid var(--primary)' : '1px solid var(--border)',
+                      }}
+                    >
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1.5 }}>
+                        <Box sx={{ flex: 1 }}>
+                          <Typography variant="subtitle1" fontWeight="600" color="var(--foreground)">
                             {irsaliye.irsaliyeNo}
                           </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Typography variant="body2">
+                          <Typography variant="caption" color="var(--muted-foreground)">
                             {new Date(irsaliye.irsaliyeTarihi).toLocaleDateString('tr-TR')}
                           </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
-                            <Chip
-                              size="small"
-                              label={`${remainingQty} / ${totalQty} Br.`}
-                              color={remainingQty === totalQty ? "primary" : "warning"}
-                              variant="outlined"
+                        </Box>
+                        <Checkbox
+                          checked={isSelected}
+                          onChange={(e) => {
+                            e.stopPropagation();
+                            setSelectedIrsaliyeler(prev =>
+                              prev.includes(irsaliye.id)
+                                ? prev.filter(id => id !== irsaliye.id)
+                                : [...prev, irsaliye.id]
+                            );
+                          }}
+                          sx={{ ml: 1 }}
+                        />
+                      </Box>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Chip
+                          size="small"
+                          label={`${remainingQty} / ${totalQty} Br.`}
+                          color={remainingQty === totalQty ? "primary" : "warning"}
+                          variant="outlined"
+                        />
+                        <Typography variant="subtitle1" fontWeight="700" color="var(--primary)">
+                          {formatCurrency(remainingTotal)}
+                        </Typography>
+                      </Box>
+                    </Paper>
+                  );
+                })}
+              </Box>
+            ) : (
+              /* Desktop: Table Layout */
+              <TableContainer component={Paper} variant="outlined">
+                <Table size="small">
+                  <TableHead>
+                    <TableRow>
+                      <TableCell padding="checkbox" sx={{ width: 50 }}></TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>İrsaliye No</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Tarih</TableCell>
+                      <TableCell sx={{ fontWeight: 600 }}>Detaylar (Kalan/Toplam)</TableCell>
+                      <TableCell align="right" sx={{ fontWeight: 600 }}>Kalan Tutar</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {irsaliyeler.map((irsaliye) => {
+                      const totalQty = irsaliye.kalemler?.reduce((sum: number, k: any) => sum + k.miktar, 0) || 0;
+                      const invoicedQty = irsaliye.kalemler?.reduce((sum: number, k: any) => sum + (k.faturalananMiktar || 0), 0) || 0;
+                      const remainingQty = totalQty - invoicedQty;
+
+                      // Simple remaining total calculation (approximation for UI)
+                      const remainingTotal = Number(irsaliye.genelToplam) * (totalQty > 0 ? remainingQty / totalQty : 0);
+
+                      return (
+                        <TableRow
+                          key={irsaliye.id}
+                          hover
+                          onClick={() => {
+                            setSelectedIrsaliyeler(prev =>
+                              prev.includes(irsaliye.id)
+                                ? prev.filter(id => id !== irsaliye.id)
+                                : [...prev, irsaliye.id]
+                            );
+                          }}
+                          sx={{ cursor: 'pointer' }}
+                        >
+                          <TableCell padding="checkbox">
+                            <Checkbox
+                              checked={selectedIrsaliyeler.includes(irsaliye.id)}
+                              onChange={(e) => {
+                                e.stopPropagation();
+                                setSelectedIrsaliyeler(prev =>
+                                  prev.includes(irsaliye.id)
+                                    ? prev.filter(id => id !== irsaliye.id)
+                                    : [...prev, irsaliye.id]
+                                );
+                              }}
                             />
-                          </Box>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2" fontWeight="500">
-                            {formatCurrency(remainingTotal)}
-                          </Typography>
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })}
-                </TableBody>
-              </Table>
-            </TableContainer>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2" fontWeight="500">
+                              {irsaliye.irsaliyeNo}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Typography variant="body2">
+                              {new Date(irsaliye.irsaliyeTarihi).toLocaleDateString('tr-TR')}
+                            </Typography>
+                          </TableCell>
+                          <TableCell>
+                            <Box sx={{ display: 'flex', gap: 1, alignItems: 'center' }}>
+                              <Chip
+                                size="small"
+                                label={`${remainingQty} / ${totalQty} Br.`}
+                                color={remainingQty === totalQty ? "primary" : "warning"}
+                                variant="outlined"
+                              />
+                            </Box>
+                          </TableCell>
+                          <TableCell align="right">
+                            <Typography variant="body2" fontWeight="500">
+                              {formatCurrency(remainingTotal)}
+                            </Typography>
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            )
           )}
         </DialogContent>
         <DialogActions>
@@ -3028,103 +3320,176 @@ export function SatisFaturaForm({ faturaId: editFaturaId, onBack }: { faturaId?:
         onClose={() => setOpenOdemePlaniDialog(false)}
         maxWidth="md"
         fullWidth
+        fullScreen={isMobile}
       >
         <DialogTitle>Ödeme Planı / Taksitlendirme</DialogTitle>
         <DialogContent>
-          <Box sx={{ mb: 3, mt: 1, display: 'flex', gap: 2, alignItems: 'flex-end' }}>
+          <Box sx={{ mb: 3, mt: 1, display: 'flex', gap: 2, alignItems: 'flex-end', flexWrap: 'wrap' }}>
             <TextField
               type="number"
               label="Taksit Sayısı"
               value={taksitSayisi}
               onChange={(e) => setTaksitSayisi(parseInt(e.target.value) || 1)}
               inputProps={{ min: 1, max: 24 }}
-              sx={{ width: 120 }}
+              sx={{ width: { xs: '100%', sm: 120 } }}
             />
             <Button
               variant="contained"
               onClick={handleTaksitHesapla}
-              sx={{ height: 40 }}
+              sx={{ height: 40, flex: isMobile ? 1 : 'auto' }}
             >
               Hesapla
             </Button>
           </Box>
 
-          <TableContainer component={Paper} variant="outlined">
-            <Table size="small">
-              <TableHead>
-                <TableRow>
-                  <TableCell>Vade</TableCell>
-                  <TableCell>Tutar</TableCell>
-                  <TableCell>Ödeme Tipi</TableCell>
-                  <TableCell>Açıklama</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {formData.odemePlani.length === 0 ? (
+          {/* Mobil: Card Layout */}
+          {isMobile ? (
+            <Box>
+              {formData.odemePlani.length === 0 ? (
+                <Paper sx={{ p: 3, textAlign: 'center', bgcolor: 'var(--muted)' }}>
+                  <Typography variant="body2" color="text.secondary">
+                    Henüz ödeme planı oluşturulmadı.
+                  </Typography>
+                </Paper>
+              ) : (
+                formData.odemePlani.map((item, index) => (
+                  <Paper
+                    key={index}
+                    variant="outlined"
+                    sx={{ p: 2, mb: 2, bgcolor: 'var(--card)', borderRadius: 'var(--radius)' }}
+                  >
+                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                      <Typography variant="subtitle2" fontWeight="600" color="var(--primary)">
+                        {index + 1}. Taksit
+                      </Typography>
+                      <Typography variant="h6" fontWeight="700" color="var(--foreground)">
+                        {formatCurrency(item.tutar)}
+                      </Typography>
+                    </Box>
+                    <TextField
+                      type="date"
+                      fullWidth
+                      size="small"
+                      label="Vade"
+                      value={item.vade}
+                      onChange={(e) => {
+                        const newPlan = [...formData.odemePlani];
+                        newPlan[index].vade = e.target.value;
+                        setFormData(prev => ({ ...prev, odemePlani: newPlan }));
+                      }}
+                      sx={{ mb: 1.5 }}
+                      InputLabelProps={{ shrink: true }}
+                    />
+                    <FormControl fullWidth size="small" sx={{ mb: 1.5 }}>
+                      <InputLabel>Ödeme Tipi</InputLabel>
+                      <Select
+                        value={item.odemeTipi}
+                        onChange={(e) => {
+                          const newPlan = [...formData.odemePlani];
+                          newPlan[index].odemeTipi = e.target.value;
+                          setFormData(prev => ({ ...prev, odemePlani: newPlan }));
+                        }}
+                        label="Ödeme Tipi"
+                      >
+                        <MenuItem value="KREDI_KARTI">Kredi Kartı</MenuItem>
+                        <MenuItem value="NAKIT">Nakit</MenuItem>
+                        <MenuItem value="HAVALE">Havale/EFT</MenuItem>
+                      </Select>
+                    </FormControl>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Açıklama"
+                      value={item.aciklama}
+                      onChange={(e) => {
+                        const newPlan = [...formData.odemePlani];
+                        newPlan[index].aciklama = e.target.value;
+                        setFormData(prev => ({ ...prev, odemePlani: newPlan }));
+                      }}
+                    />
+                  </Paper>
+                ))
+              )}
+            </Box>
+          ) : (
+            /* Desktop: Table Layout */
+            <TableContainer component={Paper} variant="outlined">
+              <Table size="small">
+                <TableHead>
                   <TableRow>
-                    <TableCell colSpan={4} align="center">Henüz ödeme planı oluşturulmadı.</TableCell>
+                    <TableCell>Vade</TableCell>
+                    <TableCell>Tutar</TableCell>
+                    <TableCell>Ödeme Tipi</TableCell>
+                    <TableCell>Açıklama</TableCell>
                   </TableRow>
-                ) : (
-                  formData.odemePlani.map((item, index) => (
-                    <TableRow key={index}>
-                      <TableCell>
-                        <TextField
-                          type="date"
-                          size="small"
-                          value={item.vade}
-                          onChange={(e) => {
-                            const newPlan = [...formData.odemePlani];
-                            newPlan[index].vade = e.target.value;
-                            setFormData(prev => ({ ...prev, odemePlani: newPlan }));
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          type="number"
-                          size="small"
-                          value={item.tutar}
-                          onChange={(e) => {
-                            const newPlan = [...formData.odemePlani];
-                            newPlan[index].tutar = parseFloat(e.target.value) || 0;
-                            setFormData(prev => ({ ...prev, odemePlani: newPlan }));
-                          }}
-                        />
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          select
-                          size="small"
-                          value={item.odemeTipi}
-                          onChange={(e) => {
-                            const newPlan = [...formData.odemePlani];
-                            newPlan[index].odemeTipi = e.target.value;
-                            setFormData(prev => ({ ...prev, odemePlani: newPlan }));
-                          }}
-                          SelectProps={{ native: true }}
-                        >
-                          <option value="KREDI_KARTI">Kredi Kartı</option>
-                          <option value="NAKIT">Nakit</option>
-                          <option value="HAVALE">Havale/EFT</option>
-                        </TextField>
-                      </TableCell>
-                      <TableCell>
-                        <TextField
-                          size="small"
-                          value={item.aciklama}
-                          onChange={(e) => {
-                            const newPlan = [...formData.odemePlani];
-                            newPlan[index].aciklama = e.target.value;
-                            setFormData(prev => ({ ...prev, odemePlani: newPlan }));
-                          }}
-                        />
-                      </TableCell>
+                </TableHead>
+                <TableBody>
+                  {formData.odemePlani.length === 0 ? (
+                    <TableRow>
+                      <TableCell colSpan={4} align="center">Henüz ödeme planı oluşturulmadı.</TableCell>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
+                  ) : (
+                    formData.odemePlani.map((item, index) => (
+                      <TableRow key={index}>
+                        <TableCell>
+                          <TextField
+                            type="date"
+                            size="small"
+                            value={item.vade}
+                            onChange={(e) => {
+                              const newPlan = [...formData.odemePlani];
+                              newPlan[index].vade = e.target.value;
+                              setFormData(prev => ({ ...prev, odemePlani: newPlan }));
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            type="number"
+                            size="small"
+                            value={item.tutar}
+                            onChange={(e) => {
+                              const newPlan = [...formData.odemePlani];
+                              newPlan[index].tutar = parseFloat(e.target.value) || 0;
+                              setFormData(prev => ({ ...prev, odemePlani: newPlan }));
+                            }}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            select
+                            size="small"
+                            value={item.odemeTipi}
+                            onChange={(e) => {
+                              const newPlan = [...formData.odemePlani];
+                              newPlan[index].odemeTipi = e.target.value;
+                              setFormData(prev => ({ ...prev, odemePlani: newPlan }));
+                            }}
+                            SelectProps={{ native: true }}
+                          >
+                            <option value="KREDI_KARTI">Kredi Kartı</option>
+                            <option value="NAKIT">Nakit</option>
+                            <option value="HAVALE">Havale/EFT</option>
+                          </TextField>
+                        </TableCell>
+                        <TableCell>
+                          <TextField
+                            size="small"
+                            value={item.aciklama}
+                            onChange={(e) => {
+                              const newPlan = [...formData.odemePlani];
+                              newPlan[index].aciklama = e.target.value;
+                              setFormData(prev => ({ ...prev, odemePlani: newPlan }));
+                            }}
+                          />
+                        </TableCell>
+                      </TableRow>
+                    ))
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenOdemePlaniDialog(false)}>Kapat</Button>

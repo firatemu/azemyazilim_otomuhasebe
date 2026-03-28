@@ -495,16 +495,13 @@ export default function LoginPage() {
                       },
                       '& .MuiInputBase-input': {
                         color: '#FFFFFF',
-                        fontWeight: 400,
+                        fontWeight: 700,
                         fontSize: '1.1rem',
-                        letterSpacing: '0.5px',
-                        textShadow: '0 2px 8px rgba(0, 0, 0, 0.9), 0 0 12px rgba(14, 165, 233, 0.3)',
                       },
                       '& .MuiInputBase-input::placeholder': {
                         color: 'rgba(255, 255, 255, 0.9)',
-                        fontWeight: 400,
+                        fontWeight: 700,
                         opacity: 1,
-                        letterSpacing: '0.3px',
                       },
                       '& .MuiOutlinedInput-notchedOutline': {
                         borderRadius: '8px',
@@ -602,16 +599,13 @@ export default function LoginPage() {
                       },
                       '& .MuiInputBase-input': {
                         color: '#FFFFFF',
-                        fontWeight: 400,
+                        fontWeight: 700,
                         fontSize: '1.1rem',
-                        letterSpacing: '0.5px',
-                        textShadow: '0 2px 8px rgba(0, 0, 0, 0.9), 0 0 12px rgba(14, 165, 233, 0.3)',
                       },
                       '& .MuiInputBase-input::placeholder': {
                         color: 'rgba(255, 255, 255, 0.9)',
-                        fontWeight: 400,
+                        fontWeight: 700,
                         opacity: 1,
-                        letterSpacing: '0.3px',
                       },
                       '& .MuiOutlinedInput-notchedOutline': {
                         borderRadius: '8px',

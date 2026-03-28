@@ -7,6 +7,26 @@ import {
     ArrowBack,
     Delete,
     Edit,
+    DirectionsCar,
+    LocalGasStation,
+    History,
+    FileDownload,
+    Analytics,
+    Cancel,
+    CheckCircle,
+    Info,
+    Description as FileText,
+    CalendarToday,
+    Person,
+    DriveEta,
+    Speed,
+    ConfirmationNumber,
+    Notes,
+    Download,
+    TrendingUp,
+    Description,
+    LocalParking,
+    Refresh,
 } from '@mui/icons-material';
 import {
     Alert,
@@ -26,16 +46,18 @@ import {
     MenuItem,
     Select,
     Snackbar,
-    TableContainer,
     TextField,
     Tooltip,
     Typography,
+    Avatar,
+    Divider,
+    useTheme,
+    useMediaQuery,
 } from '@mui/material';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { ChangeEvent, memo, useCallback, useEffect, useMemo, useState } from 'react';
+import { ChangeEvent, memo, useCallback, useMemo, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { Download, Description as FileText } from '@mui/icons-material';
 import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import { registerFonts, drawHeader, drawTable } from '@/lib/pdf-utils';
@@ -48,19 +70,22 @@ interface Personel {
 
 interface CompanyVehicle {
     id: string;
-    plaka: string;
-    marka: string;
+    plate: string;
+    brand: string;
     model: string;
-    yil?: number;
-    saseno?: string;
-    motorNo?: string;
-    tescilTarihi?: string;
-    aracTipi?: string;
-    yakitTipi?: string;
-    durum: boolean;
-    zimmetliPersonelId?: string;
-    ruhsatGorselUrl?: string;
-    notlar?: string;
+    year?: number;
+    chassisno?: string;
+    engineNo?: string;
+    registrationDate?: string;
+    registrationSerialNo?: string;
+    lastInspectionDate?: string;
+    insuranceDate?: string;
+    vehicleType?: string;
+    fuelType?: string;
+    isActive: boolean;
+    assignedEmployeeId?: string;
+    registrationImageUrl?: string;
+    notes?: string;
     createdAt: string;
     updatedAt: string;
     personel?: Personel;
@@ -79,17 +104,21 @@ interface VehicleExpense {
 }
 
 const EXPENSE_TYPES = [
-    'YAKIT',
-    'BAKIM',
-    'MUAYENE',
-    'TRAFIK_SIGORTASI',
-    'KASKO',
-    'CEZA',
-    'OGS_HGS',
-    'OTOPARK',
-    'YIKAMA',
-    'DIGER'
+    { value: 'YAKIT', label: 'Yakıt', icon: LocalGasStation, color: '#3b82f6' },
+    { value: 'BAKIM', label: 'Bakım', icon: History, color: '#f59e0b' },
+    { value: 'MUAYENE', label: 'Muayene', icon: Info, color: '#8b5cf6' },
+    { value: 'TRAFIK_SIGORTASI', label: 'Trafik Sigortası', icon: Description, color: '#10b981' },
+    { value: 'KASKO', label: 'Kasko', icon: CheckCircle, color: '#0ea5e9' },
+    { value: 'CEZA', label: 'Ceza', icon: Cancel, color: '#ef4444' },
+    { value: 'OGS_HGS', label: 'OGS / HGS', icon: DriveEta, color: '#6366f1' },
+    { value: 'OTOPARK', label: 'Otopark', icon: LocalParking, color: '#475569' },
+    { value: 'YIKAMA', label: 'Yıkama', icon: LocalGasStation, color: '#14b8a6' },
+    { value: 'DIGER', label: 'Diğer', icon: Notes, color: '#64748b' }
 ];
+
+const getExpenseTypeInfo = (type: string) => {
+    return EXPENSE_TYPES.find(t => t.value === type) || EXPENSE_TYPES[EXPENSE_TYPES.length - 1];
+};
 
 const formatCurrency = (value: number) =>
     new Intl.NumberFormat('tr-TR', {
@@ -117,12 +146,15 @@ const DataGridNoRowsOverlay = () => (
         sx={{
             height: '100%',
             display: 'flex',
+            flexDirection: 'column',
             alignItems: 'center',
             justifyContent: 'center',
             color: 'var(--muted-foreground)',
+            gap: 1
         }}
     >
-        Masraf bulunamadı
+        <History sx={{ fontSize: 48, opacity: 0.2 }} />
+        <Typography variant="body2">Masraf kaydı bulunamadı</Typography>
     </Box>
 );
 
@@ -135,6 +167,9 @@ const ExpenseFormDialog = memo(({
     onSubmit,
     onFormChange
 }: any) => {
+    const theme = useTheme();
+    const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+
     if (!open) return null;
 
     return (
@@ -143,33 +178,66 @@ const ExpenseFormDialog = memo(({
             onClose={onClose}
             maxWidth="md"
             fullWidth
+            fullScreen={isMobile}
             PaperProps={{
                 sx: {
                     bgcolor: 'var(--card)',
                     backgroundImage: 'none',
+                    borderRadius: isMobile ? 0 : '16px',
+                    border: '1px solid var(--border)',
                 },
             }}
         >
             <DialogTitle component="div" sx={{
-                bgcolor: 'var(--destructive)',
-                color: 'var(--destructive-foreground)',
+                p: 2.5,
+                bgcolor: 'var(--card)',
                 borderBottom: '1px solid var(--border)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between'
             }}>
-                {editMode ? 'Masraf Düzenle' : 'Yeni Araç Masrafı'}
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                    <Box sx={{
+                        width: 40,
+                        height: 40,
+                        borderRadius: '10px',
+                        background: editMode ? 'linear-gradient(135deg, #f59e0b 0%, #d97706 100%)' : 'linear-gradient(135deg, #ef4444 0%, #dc2626 100%)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: '0 4px 12px rgba(0,0,0,0.1)'
+                    }}>
+                        <TrendingUp sx={{ color: '#fff' }} />
+                    </Box>
+                    <Box>
+                        <Typography variant="h6" sx={{ fontWeight: 700, lineHeight: 1.2, color: 'var(--foreground)' }}>
+                            {editMode ? 'Masraf Düzenle' : 'Yeni Araç Masrafı'}
+                        </Typography>
+                        <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
+                            Operasyonel harcama detaylarını girin
+                        </Typography>
+                    </Box>
+                </Box>
+                <IconButton onClick={onClose} size="small" sx={{ color: 'var(--muted-foreground)' }}>
+                    <Cancel />
+                </IconButton>
             </DialogTitle>
-            <DialogContent sx={{ bgcolor: 'var(--background)' }}>
-                <Grid container spacing={2} sx={{ mt: 1 }}>
+            <DialogContent sx={{ p: 3 }}>
+                <Grid container spacing={2.5} sx={{ mt: 0.5 }}>
                     <Grid size={{ xs: 12, md: 6 }}>
-                        <FormControl fullWidth required className="form-control-select">
+                        <FormControl fullWidth required>
                             <InputLabel>Masraf Tipi</InputLabel>
                             <Select
                                 value={formData.masrafTipi || ''}
                                 onChange={(e) => onFormChange('masrafTipi', e.target.value)}
                                 label="Masraf Tipi"
                             >
-                                {EXPENSE_TYPES.map((type: string) => (
-                                    <MenuItem key={type} value={type}>
-                                        {type.replace('_', ' ')}
+                                {EXPENSE_TYPES.map((type) => (
+                                    <MenuItem key={type.value} value={type.value}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                            <type.icon sx={{ fontSize: 18, color: type.color }} />
+                                            {type.label}
+                                        </Box>
                                     </MenuItem>
                                 ))}
                             </Select>
@@ -180,19 +248,21 @@ const ExpenseFormDialog = memo(({
                             fullWidth
                             required
                             type="number"
-                            className="form-control-textfield"
                             label="Tutar"
+                            placeholder="0,00"
                             value={formData.tutar || ''}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => onFormChange('tutar', e.target.value)}
-                            inputProps={{ min: 0.01, step: 0.01 }}
+                            InputProps={{
+                                startAdornment: <Typography variant="body2" sx={{ mr: 1, color: 'var(--muted-foreground)' }}>₺</Typography>,
+                                inputProps: { min: 0.01, step: 0.01 }
+                            }}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, md: 6 }}>
                         <TextField
                             fullWidth
                             type="date"
-                            className="form-control-textfield"
-                            label="Tarih"
+                            label="İşlem Tarihi"
                             value={formData.tarih || ''}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => onFormChange('tarih', e.target.value)}
                             InputLabelProps={{ shrink: true }}
@@ -202,17 +272,20 @@ const ExpenseFormDialog = memo(({
                         <TextField
                             fullWidth
                             type="number"
-                            className="form-control-textfield"
                             label="Kilometre"
+                            placeholder="Örn: 45200"
                             value={formData.kilometre || ''}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => onFormChange('kilometre', e.target.value ? parseInt(e.target.value, 10) : '')}
+                            InputProps={{
+                                endAdornment: <Typography variant="caption" sx={{ ml: 1, color: 'var(--muted-foreground)' }}>KM</Typography>
+                            }}
                         />
                     </Grid>
                     <Grid size={{ xs: 12, md: 6 }}>
                         <TextField
                             fullWidth
-                            className="form-control-textfield"
                             label="Belge No"
+                            placeholder="Fatura/Fiş No"
                             value={formData.belgeNo || ''}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => onFormChange('belgeNo', e.target.value)}
                         />
@@ -221,25 +294,25 @@ const ExpenseFormDialog = memo(({
                         <TextField
                             fullWidth
                             label="Açıklama"
-                            className="form-control-textfield"
                             value={formData.aciklama || ''}
                             onChange={(e: ChangeEvent<HTMLInputElement>) => onFormChange('aciklama', e.target.value)}
                             multiline
                             rows={3}
+                            placeholder="Masraf hakkında detaylı bilgi..."
                         />
                     </Grid>
                 </Grid>
             </DialogContent>
-            <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
+            <DialogActions sx={{ p: 2.5, borderTop: '1px solid var(--border)', gap: 1.5 }}>
                 <Button
                     onClick={onClose}
+                    variant="outlined"
                     sx={{
+                        borderRadius: '10px',
+                        textTransform: 'none',
+                        px: 3,
                         borderColor: 'var(--border)',
-                        color: 'var(--foreground)',
-                        '&:hover': {
-                            borderColor: 'var(--primary)',
-                            bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-                        },
+                        color: 'var(--foreground)'
                     }}
                 >
                     İptal
@@ -249,14 +322,15 @@ const ExpenseFormDialog = memo(({
                     onClick={onSubmit}
                     disabled={loading}
                     sx={{
+                        borderRadius: '10px',
+                        textTransform: 'none',
+                        px: 4,
                         bgcolor: 'var(--destructive)',
                         color: 'var(--destructive-foreground)',
-                        '&:hover': {
-                            bgcolor: 'color-mix(in srgb, var(--destructive) 90%, #000 10%)',
-                        },
+                        boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)'
                     }}
                 >
-                    {editMode ? 'Güncelle' : 'Kaydet'}
+                    {editMode ? 'Güncelle' : 'Masrafı Kaydet'}
                 </Button>
             </DialogActions>
         </Dialog>
@@ -271,12 +345,10 @@ export default function VehicleDetailPage() {
     const router = useRouter();
     const queryClient = useQueryClient();
     const [actionLoading, setActionLoading] = useState(false);
-
     const [openDialog, setOpenDialog] = useState(false);
     const [openDelete, setOpenDelete] = useState(false);
     const [editMode, setEditMode] = useState(false);
     const [selectedExpense, setSelectedExpense] = useState<VehicleExpense | null>(null);
-
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
@@ -329,7 +401,6 @@ export default function VehicleDetailPage() {
             return response.data;
         },
     });
-
 
     const handleOpenDialog = useCallback((expense?: VehicleExpense) => {
         if (expense) {
@@ -426,7 +497,7 @@ export default function VehicleDetailPage() {
         if (type === 'excel') {
             const exportData = expenses.map((exp: VehicleExpense) => ({
                 'Tarih': formatDate(exp.tarih),
-                'Masraf Tipi': exp.masrafTipi.replace('_', ' '),
+                'Masraf Tipi': getExpenseTypeInfo(exp.masrafTipi).label,
                 'Tutar': formatCurrency(exp.tutar),
                 'Kilometre': exp.kilometre ? `${exp.kilometre.toLocaleString('tr-TR')} km` : '-',
                 'Belge No': exp.belgeNo || '-',
@@ -435,7 +506,7 @@ export default function VehicleDetailPage() {
             const ws = XLSX.utils.json_to_sheet(exportData);
             const wb = XLSX.utils.book_new();
             XLSX.utils.book_append_sheet(wb, ws, 'Araç Masrafları');
-            XLSX.writeFile(wb, `${vehicle.plaka}_masraf_raporu_${new Date().toISOString().split('T')[0]}.xlsx`);
+            XLSX.writeFile(wb, `${vehicle.plate}_masraf_raporu_${new Date().toISOString().split('T')[0]}.xlsx`);
         } else {
             const doc = new jsPDF();
             registerFonts(doc);
@@ -444,7 +515,7 @@ export default function VehicleDetailPage() {
                 ? tenantSettings?.companyName
                 : (tenantSettings?.firstName ? `${tenantSettings.firstName} ${tenantSettings.lastName}` : 'OTOMUHASEBE');
 
-            drawHeader(doc, 'ARAÇ MASRAF RAPORU', `${vehicle.plaka} - ${vehicle.marka} ${vehicle.model}`, companyName);
+            drawHeader(doc, 'ARAÇ MASRAF RAPORU', `${vehicle.plate} - ${vehicle.brand} ${vehicle.model}`, companyName);
 
             // Vehicle Info Section
             doc.setFontSize(14);
@@ -454,8 +525,8 @@ export default function VehicleDetailPage() {
 
             doc.setFontSize(10);
             doc.setFont('Roboto', 'normal');
-            doc.text(`Plaka: ${vehicle.plaka}`, 20, 68);
-            doc.text(`Marka / Model: ${vehicle.marka} ${vehicle.model} ${vehicle.yil ? `(${vehicle.yil})` : ''}`, 20, 75);
+            doc.text(`Plaka: ${vehicle.plate}`, 20, 68);
+            doc.text(`Marka / Model: ${vehicle.brand} ${vehicle.model} ${vehicle.year ? `(${vehicle.year})` : ''}`, 20, 75);
             doc.text(`Zimmetli Personel: ${vehicle.personel ? `${vehicle.personel.ad} ${vehicle.personel.soyad}` : '-'}`, 20, 82);
 
             doc.text(`Toplam Masraf: ${formatCurrency(totalExpense)}`, 120, 68);
@@ -465,7 +536,7 @@ export default function VehicleDetailPage() {
             const headers = ['Tarih', 'Masraf Tipi', 'KM', 'Belge No', 'Tutar'];
             const rows = expenses.map((exp: VehicleExpense) => [
                 formatDate(exp.tarih),
-                exp.masrafTipi.replace('_', ' '),
+                getExpenseTypeInfo(exp.masrafTipi).label,
                 exp.kilometre ? exp.kilometre.toLocaleString('tr-TR') : '-',
                 exp.belgeNo || '-',
                 formatCurrency(exp.tutar)
@@ -474,52 +545,61 @@ export default function VehicleDetailPage() {
 
             drawTable(doc, 95, headers, rows, colWidths);
 
-            doc.save(`${vehicle.plaka}_masraf_raporu_${new Date().toISOString().split('T')[0]}.pdf`);
+            doc.save(`${vehicle.plate}_masraf_raporu_${new Date().toISOString().split('T')[0]}.pdf`);
         }
     }, [vehicle, expenses, totalExpense, tenantSettings]);
-
 
     const columns = useMemo<GridColDef[]>(() => [
         {
             field: 'tarih',
-            headerName: 'Tarih',
+            headerName: 'İşlem Tarihi',
             width: 130,
             renderCell: (params: any) => (
-                <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
+                <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>
                     {formatDate(params.row.tarih)}
                 </Typography>
             ),
         },
         {
             field: 'masrafTipi',
-            headerName: 'Masraf Tipi',
-            width: 150,
-            renderCell: (params: any) => (
-                <Chip
-                    label={params.row.masrafTipi.replace('_', ' ')}
-                    size="small"
-                    sx={{
-                        bgcolor: 'color-mix(in srgb, var(--muted-foreground) 10%, transparent)',
-                        color: 'var(--foreground)',
-                        borderColor: 'var(--border)',
-                    }}
-                    variant="outlined"
-                />
-            ),
+            headerName: 'Masraf Türü',
+            width: 180,
+            renderCell: (params: any) => {
+                const info = getExpenseTypeInfo(params.row.masrafTipi);
+                return (
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Box sx={{
+                            width: 28,
+                            height: 28,
+                            borderRadius: '8px',
+                            bgcolor: `${info.color}15`,
+                            color: info.color,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center'
+                        }}>
+                            <info.icon sx={{ fontSize: 16 }} />
+                        </Box>
+                        <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 600 }}>
+                            {info.label}
+                        </Typography>
+                    </Box>
+                );
+            },
         },
         {
             field: 'tutar',
             headerName: 'Tutar',
             width: 140,
             renderCell: (params: any) => (
-                <Typography variant="body2" fontWeight={600} sx={{ color: 'var(--destructive)' }}>
+                <Typography variant="body2" fontWeight={700} sx={{ color: 'var(--destructive)' }}>
                     {formatCurrency(params.row.tutar)}
                 </Typography>
             ),
         },
         {
             field: 'kilometre',
-            headerName: 'KM',
+            headerName: 'Kilometre',
             width: 120,
             renderCell: (params: any) => (
                 <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>
@@ -528,13 +608,19 @@ export default function VehicleDetailPage() {
             ),
         },
         {
-            field: 'aciklama',
-            headerName: 'Açıklama',
-            flex: 1,
-            minWidth: 200,
+            field: 'belgeNo',
+            headerName: 'Belge No',
+            width: 130,
             renderCell: (params: any) => (
-                <Typography variant="body2" sx={{ color: 'var(--foreground)' }} noWrap>
-                    {params.row.aciklama || '-'}
+                <Typography variant="caption" sx={{
+                    color: 'var(--muted-foreground)',
+                    fontFamily: 'monospace',
+                    bgcolor: 'color-mix(in srgb, var(--muted) 40%, transparent)',
+                    px: 0.8,
+                    py: 0.2,
+                    borderRadius: '4px'
+                }}>
+                    {params.row.belgeNo || '-'}
                 </Typography>
             ),
         },
@@ -547,298 +633,286 @@ export default function VehicleDetailPage() {
             renderCell: (params: any) => {
                 const row = params.row as VehicleExpense;
                 return (
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                        <Tooltip title="Düzenle">
-                            <IconButton
-                                size="small"
-                                onClick={() => handleOpenDialog(row)}
-                                sx={{
-                                    color: 'var(--chart-3)',
-                                    '&:hover': {
-                                        bgcolor: 'color-mix(in srgb, var(--chart-3) 10%, transparent)',
-                                    },
-                                }}
-                            >
-                                <Edit fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
-                        <Tooltip title="Sil">
-                            <IconButton
-                                size="small"
-                                onClick={() => {
-                                    setSelectedExpense(row);
-                                    setOpenDelete(true);
-                                }}
-                                sx={{
-                                    color: 'var(--destructive)',
-                                    '&:hover': {
-                                        bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
-                                    },
-                                }}
-                            >
-                                <Delete fontSize="small" />
-                            </IconButton>
-                        </Tooltip>
+                    <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', height: '100%' }}>
+                        <IconButton
+                            size="small"
+                            onClick={() => handleOpenDialog(row)}
+                            sx={{
+                                color: '#f59e0b',
+                                bgcolor: 'rgba(245, 158, 11, 0.08)',
+                                '&:hover': { bgcolor: 'rgba(245, 158, 11, 0.15)' }
+                            }}
+                        >
+                            <Edit sx={{ fontSize: 18 }} />
+                        </IconButton>
+                        <IconButton
+                            size="small"
+                            onClick={() => {
+                                setSelectedExpense(row);
+                                setOpenDelete(true);
+                            }}
+                            sx={{
+                                color: 'var(--destructive)',
+                                bgcolor: 'color-mix(in srgb, var(--destructive) 8%, transparent)',
+                                '&:hover': { bgcolor: 'color-mix(in srgb, var(--destructive) 15%, transparent)' }
+                            }}
+                        >
+                            <Delete sx={{ fontSize: 18 }} />
+                        </IconButton>
                     </Box>
                 );
             },
         },
     ], [handleOpenDialog]);
 
-    if (isVehicleLoading) {
-        return <MainLayout><Box p={3}>Yükleniyor...</Box></MainLayout>;
-    }
-
-    if (!vehicle) {
-        return <MainLayout><Box p={3}>Araç bulunamadı.</Box></MainLayout>;
-    }
+    if (isVehicleLoading) return <MainLayout><Box p={4} sx={{ display: 'flex', justifyContent: 'center' }}>Yükleniyor...</Box></MainLayout>;
+    if (!vehicle) return <MainLayout><Box p={4} sx={{ textAlign: 'center' }}>Araç bulunamadı.</Box></MainLayout>;
 
     return (
         <MainLayout>
-            <Box sx={{ p: 3, bgcolor: 'var(--background)' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', mb: 3, gap: 2 }}>
-                    <IconButton
-                        onClick={() => router.push('/sirket-araclari')}
-                        sx={{ color: 'var(--foreground)' }}
-                    >
-                        <ArrowBack />
-                    </IconButton>
-                    <Box>
-                        <Typography variant="h4" sx={{ fontWeight: 700, color: 'var(--foreground)', letterSpacing: '-0.02em' }}>
-                            {vehicle.plaka}
-                        </Typography>
-                        <Typography variant="body1" sx={{ color: 'var(--muted-foreground)' }}>
-                            {vehicle.marka} {vehicle.model} {vehicle.yil ? `(${vehicle.yil})` : ''}
-                        </Typography>
+            <Box sx={{ p: { xs: 2, md: 3 }, bgcolor: 'var(--background)', minHeight: '100vh' }}>
+                {/* Modern Header */}
+                <Box sx={{ display: 'flex', flexDirection: { xs: 'column', md: 'row' }, justifyContent: 'space-between', alignItems: { xs: 'flex-start', md: 'center' }, gap: 2, mb: 4 }}>
+                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                        <IconButton
+                            onClick={() => router.push('/company-vehicles')}
+                            sx={{
+                                bgcolor: 'var(--card)',
+                                border: '1px solid var(--border)',
+                                color: 'var(--foreground)',
+                                '&:hover': { bgcolor: 'color-mix(in srgb, var(--muted) 20%, transparent)' }
+                            }}
+                        >
+                            <ArrowBack />
+                        </IconButton>
+                        <Box>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5, mb: 0.5 }}>
+                                <Box sx={{
+                                    bgcolor: '#fff',
+                                    border: '1.5px solid #1e293b',
+                                    borderRadius: '6px',
+                                    px: 1.5,
+                                    py: 0.5,
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    boxShadow: '0 2px 4px rgba(0,0,0,0.1)',
+                                    position: 'relative',
+                                    '&::before': {
+                                        content: '""',
+                                        position: 'absolute',
+                                        left: 0,
+                                        top: 0,
+                                        bottom: 0,
+                                        width: '6px',
+                                        bgcolor: '#3b82f6',
+                                        borderRadius: '6px 0 0 6px'
+                                    }
+                                }}>
+                                    <Typography variant="h5" sx={{ fontWeight: 800, color: '#1e293b', letterSpacing: '0.05em' }}>
+                                        {vehicle.plate}
+                                    </Typography>
+                                </Box>
+                                <Chip
+                                    label={vehicle.isActive ? 'AKTİF' : 'PASİF'}
+                                    size="small"
+                                    icon={vehicle.isActive ? <CheckCircle sx={{ fontSize: '14px !important' }} /> : <Cancel sx={{ fontSize: '14px !important' }} />}
+                                    sx={{
+                                        bgcolor: vehicle.isActive ? 'rgba(16, 185, 129, 0.1)' : 'rgba(239, 68, 68, 0.1)',
+                                        color: vehicle.isActive ? '#10b981' : '#ef4444',
+                                        fontWeight: 700,
+                                        border: 'none'
+                                    }}
+                                />
+                            </Box>
+                            <Typography variant="body2" sx={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>
+                                {vehicle.brand} {vehicle.model} • {vehicle.year || 'Bilinmiyor'}
+                            </Typography>
+                        </Box>
                     </Box>
-                </Box>
-
-                <Grid container spacing={2} sx={{ mb: 3 }}>
-                    {/* Araç Bilgileri */}
-                    <Grid size={{ xs: 12, md: 8 }}>
-                        <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--border)', height: '100%', boxShadow: 'var(--shadow-sm)' }}>
-                            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 } }}>
-                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 1.5 }}>
-                                    <Typography variant="subtitle1" sx={{ color: 'var(--foreground)', fontWeight: 700, fontSize: '0.9rem' }}>
-                                        Araç Bilgileri
-                                    </Typography>
-                                    <Chip
-                                        label={vehicle.durum ? 'AKTİF' : 'PASİF'}
-                                        size="small"
-                                        sx={{
-                                            bgcolor: vehicle.durum ? 'color-mix(in srgb, var(--success) 10%, transparent)' : 'color-mix(in srgb, var(--muted-foreground) 10%, transparent)',
-                                            color: vehicle.durum ? 'var(--success)' : 'var(--muted-foreground)',
-                                            borderColor: vehicle.durum ? 'var(--success)' : 'var(--border)',
-                                            fontWeight: 700,
-                                            fontSize: '0.7rem',
-                                            height: '20px'
-                                        }}
-                                        variant="outlined"
-                                    />
-                                </Box>
-                                <Grid container spacing={2}>
-                                    <Grid size={{ xs: 12, sm: 4 }}>
-                                        <Box sx={{ mb: 1 }}>
-                                            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block', mb: 0.2 }}>Marka / Model</Typography>
-                                            <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>{vehicle.marka} {vehicle.model} {vehicle.yil ? `(${vehicle.yil})` : ''}</Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block', mb: 0.2 }}>Araç Tipi</Typography>
-                                            <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>{vehicle.aracTipi || '-'}</Typography>
-                                        </Box>
-                                    </Grid>
-                                    <Grid size={{ xs: 12, sm: 4 }}>
-                                        <Box sx={{ mb: 1 }}>
-                                            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block', mb: 0.2 }}>Şase No</Typography>
-                                            <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>{vehicle.saseno || '-'}</Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block', mb: 0.2 }}>Motor No</Typography>
-                                            <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>{vehicle.motorNo || '-'}</Typography>
-                                        </Box>
-                                    </Grid>
-                                    <Grid size={{ xs: 12, sm: 4 }}>
-                                        <Box sx={{ mb: 1 }}>
-                                            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block', mb: 0.2 }}>Yakıt / Personel</Typography>
-                                            <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>
-                                                {vehicle.yakitTipi || '-'} / {vehicle.personel ? `${vehicle.personel.ad} ${vehicle.personel.soyad}` : '-'}
-                                            </Typography>
-                                        </Box>
-                                        <Box>
-                                            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block', mb: 0.2 }}>Tescil Tarihi</Typography>
-                                            <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>{formatDate(vehicle.tescilTarihi)}</Typography>
-                                        </Box>
-                                    </Grid>
-                                    {vehicle.notlar && (
-                                        <Grid size={12}>
-                                            <Box sx={{ mt: 0.5, p: 1, bgcolor: 'color-mix(in srgb, var(--muted) 30%, transparent)', borderRadius: 1 }}>
-                                                <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block', mb: 0.2 }}>Araç Notları</Typography>
-                                                <Typography variant="body2" sx={{ color: 'var(--foreground)', fontStyle: 'italic', fontSize: '0.8rem' }}>{vehicle.notlar}</Typography>
-                                            </Box>
-                                        </Grid>
-                                    )}
-                                </Grid>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-
-                    {/* Toplam Masraf Özeti */}
-                    <Grid size={{ xs: 12, md: 4 }}>
-                        <Card sx={{ bgcolor: 'color-mix(in srgb, var(--destructive) 5%, var(--card))', border: '1px solid var(--destructive)', height: '100%', boxShadow: 'var(--shadow-sm)' }}>
-                            <CardContent sx={{ p: 2, '&:last-child': { pb: 2 }, display: 'flex', flexDirection: 'column', justifyContent: 'center', height: '100%' }}>
-                                <Typography variant="subtitle2" sx={{ color: 'var(--destructive)', fontWeight: 700, mb: 0.5 }}>
-                                    Toplam Masraf
-                                </Typography>
-                                <Typography variant="h4" sx={{ color: 'var(--destructive)', fontWeight: 800 }}>
-                                    {formatCurrency(totalExpense)}
-                                </Typography>
-                                <Box sx={{ mt: 1, pt: 1, borderTop: '1px solid color-mix(in srgb, var(--destructive) 20%, transparent)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                                    <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
-                                        Harcanan Tutar
-                                    </Typography>
-                                    <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 600 }}>
-                                        {expenses.length} Adet Masraf
-                                    </Typography>
-                                </Box>
-                            </CardContent>
-                        </Card>
-                    </Grid>
-                </Grid>
-
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                    <Typography variant="h5" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
-                        Araç Masrafları
-                    </Typography>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
+                    <Box sx={{ display: 'flex', gap: 1.5, width: { xs: '100%', md: 'auto' } }}>
                         <Button
                             variant="outlined"
-                            startIcon={<Download />}
-                            onClick={() => handleExport('excel')}
-                            sx={{
-                                borderColor: 'var(--border)',
-                                color: 'var(--foreground)',
-                                '&:hover': {
-                                    borderColor: 'var(--primary)',
-                                    bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-                                },
-                            }}
-                        >
-                            Excel
-                        </Button>
-                        <Button
-                            variant="outlined"
-                            startIcon={<FileText />}
+                            startIcon={<Description />}
                             onClick={() => handleExport('pdf')}
-                            sx={{
-                                borderColor: 'var(--border)',
-                                color: 'var(--foreground)',
-                                '&:hover': {
-                                    borderColor: 'var(--primary)',
-                                    bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-                                },
-                            }}
+                            sx={{ borderRadius: '12px', textTransform: 'none', fontWeight: 600, borderColor: 'var(--border)', color: 'var(--foreground)' }}
                         >
-                            PDF
+                            Rapor Al (PDF)
                         </Button>
                         <Button
                             variant="contained"
                             startIcon={<Add />}
                             onClick={() => handleOpenDialog()}
                             sx={{
+                                borderRadius: '12px',
+                                textTransform: 'none',
+                                fontWeight: 600,
                                 bgcolor: 'var(--destructive)',
                                 color: 'var(--destructive-foreground)',
-                                '&:hover': {
-                                    bgcolor: 'color-mix(in srgb, var(--destructive) 90%, #000 10%)',
-                                },
+                                px: 3,
+                                boxShadow: '0 4px 12px rgba(220, 38, 38, 0.2)'
                             }}
                         >
-                            Masraf Ekle
+                            Yeni Masraf Ekle
                         </Button>
                     </Box>
                 </Box>
 
-                <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--border)', boxShadow: 'var(--shadow-sm)' }}>
-                    <TableContainer>
-                        <DataGrid
-                            rows={expenses}
-                            columns={columns}
-                            loading={isExpensesLoading || actionLoading}
-                            disableRowSelectionOnClick
-                            autoHeight
-                            slots={{
-                                noRowsOverlay: DataGridNoRowsOverlay,
-                            }}
-                            rowHeight={60}
-                            initialState={{
-                                pagination: { paginationModel: { pageSize: 10 } },
-                                sorting: { sortModel: [{ field: 'tarih', sort: 'desc' }] },
-                            }}
-                            pageSizeOptions={[10, 25, 50]}
-                            sx={{
-                                border: 'none',
-                                '& .MuiDataGrid-cell': {
-                                    borderColor: 'var(--border)',
-                                    color: 'var(--foreground)',
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                },
-                                '& .MuiDataGrid-columnHeaders': {
-                                    bgcolor: 'color-mix(in srgb, var(--muted) 50%, transparent)',
-                                    borderColor: 'var(--border)',
-                                    color: 'var(--muted-foreground)',
-                                },
-                                '& .MuiDataGrid-footerContainer': {
-                                    borderColor: 'var(--border)',
-                                    color: 'var(--foreground)',
-                                },
-                                '& .MuiTablePagination-root': {
-                                    color: 'var(--foreground)',
-                                },
-                            }}
-                        />
-                    </TableContainer>
-                </Card>
+                <Grid container spacing={3}>
+                    {/* Vehicle Details Card */}
+                    <Grid size={{ xs: 12, lg: 8 }}>
+                        <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', boxShadow: 'var(--shadow-sm)', height: '100%' }}>
+                            <CardContent sx={{ p: 3 }}>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 3 }}>
+                                    <Info sx={{ color: 'var(--primary)' }} />
+                                    <Typography variant="h6" fontWeight={700} sx={{ color: 'var(--foreground)' }}>Araç Teknik Bilgileri</Typography>
+                                </Box>
+                                <Grid container spacing={4}>
+                                    <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                                        <InfoItem icon={DirectionsCar} label="Araç Tipi" value={vehicle.vehicleType || '-'} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                                        <InfoItem icon={LocalGasStation} label="Yakıt Tipi" value={vehicle.fuelType || '-'} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                                        <InfoItem icon={CalendarToday} label="Kayıt Yılı" value={vehicle.year?.toString() || '-'} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                                        <InfoItem icon={ConfirmationNumber} label="Şase No" value={vehicle.chassisno || '-'} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                                        <InfoItem icon={Speed} label="Motor No" value={vehicle.engineNo || '-'} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                                        <InfoItem icon={ConfirmationNumber} label="Ruhsat Seri No" value={vehicle.registrationSerialNo || '-'} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                                        <InfoItem icon={CalendarToday} label="Tescil Tarihi" value={formatDate(vehicle.registrationDate)} />
+                                    </Grid>
+                                    <Grid size={{ xs: 6, sm: 4, md: 3 }}>
+                                        <InfoItem icon={Info} label="Muayene / Sigorta" value={
+                                            <Box>
+                                                <Typography variant="caption" display="block">M: {formatDate(vehicle.lastInspectionDate)}</Typography>
+                                                <Typography variant="caption" display="block">S: {formatDate(vehicle.insuranceDate)}</Typography>
+                                            </Box>
+                                        } />
+                                    </Grid>
+                                    <Grid size={{ xs: 12, md: 6 }}>
+                                        <Box sx={{ p: 2, bgcolor: 'color-mix(in srgb, var(--primary) 5%, transparent)', borderRadius: '12px', display: 'flex', alignItems: 'center', gap: 2 }}>
+                                            <Avatar sx={{ bgcolor: 'var(--primary)', width: 40, height: 40 }}>
+                                                <Person />
+                                            </Avatar>
+                                            <Box>
+                                                <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block' }}>Zimmetli Personel</Typography>
+                                                <Typography variant="body1" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
+                                                    {vehicle.personel ? `${vehicle.personel.ad} ${vehicle.personel.soyad}` : 'Henüz Atanmamış'}
+                                                </Typography>
+                                            </Box>
+                                        </Box>
+                                    </Grid>
+                                </Grid>
+                                {vehicle.notes && (
+                                    <Box sx={{ mt: 4, p: 2, bgcolor: 'color-mix(in srgb, var(--muted) 20%, transparent)', borderRadius: '12px', border: '1px solid var(--border)' }}>
+                                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                                            <Notes sx={{ fontSize: 18, color: 'var(--muted-foreground)' }} />
+                                            <Typography variant="caption" sx={{ fontWeight: 700, color: 'var(--muted-foreground)', textTransform: 'uppercase' }}>Araç Notları</Typography>
+                                        </Box>
+                                        <Typography variant="body2" sx={{ color: 'var(--foreground)' }}>{vehicle.notes}</Typography>
+                                    </Box>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </Grid>
 
-                {/* Delete Expense Dialog */}
-                <Dialog
-                    open={openDelete}
-                    onClose={() => setOpenDelete(false)}
-                    PaperProps={{
-                        sx: {
-                            bgcolor: 'var(--card)',
-                            backgroundImage: 'none',
-                            minWidth: '350px',
-                        },
-                    }}
-                >
-                    <DialogTitle sx={{ color: 'var(--foreground)' }}>Silme İşlemi</DialogTitle>
-                    <DialogContent>
-                        <Alert severity="warning" sx={{ mb: 2, bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)', color: 'var(--destructive)' }}>
-                            Bu masrafı silmek istediğinize emin misiniz? Tutarı genel toplamdan düşülecektir.
-                        </Alert>
-                    </DialogContent>
-                    <DialogActions sx={{ p: 2, pt: 0 }}>
-                        <Button
-                            onClick={() => setOpenDelete(false)}
-                            disabled={actionLoading}
-                            sx={{ color: 'var(--foreground)' }}
-                        >
-                            İptal
-                        </Button>
-                        <Button
-                            onClick={handleDelete}
-                            variant="contained"
-                            disabled={actionLoading}
-                            sx={{
-                                bgcolor: 'var(--destructive)',
-                                '&:hover': { bgcolor: 'color-mix(in srgb, var(--destructive) 80%, black)' },
-                            }}
-                        >
-                            Sil
-                        </Button>
-                    </DialogActions>
-                </Dialog>
+                    {/* Summary Stats Card */}
+                    <Grid size={{ xs: 12, lg: 4 }}>
+                        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, height: '100%' }}>
+                            <Card sx={{
+                                bgcolor: 'color-mix(in srgb, var(--destructive) 5%, var(--card))',
+                                border: '1px solid var(--destructive)',
+                                borderRadius: '20px',
+                                boxShadow: 'var(--shadow-sm)',
+                                p: 3
+                            }}>
+                                <Typography variant="subtitle2" sx={{ color: 'var(--destructive)', fontWeight: 700, mb: 1, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                                    Toplam Operasyonel Masraf
+                                </Typography>
+                                <Typography variant="h3" sx={{ fontWeight: 800, color: 'var(--destructive)', letterSpacing: '-0.04em' }}>
+                                    {formatCurrency(totalExpense)}
+                                </Typography>
+                                <Divider sx={{ my: 2, borderColor: 'color-mix(in srgb, var(--destructive) 20%, transparent)' }} />
+                                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>Toplam İşlem Sayısı</Typography>
+                                    <Typography variant="h6" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>{expenses.length} Adet</Typography>
+                                </Box>
+                            </Card>
 
+                            <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', p: 3, flex: 1, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                                <Typography variant="subtitle2" sx={{ color: 'var(--muted-foreground)', fontWeight: 700, mb: 2, textTransform: 'uppercase' }}>İşlem Özeti</Typography>
+                                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                    <StatRow label="Son İşlem" value={expenses.length > 0 ? formatDate(expenses[0].tarih) : '-'} />
+                                    <StatRow label="En Yüksek Masraf" value={expenses.length > 0 ? formatCurrency(Math.max(...expenses.map(e => Number(e.tutar)))) : '-'} />
+                                    <StatRow label="Ortalama Masraf" value={expenses.length > 0 ? formatCurrency(totalExpense / expenses.length) : '-'} />
+                                </Box>
+                            </Card>
+                        </Box>
+                    </Grid>
+
+                    {/* Expenses DataGrid */}
+                    <Grid size={12}>
+                        <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--border)', borderRadius: '20px', overflow: 'hidden', boxShadow: 'var(--shadow-sm)' }}>
+                            <Box sx={{ p: 2.5, borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                <Typography variant="h6" fontWeight={700}>Masraf Geçmişi</Typography>
+                                <Box sx={{ display: 'flex', gap: 1 }}>
+                                    <IconButton size="small" sx={{ bgcolor: 'color-mix(in srgb, var(--muted) 20%, transparent)', borderRadius: '8px' }}>
+                                        <Refresh sx={{ fontSize: 20 }} />
+                                    </IconButton>
+                                    <Button
+                                        size="small"
+                                        startIcon={<Download />}
+                                        onClick={() => handleExport('excel')}
+                                        sx={{ borderRadius: '8px', textTransform: 'none', color: 'var(--muted-foreground)', '&:hover': { color: 'var(--primary)' } }}
+                                    >
+                                        Dışa Aktar
+                                    </Button>
+                                </Box>
+                            </Box>
+                            <DataGrid
+                                rows={expenses}
+                                columns={columns}
+                                loading={isExpensesLoading || actionLoading}
+                                disableRowSelectionOnClick
+                                autoHeight
+                                slots={{ noRowsOverlay: DataGridNoRowsOverlay }}
+                                rowHeight={70}
+                                initialState={{
+                                    pagination: { paginationModel: { pageSize: 10 } },
+                                    sorting: { sortModel: [{ field: 'tarih', sort: 'desc' }] },
+                                }}
+                                sx={{
+                                    border: 'none',
+                                    '& .MuiDataGrid-columnHeader': {
+                                        bgcolor: 'transparent',
+                                        color: 'var(--muted-foreground)',
+                                        fontWeight: 700,
+                                        fontSize: '0.75rem',
+                                        textTransform: 'uppercase',
+                                        letterSpacing: '0.05em'
+                                    },
+                                    '& .MuiDataGrid-cell': {
+                                        borderColor: 'var(--border)',
+                                        display: 'flex',
+                                        alignItems: 'center'
+                                    },
+                                    '& .MuiDataGrid-row:hover': {
+                                        bgcolor: 'color-mix(in srgb, var(--muted) 10%, transparent)'
+                                    }
+                                }}
+                            />
+                        </Card>
+                    </Grid>
+                </Grid>
+
+                {/* Dialogs */}
                 <ExpenseFormDialog
                     open={openDialog}
                     editMode={editMode}
@@ -849,21 +923,60 @@ export default function VehicleDetailPage() {
                     onFormChange={handleFormChange}
                 />
 
+                <Dialog
+                    open={openDelete}
+                    onClose={() => setOpenDelete(false)}
+                    PaperProps={{ sx: { borderRadius: '16px', p: 1, bgcolor: 'var(--card)', backgroundImage: 'none' } }}
+                >
+                    <DialogTitle sx={{ textAlign: 'center', pb: 0, color: 'var(--foreground)' }}>
+                        <Box sx={{ width: 56, height: 56, borderRadius: '50%', bgcolor: 'rgba(239, 68, 68, 0.1)', color: '#ef4444', display: 'flex', alignItems: 'center', justifyContent: 'center', mx: 'auto', mb: 2 }}>
+                            <Delete sx={{ fontSize: 32 }} />
+                        </Box>
+                        Masraf Kaydını Sil
+                    </DialogTitle>
+                    <DialogContent>
+                        <Typography sx={{ textAlign: 'center', color: 'var(--muted-foreground)' }}>
+                            Bu masraf kaydını silmek istediğinize emin misiniz? Bu işlem geri alınamaz.
+                        </Typography>
+                    </DialogContent>
+                    <DialogActions sx={{ justifyContent: 'center', pb: 3, gap: 2 }}>
+                        <Button variant="outlined" onClick={() => setOpenDelete(false)} sx={{ borderRadius: '10px', textTransform: 'none', px: 4, borderColor: 'var(--border)', color: 'var(--foreground)' }}>İptal</Button>
+                        <Button variant="contained" color="error" onClick={handleDelete} disabled={actionLoading} sx={{ borderRadius: '10px', textTransform: 'none', px: 4, bgcolor: '#ef4444', color: '#fff' }}>Sil</Button>
+                    </DialogActions>
+                </Dialog>
+
                 <Snackbar
                     open={snackbar.open}
-                    autoHideDuration={6000}
-                    onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
+                    autoHideDuration={4000}
+                    onClose={() => setSnackbar({ ...snackbar, open: false })}
                     anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
                 >
-                    <Alert
-                        onClose={() => setSnackbar((prev) => ({ ...prev, open: false }))}
-                        severity={snackbar.severity}
-                        sx={{ width: '100%' }}
-                    >
-                        {snackbar.message}
-                    </Alert>
+                    <Alert severity={snackbar.severity} sx={{ borderRadius: '12px', boxShadow: '0 8px 32px rgba(0,0,0,0.1)' }}>{snackbar.message}</Alert>
                 </Snackbar>
             </Box>
         </MainLayout>
+    );
+}
+
+function InfoItem({ icon: Icon, label, value }: any) {
+    return (
+        <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                <Icon sx={{ fontSize: 16, color: 'var(--muted-foreground)' }} />
+                <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 600 }}>{label}</Typography>
+            </Box>
+            <Box sx={{ fontWeight: 700, color: 'var(--foreground)', pl: 3, fontSize: '0.875rem' }}>
+                {value}
+            </Box>
+        </Box>
+    );
+}
+
+function StatRow({ label, value }: any) {
+    return (
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <Typography variant="body2" sx={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>{label}</Typography>
+            <Box sx={{ fontWeight: 700, color: 'var(--foreground)', fontSize: '0.875rem' }}>{value}</Box>
+        </Box>
     );
 }

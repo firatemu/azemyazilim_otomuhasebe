@@ -31,7 +31,7 @@ export default function MasrafDetayPage() {
 
     const fetchMasrafDetay = async () => {
         try {
-            const response = await axios.get(`/masraf/${id}`);
+            const response = await axios.get(`/expenses/${id}`);
             setMasraf(response.data);
         } catch (error) {
             console.error('Masraf detay yüklenirken hata:', error);
@@ -56,10 +56,10 @@ export default function MasrafDetayPage() {
                     <Typography variant="h5" fontWeight="bold">
                         Masraf Detayı
                     </Typography>
-                    <Chip 
-                        icon={<Category fontSize="small"/>}
-                        label={masraf.kategori?.kategoriAdi || 'Kategorisiz'} 
-                        color="secondary" 
+                    <Chip
+                        icon={<Category fontSize="small" />}
+                        label={masraf.kategori?.kategoriAdi || 'Kategorisiz'}
+                        color="secondary"
                         variant="outlined"
                     />
                 </Box>
@@ -83,7 +83,7 @@ export default function MasrafDetayPage() {
                                     <Typography color="text.secondary">Ödeme Tipi</Typography>
                                     <Typography fontWeight="bold">{masraf.odemeTipi?.replace('_', ' ')}</Typography>
                                 </Grid>
-                                
+
                                 {masraf.kasa && (
                                     <Grid size={{ xs: 6, md: 3 }}>
                                         <Typography color="text.secondary">Kasa</Typography>

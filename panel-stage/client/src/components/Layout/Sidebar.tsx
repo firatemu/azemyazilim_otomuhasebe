@@ -1,9 +1,5 @@
 'use client';
 
-import { useAuthStore } from '@/stores/authStore';
-import { useTabStore } from '@/stores/tabStore';
-import { useQuickMenuStore } from '@/stores/quickMenuStore';
-import axios from '@/lib/axios';
 import {
   AccountBalance,
   AccountBalanceWallet,
@@ -33,7 +29,6 @@ import {
   LocalOffer,
   LocalShipping,
   Logout,
-  Menu as MenuIcon,
   MoreVert,
   Notifications,
   Payment,
@@ -56,33 +51,32 @@ import {
   AdminPanelSettings,
   Event,
   Help,
+  Menu as MenuIcon,
 } from '@mui/icons-material';
 import {
+  Avatar,
   Box,
   Button,
-  Chip,
   Collapse,
   Divider,
   Drawer,
   IconButton,
   InputAdornment,
-  List,
-  ListItem,
-  ListItemButton,
-  ListItemIcon,
-  ListItemText,
   Menu,
   MenuItem,
   TextField,
-  Toolbar,
   Typography,
-  Avatar,
   Skeleton,
+  Toolbar,
   useTheme,
 } from '@mui/material';
 import { useRouter } from 'next/navigation';
 import { clearServerAuthCookies } from '@/lib/clearServerAuthCookies';
 import React, { useEffect, useMemo, useState } from 'react';
+import axios from '@/lib/axios';
+import { useTabStore } from '@/stores/tabStore';
+import { useAuthStore } from '@/stores/authStore';
+import { useQuickMenuStore } from '@/stores/quickMenuStore';
 
 export const SIDEBAR_WIDTH = 280;
 
@@ -107,25 +101,7 @@ const generateGradient = (color: string): string => {
   return `linear-gradient(135deg, ${color} 0%, ${darkerColor} 100%)`;
 };
 
-const palette = {
-  secondaryHex: 'var(--secondary)',
-  gradient: 'var(--card)',
-  headerGradient: 'linear-gradient(135deg, color-mix(in srgb, var(--primary) 65%, var(--secondary) 35%) 0%, color-mix(in srgb, var(--primary) 45%, var(--background) 55%) 100%)',
-  textPrimary: 'var(--foreground)',
-  textSecondary: 'var(--muted-foreground)',
-  iconBg: 'var(--muted)',
-  iconBgActive: 'color-mix(in srgb, var(--secondary) 18%, var(--card) 82%)',
-  itemHover: 'var(--accent)',
-  itemBorder: 'var(--border)',
-  itemSelectedBorder: 'var(--primary)',
-  itemSelectedBg: 'color-mix(in srgb, var(--primary) 35%, var(--secondary) 25%, var(--card) 40%)',
-  submenuBg: 'var(--muted)',
-  submenuBorder: 'var(--border)',
-  searchBg: 'var(--muted)',
-  searchBorder: 'var(--border)',
-};
-
-// İkon Haritası - Wildcard import yerine güvenli ve performanslı eşleme
+// İkon Haritası
 const IconMap: Record<string, any> = {
   AccountBalance,
   AccountBalanceWallet,
@@ -180,6 +156,413 @@ const IconMap: Record<string, any> = {
   Help,
 };
 
+const SidebarSubItem = React.memo(({
+  item,
+  subItem,
+  activeTab,
+  onSubMenuClick,
+  setOpenSubMenus,
+  openSubMenus,
+  searchTerm,
+  theme,
+  itemColor
+}: any) => {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = (y - centerY) / 25;
+    const rotateY = (centerX - x) / 25;
+    setTilt({ x: rotateX, y: rotateY });
+    setMousePos({ x, y });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+  };
+
+  const isSubActive = activeTab === subItem.id;
+  const hasNestedSubItems = !!subItem.subItems;
+  const isNestedOpen = openSubMenus[`${item.id}-${subItem.id}`] === true;
+  const SubIcon: any = IconMap[subItem.icon] || IconMap.Help;
+  const subColor = subItem.color || itemColor;
+
+  return (
+    <Box key={subItem.id}>
+      <Box
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={() => {
+          if (hasNestedSubItems) {
+            setOpenSubMenus((prev: any) => ({
+              ...prev,
+              [`${item.id}-${subItem.id}`]: !prev[`${item.id}-${subItem.id}`],
+            }));
+          } else {
+            onSubMenuClick(item, subItem);
+          }
+        }}
+        sx={{
+          position: 'relative',
+          borderRadius: '8px',
+          background: isSubActive
+            ? subColor
+            : (theme.palette.mode === 'light'
+              ? 'rgba(255, 255, 255, 0.4)'
+              : 'rgba(30, 41, 59, 0.4)'),
+          backdropFilter: 'blur(12px)',
+          border: isSubActive
+            ? '1px solid rgba(255, 255, 255, 0.8)'
+            : (theme.palette.mode === 'light'
+              ? '1px solid rgba(255, 255, 255, 0.5)'
+              : '1px solid rgba(255, 255, 255, 0.1)'),
+          boxShadow: isSubActive
+            ? `0 2px 6px ${subColor}25`
+            : (theme.palette.mode === 'light'
+              ? '0 1px 3px rgba(0, 0, 0, 0.03)'
+              : '0 1px 3px rgba(0, 0, 0, 0.2)'),
+          mb: 0.25,
+          ml: 0.5,
+          mr: 0.25,
+          p: 0,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '8px',
+            background: `radial-gradient(150px circle at ${mousePos.x}px ${mousePos.y}px, ${theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)'}, transparent 40%)`,
+            pointerEvents: 'none',
+          },
+          '&:hover': {
+            background: isSubActive
+              ? subColor
+              : (theme.palette.mode === 'light'
+                ? 'rgba(255, 255, 255, 0.7)'
+                : 'rgba(30, 41, 59, 0.7)'),
+            transform: 'translateX(2px)',
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', p: 0.75, gap: 0.75 }}>
+          <Box
+            sx={{
+              width: 24,
+              height: 24,
+              borderRadius: '6px',
+              background: generateGradient(subColor),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: `0 2px 6px ${subColor}25`,
+            }}
+          >
+            <SubIcon sx={{ fontSize: 12, color: '#FFFFFF' }} />
+          </Box>
+          <Typography sx={{
+            fontWeight: 600,
+            fontSize: '0.75rem',
+            color: isSubActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#475569' : '#CBD5E1'),
+            flex: 1,
+            overflow: 'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace: 'nowrap',
+          }}>
+            {subItem.label}
+          </Typography>
+          {hasNestedSubItems && (
+            <Box sx={{
+              color: isSubActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#94A3B8' : '#64748B'),
+              transition: 'transform 0.3s ease',
+              transform: isNestedOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            }}>
+              <ExpandMore sx={{ fontSize: 14 }} />
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      {/* Nested Sub Menu Items */}
+      {hasNestedSubItems && (
+        <Collapse in={isNestedOpen} timeout={200} unmountOnExit>
+          <Box
+            sx={{
+              bgcolor: 'rgba(255, 255, 255, 0.2)',
+              backdropFilter: 'blur(8px)',
+              borderRadius: '6px',
+              mx: 1,
+              mb: 0.25,
+              mt: 0.25,
+              px: 0.5,
+              py: 0.25,
+              border: '1px solid rgba(255, 255, 255, 0.3)',
+            }}
+          >
+            {subItem.subItems
+              ?.filter((nestedItem: any) =>
+                !searchTerm || nestedItem.label.toLowerCase().includes(searchTerm.toLowerCase())
+              )
+              .map((nestedItem: any) => {
+                const isNestedActive = activeTab === nestedItem.id;
+                const NestedIcon: any = IconMap[nestedItem.icon] || IconMap.Help;
+                const nestedColor = nestedItem.color || subColor;
+
+                return (
+                  <Box
+                    key={nestedItem.id}
+                    onClick={() => onSubMenuClick(item, nestedItem)}
+                    sx={{
+                      position: 'relative',
+                      borderRadius: '6px',
+                      background: isNestedActive
+                        ? nestedColor
+                        : (theme.palette.mode === 'light'
+                          ? 'rgba(255, 255, 255, 0.3)'
+                          : 'rgba(30, 41, 59, 0.3)'),
+                      backdropFilter: 'blur(8px)',
+                      border: isNestedActive
+                        ? '1px solid rgba(255, 255, 255, 0.6)'
+                        : (theme.palette.mode === 'light'
+                          ? '1px solid rgba(255, 255, 255, 0.3)'
+                          : '1px solid rgba(255, 255, 255, 0.05)'),
+                      boxShadow: isNestedActive
+                        ? `0 2px 4px ${nestedColor}20`
+                        : 'none',
+                      mb: 0.2,
+                      ml: 0.5,
+                      mr: 0.25,
+                      p: 0,
+                      overflow: 'hidden',
+                      cursor: 'pointer',
+                      transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+                      '&:hover': {
+                        background: isNestedActive
+                          ? nestedColor
+                          : (theme.palette.mode === 'light'
+                            ? 'rgba(255, 255, 255, 0.5)'
+                            : 'rgba(30, 41, 59, 0.5)'),
+                        transform: 'translateX(2px)',
+                      },
+                    }}
+                  >
+                    <Box sx={{ display: 'flex', alignItems: 'center', p: 0.6, gap: 0.6 }}>
+                      <Box
+                        sx={{
+                          width: 20,
+                          height: 20,
+                          borderRadius: '5px',
+                          background: generateGradient(nestedColor),
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          boxShadow: `0 1px 4px ${nestedColor}20`,
+                        }}
+                      >
+                        <NestedIcon sx={{ fontSize: 10, color: '#FFFFFF' }} />
+                      </Box>
+                      <Typography sx={{
+                        fontWeight: 600,
+                        fontSize: '0.7rem',
+                        color: isNestedActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#475569' : '#CBD5E1'),
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap',
+                      }}>
+                        {nestedItem.label}
+                      </Typography>
+                    </Box>
+                  </Box>
+                );
+              })}
+          </Box>
+        </Collapse>
+      )}
+    </Box>
+  );
+});
+SidebarSubItem.displayName = 'SidebarSubItem';
+
+const SidebarItem = React.memo(({
+  item,
+  isActive,
+  isOpen,
+  onMenuClick,
+  onSubMenuClick,
+  setOpenSubMenus,
+  openSubMenus,
+  searchTerm,
+  activeTab,
+  theme
+}: any) => {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+  const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+
+  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+    const centerX = rect.width / 2;
+    const centerY = rect.height / 2;
+    const rotateX = (y - centerY) / 25;
+    const rotateY = (centerX - x) / 25;
+    setTilt({ x: rotateX, y: rotateY });
+    setMousePos({ x, y });
+  };
+
+  const handleMouseLeave = () => {
+    setTilt({ x: 0, y: 0 });
+  };
+
+  const itemColor = item.color || '#0ea5e9';
+  const hasSubMenu = !!item.subItems;
+  const ParentIcon: any = IconMap[item.icon] || IconMap.Help;
+
+  return (
+    <React.Fragment key={item.id}>
+      <Box
+        onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
+        onClick={() => onMenuClick(item)}
+        sx={{
+          position: 'relative',
+          borderRadius: '10px',
+          background: isActive
+            ? itemColor
+            : (theme.palette.mode === 'light'
+              ? 'rgba(255, 255, 255, 0.5)'
+              : 'rgba(30, 41, 59, 0.5)'),
+          backdropFilter: 'blur(16px)',
+          border: isActive
+            ? '1px solid rgba(255, 255, 255, 0.8)'
+            : (theme.palette.mode === 'light'
+              ? '1px solid rgba(255, 255, 255, 0.6)'
+              : '1px solid rgba(255, 255, 255, 0.1)'),
+          boxShadow: isActive
+            ? `0 4px 12px ${itemColor}30`
+            : (theme.palette.mode === 'light'
+              ? '0 1px 4px rgba(0, 0, 0, 0.04)'
+              : '0 1px 4px rgba(0, 0, 0, 0.2)'),
+          mb: 0.5,
+          mx: 1,
+          p: 0,
+          overflow: 'hidden',
+          cursor: 'pointer',
+          transform: `perspective(1000px) rotateX(${tilt.x}deg) rotateY(${tilt.y}deg)`,
+          transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            inset: 0,
+            borderRadius: '10px',
+            background: `radial-gradient(200px circle at ${mousePos.x}px ${mousePos.y}px, ${theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}, transparent 40%)`,
+            pointerEvents: 'none',
+            opacity: 0.6,
+          },
+          '&:hover': {
+            background: isActive
+              ? itemColor
+              : (theme.palette.mode === 'light'
+                ? 'rgba(255, 255, 255, 0.8)'
+                : 'rgba(30, 41, 59, 0.8)'),
+            transform: 'translateX(2px)',
+            boxShadow: theme.palette.mode === 'light'
+              ? '0 2px 8px rgba(0, 0, 0, 0.06)'
+              : '0 2px 8px rgba(0, 0, 0, 0.3)',
+          },
+        }}
+      >
+        <Box sx={{ display: 'flex', alignItems: 'center', p: 1, gap: 1 }}>
+          <Box
+            sx={{
+              width: 32,
+              height: 32,
+              borderRadius: '8px',
+              background: generateGradient(itemColor),
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: `0 2px 8px ${itemColor}30`,
+              animation: isActive ? 'iconFloat 3s ease-in-out infinite' : 'none',
+              '@keyframes iconFloat': {
+                '0%, 100%': { transform: 'translateY(0) scale(1)' },
+                '50%': { transform: 'translateY(-2px) scale(1.02)' },
+              },
+            }}
+          >
+            <ParentIcon sx={{ fontSize: 16, color: '#FFFFFF' }} />
+          </Box>
+          <Box sx={{ flex: 1 }}>
+            <Typography sx={{
+              fontWeight: 600,
+              fontSize: '0.8rem',
+              color: isActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#475569' : '#CBD5E1'),
+              letterSpacing: '-0.01em',
+            }}>
+              {item.label}
+            </Typography>
+          </Box>
+          {hasSubMenu && (
+            <Box sx={{
+              color: isActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#94A3B8' : '#64748B'),
+              transition: 'transform 0.3s ease',
+              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+            }}>
+              <ExpandMore sx={{ fontSize: 16 }} />
+            </Box>
+          )}
+        </Box>
+      </Box>
+
+      {/* Sub Menu Items */}
+      {hasSubMenu && (
+        <Collapse in={isOpen} timeout={200} unmountOnExit>
+          <Box
+            sx={{
+              bgcolor: 'rgba(255, 255, 255, 0.3)',
+              backdropFilter: 'blur(12px)',
+              borderRadius: '8px',
+              mx: 1,
+              mb: 0.5,
+              mt: 0.25,
+              px: 0.5,
+              py: 0.5,
+              border: '1px solid rgba(255, 255, 255, 0.5)',
+            }}
+          >
+            {item.subItems
+              ?.filter((subItem: any) =>
+                !searchTerm || subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
+              )
+              .map((subItem: any) => (
+                <SidebarSubItem
+                  key={subItem.id}
+                  item={item}
+                  subItem={subItem}
+                  activeTab={activeTab}
+                  onSubMenuClick={onSubMenuClick}
+                  setOpenSubMenus={setOpenSubMenus}
+                  openSubMenus={openSubMenus}
+                  searchTerm={searchTerm}
+                  theme={theme}
+                  itemColor={itemColor}
+                />
+              ))}
+          </Box>
+        </Collapse>
+      )}
+    </React.Fragment>
+  );
+});
+SidebarItem.displayName = 'SidebarItem';
+
 interface SidebarProps {
   open: boolean;
   pinned: boolean;
@@ -197,21 +580,18 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
   useEffect(() => {
     fetchQuickMenuItems();
   }, [fetchQuickMenuItems]);
+
   const router = useRouter();
-  const [openSubMenu, setOpenSubMenu] = useState<string | null>(null);
+  const [openSubMenus, setOpenSubMenus] = useState<Record<string, boolean>>({});
   const [searchTerm, setSearchTerm] = useState('');
   const [userMenuAnchor, setUserMenuAnchor] = useState<null | HTMLElement>(null);
   const [quickMenuAnchor, setQuickMenuAnchor] = useState<null | HTMLElement>(null);
   const [tenantSettings, setTenantSettings] = useState<any>(null);
   const [tenantLoading, setTenantLoading] = useState(true);
 
-  // 3D Tilt state for header
+  // Header 3D tilt state
   const [headerRotate, setHeaderRotate] = useState({ x: 0, y: 0 });
   const [headerMouse, setHeaderMouse] = useState({ x: 0, y: 0 });
-
-  // 3D Tilt state for menu items
-  const [itemTilts, setItemTilts] = useState<Record<string, { x: number; y: number }>>({});
-  const [itemMousePositions, setItemMousePositions] = useState<Record<string, { x: number; y: number }>>({});
 
   useEffect(() => {
     const fetchTenantSettings = async () => {
@@ -230,11 +610,13 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
 
   const handleMenuClick = (item: any) => {
     if (item.subItems) {
-      setOpenSubMenu((current) => (current === item.id ? null : item.id));
+      setOpenSubMenus((prev) => ({
+        ...prev,
+        [item.id]: !prev[item.id],
+      }));
       return;
     }
 
-    // Don't create tab for /menu page
     if (item.path === '/menu') {
       router.push(item.path);
       if (!pinned) {
@@ -278,11 +660,9 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
       if (item.label.toLowerCase().includes(searchLower)) {
         return true;
       }
-
       if (item.subItems) {
         return item.subItems.some((subItem: any) => subItem.label.toLowerCase().includes(searchLower));
       }
-
       return false;
     });
   }, [searchTerm, menuItems]);
@@ -298,7 +678,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
           subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
         );
         if (hasMatchingSubItem) {
-          setOpenSubMenu(item.id);
+          setOpenSubMenus((prev) => ({ ...prev, [item.id]: true }));
         }
       }
     });
@@ -306,7 +686,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
 
   useEffect(() => {
     if (!open) {
-      setOpenSubMenu(null);
+      setOpenSubMenus({});
       setSearchTerm('');
     }
   }, [open]);
@@ -334,7 +714,6 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
     handleUserMenuClose();
   };
 
-  // Header 3D tilt handlers
   const handleHeaderMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const rect = e.currentTarget.getBoundingClientRect();
     const x = e.clientX - rect.left;
@@ -349,34 +728,6 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
 
   const handleHeaderMouseLeave = () => {
     setHeaderRotate({ x: 0, y: 0 });
-  };
-
-  // Menu item 3D tilt handlers
-  const handleMenuItemMouseMove = (e: React.MouseEvent<HTMLDivElement>, itemId: string) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-    const centerX = rect.width / 2;
-    const centerY = rect.height / 2;
-    const rotateX = (y - centerY) / 25;
-    const rotateY = (centerX - x) / 25;
-
-    setItemTilts((prev) => ({
-      ...prev,
-      [itemId]: { x: rotateX, y: rotateY },
-    }));
-
-    setItemMousePositions((prev) => ({
-      ...prev,
-      [itemId]: { x, y },
-    }));
-  };
-
-  const handleMenuItemMouseLeave = (itemId: string) => {
-    setItemTilts((prev) => ({
-      ...prev,
-      [itemId]: { x: 0, y: 0 },
-    }));
   };
 
   const drawerVariant = pinned ? 'permanent' : 'temporary';
@@ -477,19 +828,14 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
             animation: `float ${[25, 30, 20, 28, 22, 26][i]}s ease-in-out infinite`,
             animationDelay: `${i * 2}s`,
             '@keyframes float': {
-              '0%, 100%': {
-                transform: 'translate(0, 0) scale(1)',
-              },
-              '33%': {
-                transform: 'translate(30px, -30px) scale(1.05)',
-              },
-              '66%': {
-                transform: 'translate(-20px, 20px) scale(0.95)',
-              },
+              '0%, 100%': { transform: 'translate(0, 0) scale(1)' },
+              '33%': { transform: 'translate(30px, -30px) scale(1.05)' },
+              '66%': { transform: 'translate(-20px, 20px) scale(0.95)' },
             },
           }}
         />
       ))}
+
       {/* Glassmorphism Header with 3D Tilt */}
       <Toolbar
         onMouseMove={handleHeaderMouseMove}
@@ -817,7 +1163,21 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
       </Box>
 
       {/* Menu Items Container */}
-      <Box sx={{ px: 0.5, pt: 0.5, flexGrow: 1, overflowY: 'auto', position: 'relative', zIndex: 1, '&::-webkit-scrollbar': { width: '4px' }, '&::-webkit-scrollbar-track': { bgcolor: 'transparent' }, '&::-webkit-scrollbar-thumb': { bgcolor: 'rgba(255, 255, 255, 0.15)', borderRadius: '2px', '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' } } }}>
+      <Box sx={{
+        px: 0.5,
+        pt: 0.5,
+        flexGrow: 1,
+        overflowY: 'auto',
+        position: 'relative',
+        zIndex: 1,
+        '&::-webkit-scrollbar': { width: '4px' },
+        '&::-webkit-scrollbar-track': { bgcolor: 'transparent' },
+        '&::-webkit-scrollbar-thumb': {
+          bgcolor: 'rgba(255, 255, 255, 0.15)',
+          borderRadius: '2px',
+          '&:hover': { bgcolor: 'rgba(255, 255, 255, 0.25)' }
+        }
+      }}>
         {filteredMenuItems.length === 0 && searchTerm ? (
           <Box sx={{ px: 2, py: 3, textAlign: 'center' }}>
             <Search sx={{ fontSize: 32, color: '#CBD5E1', mb: 0.5 }} />
@@ -828,10 +1188,7 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
         ) : (
           filteredMenuItems.map((item, index) => {
             const isActive = activeTab === item.id;
-            const hasSubMenu = !!item.subItems;
-            const isOpen = openSubMenu === item.id;
-            const ParentIcon: any = IconMap[item.icon] || IconMap.Help;
-            const itemColor = item.color || '#0ea5e9';
+            const isOpen = openSubMenus[item.id] === true;
 
             const showSectionHeader = item.section && !searchTerm;
             const prevSection = index > 0 ? filteredMenuItems[index - 1].section : null;
@@ -872,213 +1229,18 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
                   </Box>
                 )}
 
-                {/* Main Menu Item Card */}
-                <Box
-                  onMouseMove={(e) => handleMenuItemMouseMove(e, item.id)}
-                  onMouseLeave={() => handleMenuItemMouseLeave(item.id)}
-                  onClick={() => handleMenuClick(item)}
-                  sx={{
-                    position: 'relative',
-                    borderRadius: '10px',
-                    background: isActive
-                      ? itemColor
-                      : (theme.palette.mode === 'light'
-                        ? 'rgba(255, 255, 255, 0.5)'
-                        : 'rgba(30, 41, 59, 0.5)'),
-                    backdropFilter: 'blur(16px)',
-                    border: isActive
-                      ? '1px solid rgba(255, 255, 255, 0.8)'
-                      : (theme.palette.mode === 'light'
-                        ? '1px solid rgba(255, 255, 255, 0.6)'
-                        : '1px solid rgba(255, 255, 255, 0.1)'),
-                    boxShadow: isActive
-                      ? `0 4px 12px ${itemColor}30`
-                      : (theme.palette.mode === 'light'
-                        ? '0 1px 4px rgba(0, 0, 0, 0.04)'
-                        : '0 1px 4px rgba(0, 0, 0, 0.2)'),
-                    mb: 0.5,
-                    mx: 1,
-                    p: 0,
-                    overflow: 'hidden',
-                    cursor: 'pointer',
-                    transform: `perspective(1000px) rotateX(${itemTilts[item.id]?.x || 0}deg) rotateY(${itemTilts[item.id]?.y || 0}deg)`,
-                    transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                    '&::before': {
-                      content: '""',
-                      position: 'absolute',
-                      inset: 0,
-                      borderRadius: '10px',
-                      background: `radial-gradient(200px circle at ${itemMousePositions[item.id]?.x || 0}px ${itemMousePositions[item.id]?.y || 0}px, ${theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.3)' : 'rgba(255, 255, 255, 0.1)'}, transparent 40%)`,
-                      pointerEvents: 'none',
-                      opacity: 0.6,
-                    },
-                    '&:hover': {
-                      background: isActive
-                        ? itemColor
-                        : (theme.palette.mode === 'light'
-                          ? 'rgba(255, 255, 255, 0.8)'
-                          : 'rgba(30, 41, 59, 0.8)'),
-                      transform: 'translateX(2px)',
-                      boxShadow: theme.palette.mode === 'light'
-                        ? '0 2px 8px rgba(0, 0, 0, 0.06)'
-                        : '0 2px 8px rgba(0, 0, 0, 0.3)',
-                    },
-                  }}
-                >
-                  <Box sx={{ display: 'flex', alignItems: 'center', p: 1, gap: 1 }}>
-                    {/* Gradient Icon Box */}
-                    <Box
-                      sx={{
-                        width: 32,
-                        height: 32,
-                        borderRadius: '8px',
-                        background: generateGradient(itemColor),
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        boxShadow: `0 2px 8px ${itemColor}30`,
-                        animation: isActive ? 'iconFloat 3s ease-in-out infinite' : 'none',
-                        '@keyframes iconFloat': {
-                          '0%, 100%': { transform: 'translateY(0) scale(1)' },
-                          '50%': { transform: 'translateY(-2px) scale(1.02)' },
-                        },
-                      }}
-                    >
-                      <ParentIcon sx={{ fontSize: 16, color: '#FFFFFF' }} />
-                    </Box>
-
-                    {/* Label */}
-                    <Box sx={{ flex: 1 }}>
-                      <Typography sx={{
-                        fontWeight: 600,
-                        fontSize: '0.8rem',
-                        color: isActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#475569' : '#CBD5E1'),
-                        letterSpacing: '-0.01em',
-                      }}>
-                        {item.label}
-                      </Typography>
-                    </Box>
-
-                    {/* Expand Icon */}
-                    {hasSubMenu && (
-                      <Box sx={{
-                        color: isActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#94A3B8' : '#64748B'),
-                        transition: 'transform 0.3s ease',
-                        transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
-                      }}>
-                        <ExpandMore sx={{ fontSize: 16 }} />
-                      </Box>
-                    )}
-                  </Box>
-                </Box>
-
-                {/* Sub Menu Items */}
-                {hasSubMenu && (
-                  <Collapse in={isOpen} timeout={200} unmountOnExit>
-                    <Box
-                      sx={{
-                        bgcolor: 'rgba(255, 255, 255, 0.3)',
-                        backdropFilter: 'blur(12px)',
-                        borderRadius: '8px',
-                        mx: 1,
-                        mb: 0.5,
-                        mt: 0.25,
-                        px: 0.5,
-                        py: 0.5,
-                        border: '1px solid rgba(255, 255, 255, 0.5)',
-                      }}
-                    >
-                      {item.subItems
-                        ?.filter((subItem: any) =>
-                          !searchTerm || subItem.label.toLowerCase().includes(searchTerm.toLowerCase())
-                        )
-                        .map((subItem: any) => {
-                          const isSubActive = activeTab === subItem.id;
-                          const SubIcon: any = IconMap[subItem.icon] || IconMap.Help;
-                          const subColor = subItem.color || itemColor;
-
-                          return (
-                            <Box
-                              key={subItem.id}
-                              onMouseMove={(e) => handleMenuItemMouseMove(e, subItem.id)}
-                              onMouseLeave={() => handleMenuItemMouseLeave(subItem.id)}
-                              onClick={() => handleSubMenuClick(item, subItem)}
-                              sx={{
-                                position: 'relative',
-                                borderRadius: '8px',
-                                background: isSubActive
-                                  ? subColor
-                                  : (theme.palette.mode === 'light'
-                                    ? 'rgba(255, 255, 255, 0.4)'
-                                    : 'rgba(30, 41, 59, 0.4)'),
-                                backdropFilter: 'blur(12px)',
-                                border: isSubActive
-                                  ? '1px solid rgba(255, 255, 255, 0.8)'
-                                  : (theme.palette.mode === 'light'
-                                    ? '1px solid rgba(255, 255, 255, 0.5)'
-                                    : '1px solid rgba(255, 255, 255, 0.1)'),
-                                boxShadow: isSubActive
-                                  ? `0 2px 6px ${subColor}25`
-                                  : (theme.palette.mode === 'light'
-                                    ? '0 1px 3px rgba(0, 0, 0, 0.03)'
-                                    : '0 1px 3px rgba(0, 0, 0, 0.2)'),
-                                mb: 0.25,
-                                ml: 0.5, // Indentation
-                                mr: 0.25,
-                                p: 0,
-                                overflow: 'hidden',
-                                cursor: 'pointer',
-                                transform: `perspective(1000px) rotateX(${itemTilts[subItem.id]?.x || 0}deg) rotateY(${itemTilts[subItem.id]?.y || 0}deg)`,
-                                transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
-                                '&::before': {
-                                  content: '""',
-                                  position: 'absolute',
-                                  inset: 0,
-                                  borderRadius: '8px',
-                                  background: `radial-gradient(150px circle at ${itemMousePositions[subItem.id]?.x || 0}px ${itemMousePositions[subItem.id]?.y || 0}px, ${theme.palette.mode === 'light' ? 'rgba(255, 255, 255, 0.25)' : 'rgba(255, 255, 255, 0.1)'}, transparent 40%)`,
-                                  pointerEvents: 'none',
-                                },
-                                '&:hover': {
-                                  background: isSubActive
-                                    ? subColor
-                                    : (theme.palette.mode === 'light'
-                                      ? 'rgba(255, 255, 255, 0.7)'
-                                      : 'rgba(30, 41, 59, 0.7)'),
-                                  transform: 'translateX(2px)',
-                                },
-                              }}
-                            >
-                              <Box sx={{ display: 'flex', alignItems: 'center', p: 0.75, gap: 0.75 }}>
-                                {/* Small Gradient Icon Box */}
-                                <Box
-                                  sx={{
-                                    width: 24,
-                                    height: 24,
-                                    borderRadius: '6px',
-                                    background: generateGradient(subColor),
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    justifyContent: 'center',
-                                    boxShadow: `0 2px 6px ${subColor}25`,
-                                  }}
-                                >
-                                  <SubIcon sx={{ fontSize: 12, color: '#FFFFFF' }} />
-                                </Box>
-
-                                <Typography sx={{
-                                  fontWeight: 600,
-                                  fontSize: '0.75rem',
-                                  color: isSubActive ? '#FFFFFF' : (theme.palette.mode === 'light' ? '#475569' : '#CBD5E1'),
-                                }}>
-                                  {subItem.label}
-                                </Typography>
-                              </Box>
-                            </Box>
-                          );
-                        })}
-                    </Box>
-                  </Collapse>
-                )}
+                <SidebarItem
+                  item={item}
+                  isActive={isActive}
+                  isOpen={isOpen}
+                  onMenuClick={handleMenuClick}
+                  onSubMenuClick={handleSubMenuClick}
+                  setOpenSubMenus={setOpenSubMenus}
+                  openSubMenus={openSubMenus}
+                  searchTerm={searchTerm}
+                  activeTab={activeTab}
+                  theme={theme}
+                />
               </React.Fragment>
             );
           })
@@ -1086,7 +1248,14 @@ export default function Sidebar({ open, pinned, onClose, onTogglePin, menuItems 
       </Box>
 
       {/* Glassmorphism User Profile Section */}
-      <Box sx={{ px: 1, pb: 1, pt: 0.5, borderTop: theme.palette.mode === 'light' ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.08)', position: 'relative', zIndex: 1 }}>
+      <Box sx={{
+        px: 1,
+        pb: 1,
+        pt: 0.5,
+        borderTop: theme.palette.mode === 'light' ? '1px solid rgba(0, 0, 0, 0.06)' : '1px solid rgba(255, 255, 255, 0.08)',
+        position: 'relative',
+        zIndex: 1
+      }}>
         <Box
           sx={{
             bgcolor: theme.palette.mode === 'light'

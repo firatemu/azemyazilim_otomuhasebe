@@ -33,10 +33,11 @@ export class ExpenseService {
       data: {
         tenantId: tenantId!,
         categoryId: createDto.categoryId,
+        referenceNo: createDto.referenceNo?.trim() || null,
         notes: createDto.notes?.trim() || null,
         amount: createDto.amount,
         date: new Date(createDto.date),
-        paymentType: createDto.paymentType,
+        paymentType: createDto.paymentType || null,
       },
       include: {
         category: true,

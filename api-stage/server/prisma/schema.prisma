@@ -772,6 +772,8 @@ model Account {
   dueDays     Int?       @map("due_days")
   currency    String?    @map("currency")
   bankInfo    String?    @map("bank_info")
+  efaturaPostaKutusu     String?    @map("efatura_posta_kutusu")
+  efaturaGondericiBirim  String?    @map("efatura_gonderici_birim")
   priceListId String?    @map("price_list_id")
   priceList   PriceList? @relation(fields: [priceListId], references: [id])
 
@@ -1957,10 +1959,11 @@ model Expense {
   id          String          @id @default(uuid())
   tenantId    String
   categoryId  String          @map("category_id")
+  referenceNo String?         @map("reference_no")
   notes       String?         @map("notes")
   amount      Decimal         @map("amount") @db.Decimal(10, 2)
   date        DateTime        @default(now()) @map("date")
-  paymentType PaymentMethod   @map("payment_type")
+  paymentType PaymentMethod?  @map("payment_type")
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
   category    ExpenseCategory @relation(fields: [categoryId], references: [id])
@@ -3958,6 +3961,9 @@ model CompanyVehicle {
   isActive              Boolean                 @default(true) @map("is_active")
   assignedEmployeeId    String?                 @map("assigned_employee_id")
   registrationImageUrl  String?                 @map("registration_image_url")
+  registrationSerialNo  String?                 @map("registration_serial_no")
+  lastInspectionDate    DateTime?               @map("last_inspection_date")
+  insuranceDate         DateTime?               @map("insurance_date")
   notes                 String?                 @map("notes")
   createdAt             DateTime                @default(now())
   updatedAt             DateTime                @updatedAt

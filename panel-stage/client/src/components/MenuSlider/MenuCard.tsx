@@ -53,11 +53,12 @@ export default function MenuCard({ item, onClick }: MenuCardProps) {
       <Typography
         sx={{
           color: theme.palette.mode === 'light' ? '#475569' : '#CBD5E1',
-          fontSize: { xs: '0.85rem', md: '0.95rem' },
+          fontSize: { xs: '0.75rem', sm: '0.8rem', md: '0.95rem' },
           fontWeight: 600,
           textAlign: 'center',
           lineHeight: 1.2,
-          maxWidth: '120px',
+          maxWidth: { xs: '100%', sm: '110px', md: '120px' },
+          wordBreak: 'break-word',
         }}
       >
         {item.label}

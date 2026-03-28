@@ -32,10 +32,15 @@ export class CreateExpenseDto {
   @ApiProperty()
   date: string;
 
-  @IsNotEmpty()
+  @IsOptional()
+  @IsString()
+  @ApiProperty({ required: false })
+  referenceNo?: string;
+
+  @IsOptional()
   @IsEnum(PaymentMethod)
-  @ApiProperty({ enum: PaymentMethod })
-  paymentType: PaymentMethod;
+  @ApiProperty({ enum: PaymentMethod, required: false })
+  paymentType?: PaymentMethod;
 
   @IsOptional()
   @IsString()

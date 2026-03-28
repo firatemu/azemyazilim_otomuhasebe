@@ -5,16 +5,19 @@ import {
   Typography,
   IconButton,
   Stack,
-  Grid,
   TextField,
   InputAdornment,
   useTheme,
+  Breadcrumbs,
+  Link,
+  Grid,
 } from '@mui/material';
 import {
   Close as CloseIcon,
   Search,
+  ArrowBack,
 } from '@mui/icons-material';
-import { SubMenuDialogProps } from './types';
+import { SubMenuDialogProps, MenuItem } from './types';
 import { getIconComponent } from './utils';
 
 export default function SubMenuDialog({
@@ -22,6 +25,7 @@ export default function SubMenuDialog({
   onClose,
   parentItem,
   onSubItemClick,
+  onBack,
 }: SubMenuDialogProps) {
   const theme = useTheme();
   const [searchTerm, setSearchTerm] = useState('');
@@ -60,12 +64,12 @@ export default function SubMenuDialog({
       }}
     >
       {/* Header */}
-      <Box sx={{ p: 4, pb: 2 }}>
-        <Stack direction="row" alignItems="center" spacing={2.5}>
+      <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, pb: { xs: 1, sm: 1.5, md: 2 } }}>
+        <Stack direction={{ xs: 'column', sm: 'row' }} alignItems={{ xs: 'flex-start', sm: 'center' }} spacing={{ xs: 1.5, sm: 2.5 }}>
           <Box
             sx={{
-              width: 56,
-              height: 56,
+              width: { xs: 48, sm: 56 },
+              height: { xs: 48, sm: 56 },
               borderRadius: '12px',
               background: parentItem.color || '#6366f1',
               display: 'flex',
@@ -74,24 +78,31 @@ export default function SubMenuDialog({
               boxShadow: '0 4px 12px rgba(0,0,0,0.1)',
             }}
           >
-            <ParentIcon sx={{ fontSize: 32, color: '#FFFFFF' }} />
+            <ParentIcon sx={{ fontSize: { xs: 26, sm: 32 }, color: '#FFFFFF' }} />
           </Box>
-          <Box sx={{ flex: 1 }}>
-            <Typography variant="h5" sx={{ fontWeight: 700, color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9' }}>
+          <Box sx={{ flex: 1, width: '100%' }}>
+            <Typography sx={{ fontSize: { xs: '1.1rem', sm: '1.25rem' }, fontWeight: 700, color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9', lineHeight: 1.2 }}>
               {parentItem.label}
             </Typography>
             <Typography variant="body2" sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8' }}>
-              {parentItem.section}
+              {parentItem.section || 'Menü'}
             </Typography>
           </Box>
-          <IconButton onClick={onClose} sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8' }}>
-            <CloseIcon />
-          </IconButton>
+          <Stack direction="row" spacing={1}>
+            {onBack && (
+              <IconButton onClick={onBack} sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8' }}>
+                <ArrowBack />
+              </IconButton>
+            )}
+            <IconButton onClick={onClose} sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8' }}>
+              <CloseIcon />
+            </IconButton>
+          </Stack>
         </Stack>
       </Box>
 
       {/* Search and Content */}
-      <Box sx={{ p: 4, pt: 2 }}>
+      <Box sx={{ p: { xs: 2, sm: 3, md: 4 }, pt: { xs: 1, sm: 1.5, md: 2 } }}>
         <TextField
           id={`submenu-search-${parentItem.id}`}
           fullWidth
@@ -107,7 +118,7 @@ export default function SubMenuDialog({
             ),
           }}
           sx={{
-            mb: 4,
+            mb: { xs: 2, sm: 3, md: 4 },
             '& .MuiOutlinedInput-root': {
               borderRadius: '10px',
               background: theme.palette.mode === 'light'
@@ -145,8 +156,8 @@ export default function SubMenuDialog({
           }}
         />
 
-        <Grid container spacing={2}>
-          {filteredSubItems.map((subItem) => {
+        <Grid container spacing={{ xs: 1.5, sm: 2 }}>
+          {filteredSubItems.map((subItem: MenuItem) => {
             const SubIcon = getIconComponent(subItem.icon);
             return (
               <Grid size={{ xs: 12, sm: 6 }} key={subItem.id}>
@@ -155,7 +166,7 @@ export default function SubMenuDialog({
                   sx={{
                     display: 'flex',
                     alignItems: 'center',
-                    p: 2,
+                    p: { xs: 1.5, sm: 2 },
                     borderRadius: '12px',
                     cursor: 'pointer',
                     bgcolor: theme.palette.mode === 'light'
@@ -178,20 +189,20 @@ export default function SubMenuDialog({
                 >
                   <Box
                     sx={{
-                      width: 40,
-                      height: 40,
+                      width: { xs: 36, sm: 40 },
+                      height: { xs: 36, sm: 40 },
                       borderRadius: '8px',
                       background: subItem.color || parentItem.color || '#6366f1',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      mr: 2,
+                      mr: { xs: 1.5, sm: 2 },
                       boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                     }}
                   >
-                    <SubIcon sx={{ fontSize: 22, color: '#FFFFFF' }} />
+                    <SubIcon sx={{ fontSize: { xs: 20, sm: 22 }, color: '#FFFFFF' }} />
                   </Box>
-                  <Typography sx={{ color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9', fontWeight: 600 }}>
+                  <Typography sx={{ color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9', fontWeight: 600, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                     {subItem.label}
                   </Typography>
                 </Box>

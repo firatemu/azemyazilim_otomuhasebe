@@ -35,17 +35,16 @@ export default function SearchResultsList({
     const theme = useTheme();
     const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({});
 
-    // Filter to show ONLY sub-items, exclude main menu items
-    const subItemResults = useMemo(() => {
-        return results.filter((result) => result.type === 'sub');
-    }, [results]);
+    // Show all results (both main and sub-items)
+    const allResults = results;
 
-    // Group sub-items by their parent category
+    // Group results by their parent category
     const groupedResults = useMemo(() => {
         const grouped: Record<string, { parentItem: MenuItem; items: SearchResult[] }> = {};
 
-        subItemResults.forEach((result) => {
-            const parentItem = result.parentItem!;
+        allResults.forEach((result) => {
+            // For main menu items, use themselves as parent
+            const parentItem = result.parentItem || result.item;
             const parentKey = parentItem.id;
 
             if (!grouped[parentKey]) {
@@ -59,7 +58,7 @@ export default function SearchResultsList({
         });
 
         return grouped;
-    }, [subItemResults]);
+    }, [allResults]);
 
     const toggleGroup = (groupKey: string) => {
         setExpandedGroups(prev => ({
@@ -71,16 +70,16 @@ export default function SearchResultsList({
     const isExpanded = (groupKey: string) => expandedGroups[groupKey] !== false;
 
     return (
-        <Box sx={{ width: '100%', maxWidth: '900px', mx: 'auto', mt: 4 }}>
-            <Typography sx={{ color: theme.palette.mode === 'light' ? '#475569' : '#CBD5E1', fontSize: '1rem', fontWeight: 600, mb: 3 }}>
-                "{subItemResults.length} sonuç bulundu"
+        <Box sx={{ width: '100%', maxWidth: { xs: '100%', sm: '900px' }, mx: 'auto', mt: { xs: 2, sm: 3, md: 4 } }}>
+            <Typography sx={{ color: theme.palette.mode === 'light' ? '#475569' : '#CBD5E1', fontSize: { xs: '0.9rem', sm: '1rem' }, fontWeight: 600, mb: { xs: 2, sm: 3 } }}>
+                {allResults.length} sonuç bulundu
             </Typography>
 
             {Object.entries(groupedResults).map(([groupKey, group]) => {
                 const ParentIcon = getIconComponent(group.parentItem.icon);
 
                 return (
-                    <Box key={groupKey} sx={{ mb: 3 }}>
+                    <Box key={groupKey} sx={{ mb: { xs: 2, sm: 3 } }}>
                         {/* Parent Category Header */}
                         <Paper
                             onClick={() => toggleGroup(groupKey)}
@@ -88,7 +87,7 @@ export default function SearchResultsList({
                                 display: 'flex',
                                 alignItems: 'center',
                                 justifyContent: 'space-between',
-                                p: 2,
+                                p: { xs: 1.5, sm: 2 },
                                 bgcolor: theme.palette.mode === 'light'
                                     ? 'rgba(255, 255, 255, 0.6)'
                                     : 'rgba(30, 41, 59, 0.6)',
@@ -110,11 +109,11 @@ export default function SearchResultsList({
                                 }
                             }}
                         >
-                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: { xs: 1.5, sm: 2 } }}>
                                 <Box
                                     sx={{
-                                        width: 48,
-                                        height: 48,
+                                        width: { xs: 40, sm: 48 },
+                                        height: { xs: 40, sm: 48 },
                                         borderRadius: '10px',
                                         bgcolor: group.parentItem.color || '#6366f1',
                                         display: 'flex',
@@ -123,13 +122,13 @@ export default function SearchResultsList({
                                         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
                                     }}
                                 >
-                                    <ParentIcon sx={{ fontSize: 28, color: '#FFFFFF' }} />
+                                    <ParentIcon sx={{ fontSize: { xs: 22, sm: 28 }, color: '#FFFFFF' }} />
                                 </Box>
                                 <Box>
-                                    <Typography sx={{ fontWeight: 700, fontSize: '1.1rem', color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9' }}>
+                                    <Typography sx={{ fontWeight: 700, fontSize: { xs: '1rem', sm: '1.1rem' }, color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9' }}>
                                         {group.parentItem.label}
                                     </Typography>
-                                    <Typography sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8', fontSize: '0.85rem' }}>
+                                    <Typography sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8', fontSize: { xs: '0.75rem', sm: '0.85rem' } }}>
                                         {group.items.length} sonuç
                                     </Typography>
                                 </Box>
@@ -141,7 +140,7 @@ export default function SearchResultsList({
 
                         {/* Group Items List */}
                         <Collapse in={isExpanded(groupKey)}>
-                            <Stack spacing={1.5} sx={{ mt: 2 }}>
+                            <Stack spacing={{ xs: 1, sm: 1.5 }} sx={{ mt: { xs: 1.5, sm: 2 } }}>
                                 {group.items.map((result, idx) => {
                                     const IconComponent = getIconComponent(result.item.icon);
 
@@ -152,7 +151,7 @@ export default function SearchResultsList({
                                             sx={{
                                                 display: 'flex',
                                                 alignItems: 'center',
-                                                p: 2,
+                                                p: { xs: 1.5, sm: 2 },
                                                 borderRadius: '12px',
                                                 cursor: 'pointer',
                                                 transition: 'all 0.2s ease',
@@ -162,7 +161,7 @@ export default function SearchResultsList({
                                                 border: theme.palette.mode === 'light'
                                                     ? '1px solid rgba(255, 255, 255, 0.5)'
                                                     : '1px solid rgba(255, 255, 255, 0.1)',
-                                                marginLeft: '24px', // Indent all items (sub-items)
+                                                marginLeft: { xs: '16px', sm: '24px' }, // Indent all items (sub-items)
                                                 '&:hover': {
                                                     bgcolor: theme.palette.mode === 'light'
                                                         ? 'rgba(255, 255, 255, 0.7)'
@@ -176,24 +175,24 @@ export default function SearchResultsList({
                                         >
                                             <Box
                                                 sx={{
-                                                    width: 40,
-                                                    height: 40,
+                                                    width: { xs: 36, sm: 40 },
+                                                    height: { xs: 36, sm: 40 },
                                                     borderRadius: '8px',
                                                     bgcolor: result.item.color || group.parentItem.color || '#6366f1',
                                                     display: 'flex',
                                                     alignItems: 'center',
                                                     justifyContent: 'center',
-                                                    mr: 2,
+                                                    mr: { xs: 1.5, sm: 2 },
                                                     flexShrink: 0,
                                                 }}
                                             >
-                                                <IconComponent sx={{ fontSize: 22, color: '#FFFFFF' }} />
+                                                <IconComponent sx={{ fontSize: { xs: 20, sm: 22 }, color: '#FFFFFF' }} />
                                             </Box>
                                             <Box sx={{ flex: 1 }}>
-                                                <Typography sx={{ color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9', fontWeight: 600, fontSize: '1rem' }}>
+                                                <Typography sx={{ color: theme.palette.mode === 'light' ? '#1E293B' : '#F1F5F9', fontWeight: 600, fontSize: { xs: '0.9rem', sm: '1rem' } }}>
                                                     {result.item.label}
                                                 </Typography>
-                                                <Typography sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8', fontSize: '0.85rem' }}>
+                                                <Typography sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8', fontSize: { xs: '0.75rem', sm: '0.85rem' } }}>
                                                     {group.parentItem.label}
                                                 </Typography>
                                             </Box>
@@ -206,8 +205,8 @@ export default function SearchResultsList({
                 );
             })}
 
-            {subItemResults.length === 0 && (
-                <Box sx={{ textAlign: 'center', py: 8 }}>
+            {allResults.length === 0 && (
+                <Box sx={{ textAlign: 'center', py: { xs: 4, sm: 6, md: 8 } }}>
                     <Typography sx={{ color: theme.palette.mode === 'light' ? '#64748B' : '#94A3B8', fontSize: '1rem' }}>
                         Sonuç bulunamadı
                     </Typography>

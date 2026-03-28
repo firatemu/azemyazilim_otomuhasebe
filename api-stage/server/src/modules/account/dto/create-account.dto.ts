@@ -229,6 +229,16 @@ export class CreateAccountDto {
     bankInfo?: string;
 
     @IsOptional()
+    @IsString()
+    @ApiProperty({ required: false })
+    efaturaPostaKutusu?: string;
+
+    @IsOptional()
+    @IsString()
+    @ApiProperty({ required: false })
+    efaturaGondericiBirim?: string;
+
+    @IsOptional()
     @IsArray()
     @ValidateNested({ each: true })
     @Type(() => CreateAccountContactDto)

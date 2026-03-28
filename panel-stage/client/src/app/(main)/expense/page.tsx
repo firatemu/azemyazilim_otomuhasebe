@@ -11,8 +11,22 @@ import {
   FilterList,
   Refresh,
   Visibility,
+  Search,
+  CalendarToday,
+  TableRows,
+  TrendingDown,
+  TrendingUp,
+  History,
+  Download,
+  MoreVert,
+  Close,
+  FileDownload,
+  TableChart,
+  PictureAsPdf
 } from '@mui/icons-material';
 import {
+  useTheme,
+  useMediaQuery,
   Alert,
   Box,
   Button,
@@ -40,7 +54,18 @@ import {
   TextField,
   Tooltip,
   Typography,
+  Stack,
+  InputAdornment,
+  Divider,
+  Popover,
+  Menu,
 } from '@mui/material';
+import * as XLSX from 'xlsx';
+import { jsPDF } from 'jspdf';
+import { format } from 'date-fns';
+import StandardPage from '@/components/common/StandardPage';
+import StandardCard from '@/components/common/StandardCard';
+import ExpensePrintForm from '@/components/PrintForm/ExpensePrintForm';
 import { DataGrid, GridColDef } from '@mui/x-data-grid';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useRouter } from 'next/navigation';
@@ -48,31 +73,32 @@ import { memo, useCallback, useEffect, useMemo, useState } from 'react';
 
 interface MasrafKategori {
   id: string;
-  kategoriAdi: string;
-  aciklama?: string;
+  name: string;
+  notes?: string;
   _count?: {
-    masraflar: number;
+    expenses: number;
   };
 }
 
 interface Masraf {
   id: string;
-  kategoriId: string;
-  aciklama: string;
-  tutar: number;
-  tarih: string;
-  odemeTipi: string;
+  categoryId: string;
+  referenceNo?: string;
+  notes?: string;
+  amount: number;
+  date: string;
+  paymentType?: string;
   createdAt: string;
   updatedAt: string;
-  kategori: MasrafKategori;
+  category: MasrafKategori;
 }
 
 interface Stats {
-  toplamMasraf: number;
+  toplamExpense: number;
   toplamAdet: number;
-  kategoriler: Array<{
-    kategoriId: string;
-    kategoriAdi: string;
+  categoryler: Array<{
+    categoryId: string;
+    name: string;
     adet: number;
     toplam: number;
   }>;
@@ -100,19 +126,19 @@ const formatDate = (dateString: string | Date | undefined | null) => {
 };
 
 const ODEME_TIPI_LABELS: Record<string, string> = {
-  NAKIT: 'Nakit',
-  KREDI_KARTI: 'Kredi Kartı',
-  BANKA_HAVALESI: 'Banka Havalesi',
+  CASH: 'Nakit',
+  CREDIT_CARD: 'Kredi Kartı',
+  BANK_TRANSFER: 'Havale/EFT',
 };
 
 const ODEME_TIPI_COLORS: Record<string, string> = {
-  NAKIT: '#10b981',
-  KREDI_KARTI: '#3b82f6',
-  BANKA_HAVALESI: '#0891b2',
+  CASH: '#10b981',
+  CREDIT_CARD: '#3b82f6',
+  BANK_TRANSFER: '#0891b2',
 };
 
-const getOdemeTipiLabel = (tip: string) => ODEME_TIPI_LABELS[tip] || tip;
-const getOdemeTipiColor = (tip: string) => ODEME_TIPI_COLORS[tip] || '#6b7280';
+const getOdemeTipiLabel = (tip: string | undefined | null) => tip ? (ODEME_TIPI_LABELS[tip] || tip) : '-';
+const getOdemeTipiColor = (tip: string | undefined | null) => tip ? (ODEME_TIPI_COLORS[tip] || '#6b7280') : '#6b7280';
 
 const DataGridNoRowsOverlay = () => (
   <Box
@@ -128,6 +154,46 @@ const DataGridNoRowsOverlay = () => (
   </Box>
 );
 
+const AuditPopover = ({ anchorEl, onClose, data }: any) => (
+  <Popover
+    open={Boolean(anchorEl)}
+    anchorEl={anchorEl}
+    onClose={onClose}
+    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
+    transformOrigin={{ vertical: 'top', horizontal: 'right' }}
+    PaperProps={{
+      sx: {
+        p: 2,
+        width: 280,
+        bgcolor: 'var(--card)',
+        border: '1px solid var(--border)',
+        boxShadow: 'var(--shadow-lg)',
+        borderRadius: 'var(--radius-lg)',
+      },
+    }}
+  >
+    <Typography variant="subtitle2" sx={{ mb: 1.5, fontWeight: 700, color: 'var(--foreground)', display: 'flex', alignItems: 'center', gap: 1 }}>
+      <History sx={{ fontSize: 18, color: 'var(--primary)' }} />
+      Kayıt Geçmişi
+    </Typography>
+    <Stack spacing={1.5}>
+      <Box>
+        <Typography variant="caption" display="block" sx={{ color: 'var(--muted-foreground)', mb: 0.5 }}>Oluşturulma</Typography>
+        <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>
+          {formatDate(data?.createdAt)}
+        </Typography>
+      </Box>
+      <Divider />
+      <Box>
+        <Typography variant="caption" display="block" sx={{ color: 'var(--muted-foreground)', mb: 0.5 }}>Son Güncelleme</Typography>
+        <Typography variant="body2" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>
+          {formatDate(data?.updatedAt)}
+        </Typography>
+      </Box>
+    </Stack>
+  </Popover>
+);
+
 // Form Dialog
 const MasrafFormDialog = memo(({
   open,
@@ -137,7 +203,8 @@ const MasrafFormDialog = memo(({
   loading,
   onClose,
   onSubmit,
-  onFormChange
+  onFormChange,
+  isMobile
 }: any) => {
   if (!open) return null;
 
@@ -145,54 +212,101 @@ const MasrafFormDialog = memo(({
     <Dialog
       open={open}
       onClose={onClose}
-      maxWidth="md"
+      maxWidth="sm"
       fullWidth
+      fullScreen={isMobile}
       PaperProps={{
         sx: {
           bgcolor: 'var(--card)',
           backgroundImage: 'none',
+          borderRadius: isMobile ? 0 : 'var(--radius-xl)',
+          border: isMobile ? 'none' : '1px solid var(--border)',
+          boxShadow: 'var(--shadow-2xl)',
+          overflow: 'hidden',
         },
       }}
     >
-      <DialogTitle component="div" sx={{
-        bgcolor: 'var(--destructive)',
-        color: 'var(--destructive-foreground)',
+      <Box sx={{
+        p: 2.5,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'space-between',
         borderBottom: '1px solid var(--border)',
+        background: 'linear-gradient(to right, var(--card), color-mix(in srgb, var(--primary) 3%, transparent))',
       }}>
-        {editMode ? 'Masraf Düzenle' : 'Yeni Masraf'}
-      </DialogTitle>
-      <DialogContent sx={{ bgcolor: 'var(--background)' }}>
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          <Grid size={{ xs: 12, md: 6 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+          <Box sx={{
+            width: 36,
+            height: 36,
+            borderRadius: 2,
+            bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: 'var(--destructive)',
+          }}>
+            <CurrencyLira sx={{ fontSize: 20 }} />
+          </Box>
+          <Box>
+            <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
+              {editMode ? 'Masraf Düzenle' : 'Yeni Masraf Kaydı'}
+            </Typography>
+            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>
+              Harcama detaylarını buraya girin
+            </Typography>
+          </Box>
+        </Box>
+        <IconButton
+          size="small"
+          onClick={onClose}
+          sx={{
+            color: 'var(--muted-foreground)',
+            transition: 'all 0.2s',
+            '&:hover': {
+              color: 'var(--destructive)',
+              bgcolor: 'color-mix(in srgb, var(--destructive) 8%, transparent)',
+              transform: 'rotate(90deg)',
+            },
+          }}
+        >
+          <Close fontSize="small" />
+        </IconButton>
+      </Box>
+
+      <DialogContent sx={{ p: 3, bgcolor: 'var(--card)' }}>
+        <Grid container spacing={2.5}>
+          <Grid size={{ xs: 12 }}>
             <FormControl fullWidth required className="form-control-select">
-              <InputLabel>Kategori</InputLabel>
+              <InputLabel>Masraf Kategorisi</InputLabel>
               <Select
-                value={formData.kategoriId}
-                onChange={(e) => onFormChange('kategoriId', e.target.value)}
-                label="Kategori"
+                value={formData.categoryId}
+                onChange={(e) => onFormChange('categoryId', e.target.value)}
+                label="Masraf Kategorisi"
+                sx={{ borderRadius: 'var(--radius-md)' }}
               >
                 {kategoriler.map((kat: MasrafKategori) => (
                   <MenuItem key={kat.id} value={kat.id}>
-                    {kat.kategoriAdi}
+                    {kat.name}
                   </MenuItem>
                 ))}
               </Select>
             </FormControl>
           </Grid>
+
           <Grid size={{ xs: 12, md: 6 }}>
-            <FormControl fullWidth required className="form-control-select">
-              <InputLabel>Ödeme Tipi</InputLabel>
-              <Select
-                value={formData.odemeTipi}
-                onChange={(e) => onFormChange('odemeTipi', e.target.value)}
-                label="Ödeme Tipi"
-              >
-                <MenuItem value="NAKIT">Nakit</MenuItem>
-                <MenuItem value="KREDI_KARTI">Kredi Kartı</MenuItem>
-                <MenuItem value="BANKA_HAVALESI">Banka Havalesi</MenuItem>
-              </Select>
-            </FormControl>
+            <TextField
+              fullWidth
+              className="form-control-textfield"
+              label="Fiş/Fatura No"
+              value={formData.referenceNo}
+              onChange={(e) => onFormChange('referenceNo', e.target.value)}
+              placeholder="Örn: ABC20240001"
+              InputProps={{
+                startAdornment: <InputAdornment position="start"><History sx={{ fontSize: 18 }} /></InputAdornment>,
+              }}
+            />
           </Grid>
+
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
@@ -200,64 +314,111 @@ const MasrafFormDialog = memo(({
               type="number"
               className="form-control-textfield"
               label="Tutar"
-              value={formData.tutar}
-              onChange={(e) => onFormChange('tutar', e.target.value)}
+              value={formData.amount}
+              onChange={(e) => onFormChange('amount', e.target.value)}
               inputProps={{ min: 0.01, step: 0.01 }}
+              InputProps={{
+                startAdornment: <InputAdornment position="start">₺</InputAdornment>,
+              }}
             />
           </Grid>
+
+          <Grid size={{ xs: 12, md: 6 }}>
+            <FormControl fullWidth className="form-control-select">
+              <InputLabel>Ödeme Tipi</InputLabel>
+              <Select
+                value={formData.paymentType}
+                onChange={(e) => onFormChange('paymentType', e.target.value)}
+                label="Ödeme Tipi"
+              >
+                <MenuItem value="">
+                  <em>Belirtilmedi</em>
+                </MenuItem>
+                <MenuItem value="CASH">Nakit</MenuItem>
+                <MenuItem value="CREDIT_CARD">Kredi Kartı</MenuItem>
+                <MenuItem value="BANK_TRANSFER">Havale/EFT</MenuItem>
+              </Select>
+            </FormControl>
+          </Grid>
+
           <Grid size={{ xs: 12, md: 6 }}>
             <TextField
               fullWidth
               required
               type="date"
               className="form-control-textfield"
-              label="Tarih"
-              value={formData.tarih}
-              onChange={(e) => onFormChange('tarih', e.target.value)}
+              label="Harcama Tarihi"
+              value={formData.date}
+              onChange={(e) => onFormChange('date', e.target.value)}
               InputLabelProps={{ shrink: true }}
             />
           </Grid>
+
           <Grid size={{ xs: 12 }}>
             <TextField
               fullWidth
               label="Açıklama"
               className="form-control-textfield"
-              value={formData.aciklama}
-              onChange={(e) => onFormChange('aciklama', e.target.value)}
+              value={formData.notes}
+              onChange={(e) => onFormChange('notes', e.target.value)}
               multiline
-              rows={3}
-              placeholder="Masraf açıklaması (opsiyonel)..."
+              rows={2}
+              placeholder="Masraf hakkında kısa bilgi..."
             />
           </Grid>
         </Grid>
       </DialogContent>
-      <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
+
+      <DialogActions sx={{
+        px: 3,
+        py: 2,
+        bgcolor: 'color-mix(in srgb, var(--primary) 2%, var(--card))',
+        borderTop: '1px solid var(--border)',
+        gap: 1.5
+      }}>
         <Button
+          fullWidth
+          variant="outlined"
           onClick={onClose}
           sx={{
-            borderColor: 'var(--border)',
+            borderRadius: 'var(--radius-lg)',
+            textTransform: 'none',
+            fontWeight: 600,
             color: 'var(--foreground)',
+            borderColor: 'var(--border)',
+            py: 1.2,
             '&:hover': {
               borderColor: 'var(--primary)',
-              bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
+              bgcolor: 'transparent',
             },
           }}
         >
           İptal
         </Button>
         <Button
+          fullWidth
           variant="contained"
           onClick={onSubmit}
           disabled={loading}
           sx={{
+            borderRadius: 'var(--radius-lg)',
+            textTransform: 'none',
+            fontWeight: 700,
             bgcolor: 'var(--destructive)',
             color: 'var(--destructive-foreground)',
+            py: 1.2,
+            boxShadow: '0 4px 12px color-mix(in srgb, var(--destructive) 30%, transparent)',
             '&:hover': {
-              bgcolor: 'color-mix(in srgb, var(--destructive) 90%, #000 10%)',
+              bgcolor: 'color-mix(in srgb, var(--destructive) 90%, black)',
+              boxShadow: '0 6px 16px color-mix(in srgb, var(--destructive) 40%, transparent)',
             },
+            '&.Mui-disabled': {
+              bgcolor: 'var(--muted)',
+              color: 'var(--muted-foreground)',
+            }
           }}
         >
-          {editMode ? 'Güncelle' : 'Kaydet'}
+          {loading ? 'İşleniyor...' : (editMode ? 'Güncellemeyi Kaydet' : 'Masrafı Kaydet')}
         </Button>
       </DialogActions>
     </Dialog>
@@ -284,6 +445,31 @@ export default function MasrafPage() {
     severity: 'success' as 'success' | 'error' | 'info'
   });
 
+  const [auditAnchor, setAuditAnchor] = useState<{ el: HTMLElement | null, data: any }>({ el: null, data: null });
+
+  const theme = useTheme();
+  const isMobile = useMediaQuery(theme.breakpoints.down('sm'));
+  const isTablet = useMediaQuery(theme.breakpoints.down('md'));
+
+  const handleQuickFilter = (type: string) => {
+    const today = new Date();
+    let start = '';
+    let end = today.toISOString().split('T')[0];
+
+    if (type === 'today') {
+      start = end;
+    } else if (type === 'week') {
+      const lastWeek = new Date();
+      lastWeek.setDate(today.getDate() - 7);
+      start = lastWeek.toISOString().split('T')[0];
+    } else if (type === 'month') {
+      start = new Date(today.getFullYear(), today.getMonth(), 1).toISOString().split('T')[0];
+    }
+
+    setFilterBaslangic(start);
+    setFilterBitis(end);
+  };
+
   const showSnackbar = useCallback(
     (message: string, severity: 'success' | 'error' | 'info') => {
       setSnackbar({ open: true, message, severity });
@@ -296,17 +482,20 @@ export default function MasrafPage() {
   const [filterBitis, setFilterBitis] = useState('');
 
   const [formData, setFormData] = useState({
-    kategoriId: '',
-    aciklama: '',
-    tutar: '',
-    tarih: new Date().toISOString().split('T')[0],
-    odemeTipi: 'NAKIT',
+    categoryId: '',
+    referenceNo: '',
+    notes: '',
+    amount: '',
+    date: new Date().toISOString().split('T')[0],
+    paymentType: 'CASH',
   });
 
   const [kategoriFormData, setKategoriFormData] = useState({
-    kategoriAdi: '',
-    aciklama: '',
+    name: '',
+    notes: '',
   });
+
+  const [categorySearch, setCategorySearch] = useState('');
 
   const masrafQueryKey = useMemo(
     () => ['masraflar', filterKategori || null, filterBaslangic || null, filterBitis || null],
@@ -322,16 +511,16 @@ export default function MasrafPage() {
     queryKey: masrafQueryKey,
     queryFn: async () => {
       const params: Record<string, string | number> = { limit: 100 };
-      if (filterKategori) params.kategoriId = filterKategori;
-      if (filterBaslangic) params.baslangicTarihi = filterBaslangic;
-      if (filterBitis) params.bitisTarihi = filterBitis;
+      if (filterKategori) params.categoryId = filterKategori;
+      if (filterBaslangic) params.startDate = filterBaslangic;
+      if (filterBitis) params.endDate = filterBitis;
 
-      const response = await axios.get('/expense', { params });
+      const response = await axios.get('/expenses', { params });
       const data = response.data?.data ?? [];
       // Debug: Tarih alanını kontrol et
       if (data.length > 0) {
         console.log('Masraf verisi örneği:', data[0]);
-        console.log('Tarih alanı:', data[0].tarih, 'Tip:', typeof data[0].tarih);
+        console.log('Tarih alanı:', data[0].date, 'Tip:', typeof data[0].date);
       }
       return data;
     },
@@ -348,7 +537,7 @@ export default function MasrafPage() {
   const { data: kategoriler = [], isLoading: kategorilerLoading } = useQuery<MasrafKategori[]>({
     queryKey: ['masraf-kategoriler'],
     queryFn: async () => {
-      const response = await axios.get('/expense/categoryler');
+      const response = await axios.get('/expenses/categoryler');
       return response.data;
     },
     staleTime: 5 * 60 * 1000,
@@ -362,22 +551,8 @@ export default function MasrafPage() {
       if (filterBaslangic) params.startDate = filterBaslangic;
       if (filterBitis) params.endDate = filterBitis;
 
-      const response = await axios.get('/expense/stats', { params });
-      // Transform backend response to match Stats interface
-      const data = response.data ?? null;
-      if (data && data.categoryler) {
-        return {
-          toplamMasraf: data.toplamExpense || 0,
-          toplamAdet: data.toplamAdet || 0,
-          kategoriler: (data.categoryler || []).map((cat: any) => ({
-            kategoriId: cat.categoryId || '',
-            kategoriAdi: cat.name || '',
-            adet: cat.adet || 0,
-            toplam: cat.toplam || 0,
-          })),
-        };
-      }
-      return null;
+      const response = await axios.get('/expenses/stats', { params });
+      return response.data ?? null;
     },
   });
 
@@ -392,21 +567,23 @@ export default function MasrafPage() {
       setEditMode(true);
       setSelectedMasraf(masraf);
       setFormData({
-        kategoriId: masraf.kategoriId,
-        aciklama: masraf.aciklama,
-        tutar: String(masraf.tutar),
-        tarih: new Date(masraf.tarih).toISOString().split('T')[0],
-        odemeTipi: masraf.odemeTipi,
+        categoryId: masraf.categoryId,
+        referenceNo: masraf.referenceNo || '',
+        notes: masraf.notes || '',
+        amount: String(masraf.amount),
+        date: new Date(masraf.date).toISOString().split('T')[0],
+        paymentType: masraf.paymentType || 'CASH',
       });
     } else {
       setEditMode(false);
       setSelectedMasraf(null);
       setFormData({
-        kategoriId: '',
-        aciklama: '',
-        tutar: '',
-        tarih: new Date().toISOString().split('T')[0],
-        odemeTipi: 'NAKIT',
+        categoryId: '',
+        referenceNo: '',
+        notes: '',
+        amount: '',
+        date: new Date().toISOString().split('T')[0],
+        paymentType: 'CASH',
       });
     }
     setOpenDialog(true);
@@ -424,9 +601,9 @@ export default function MasrafPage() {
 
   const handleSubmit = async () => {
     try {
-      const tutarNumber = parseFloat(formData.tutar);
+      const amountNumber = parseFloat(formData.amount);
 
-      if (!formData.kategoriId || !tutarNumber || tutarNumber <= 0) {
+      if (!formData.categoryId || !amountNumber || amountNumber <= 0) {
         showSnackbar('Lütfen tüm zorunlu alanları doldurun', 'error');
         return;
       }
@@ -435,14 +612,15 @@ export default function MasrafPage() {
 
       const submitData = {
         ...formData,
-        tutar: tutarNumber,
+        amount: amountNumber,
+        paymentType: formData.paymentType || null,
       };
 
       if (editMode && selectedMasraf) {
-        await axios.put(`/masraf/${selectedMasraf.id}`, submitData);
+        await axios.put(`/expenses/${selectedMasraf.id}`, submitData);
         showSnackbar('Masraf kaydı güncellendi', 'success');
       } else {
-        await axios.post('/expense', submitData);
+        await axios.post('/expenses', submitData);
         showSnackbar('Masraf kaydı oluşturuldu', 'success');
       }
 
@@ -458,12 +636,64 @@ export default function MasrafPage() {
     }
   };
 
+  const [exportAnchorEl, setExportAnchorEl] = useState<null | HTMLElement>(null);
+  const [printOpen, setPrintOpen] = useState(false);
+  const openExportMenu = Boolean(exportAnchorEl);
+
+  const handleExportExcel = () => {
+    try {
+      if (masraflar.length === 0) {
+        showSnackbar('Dışa aktarılacak veri bulunamadı', 'info');
+        return;
+      }
+
+      const exportData = masraflar.map(m => ({
+        'Tarih': format(new Date(m.date), 'dd.MM.yyyy'),
+        'Kategori': m.category?.name || '-',
+        'Açıklama': m.notes || '-',
+        'Fiş/Fatura No': m.referenceNo || '-',
+        'Ödeme Şekli': m.paymentType || 'Belirtilmedi',
+        'Tutar': m.amount
+      }));
+
+      const ws = XLSX.utils.json_to_sheet(exportData);
+      const wb = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb, ws, 'Masraflar');
+
+      // Kolon genişliklerini ayarla
+      const wscols = [
+        { wch: 12 }, // Tarih
+        { wch: 25 }, // Kategori
+        { wch: 40 }, // Açıklama
+        { wch: 20 }, // Fiş No
+        { wch: 15 }, // Ödeme Şekli
+        { wch: 15 }  // Tutar
+      ];
+      ws['!cols'] = wscols;
+
+      XLSX.writeFile(wb, `Masraf_Raporu_${format(new Date(), 'yyyyMMdd_HHmm')}.xlsx`);
+      setExportAnchorEl(null);
+    } catch (error) {
+      console.error('Excel export error:', error);
+      showSnackbar('Excel oluşturulurken hata oluştu', 'error');
+    }
+  };
+
+  const handleExportPdf = () => {
+    if (masraflar.length === 0) {
+      showSnackbar('Dışa aktarılacak veri bulunamadı', 'info');
+      return;
+    }
+    setPrintOpen(true);
+    setExportAnchorEl(null);
+  };
+
   const handleDelete = async () => {
     if (!selectedMasraf) return;
 
     try {
       setActionLoading(true);
-      await axios.delete(`/masraf/${selectedMasraf.id}`);
+      await axios.delete(`/expenses/${selectedMasraf.id}`);
       showSnackbar('Masraf kaydı silindi', 'success');
       setOpenDelete(false);
       setSelectedMasraf(null);
@@ -486,15 +716,15 @@ export default function MasrafPage() {
       setKategoriEditMode(true);
       setSelectedKategori(kategori);
       setKategoriFormData({
-        kategoriAdi: kategori.kategoriAdi,
-        aciklama: kategori.aciklama || '',
+        name: kategori.name,
+        notes: kategori.notes || '',
       });
     } else {
       setKategoriEditMode(false);
       setSelectedKategori(null);
       setKategoriFormData({
-        kategoriAdi: '',
-        aciklama: '',
+        name: '',
+        notes: '',
       });
     }
     setOpenKategoriDialog(true);
@@ -502,7 +732,7 @@ export default function MasrafPage() {
 
   const handleKategoriSubmit = async () => {
     try {
-      if (!kategoriFormData.kategoriAdi.trim()) {
+      if (!kategoriFormData.name.trim()) {
         showSnackbar('Kategori adı gereklidir', 'error');
         return;
       }
@@ -510,15 +740,15 @@ export default function MasrafPage() {
       setActionLoading(true);
 
       if (kategoriEditMode && selectedKategori) {
-        await axios.put(`/expense/categoryler/${selectedKategori.id}`, kategoriFormData);
+        await axios.put(`/expenses/categoryler/${selectedKategori.id}`, kategoriFormData);
         showSnackbar('Kategori güncellendi', 'success');
       } else {
-        await axios.post('/expense/categoryler', kategoriFormData);
+        await axios.post('/expenses/categoryler', kategoriFormData);
         showSnackbar('Kategori oluşturuldu', 'success');
       }
 
       setOpenKategoriDialog(false);
-      setKategoriFormData({ kategoriAdi: '', aciklama: '' });
+      setKategoriFormData({ name: '', notes: '' });
       setKategoriEditMode(false);
       setSelectedKategori(null);
       await Promise.all([
@@ -537,7 +767,7 @@ export default function MasrafPage() {
 
     try {
       setActionLoading(true);
-      await axios.delete(`/masraf/kategoriler/${selectedKategori.id}`);
+      await axios.delete(`/expenses/categoryler/${selectedKategori.id}`);
       showSnackbar('Kategori silindi', 'success');
       setOpenKategoriDelete(false);
       setSelectedKategori(null);
@@ -554,21 +784,28 @@ export default function MasrafPage() {
 
   const masrafColumns = useMemo<GridColDef[]>(() => [
     {
-      field: 'tarih',
+      field: 'date',
       headerName: 'Tarih',
-      minWidth: 130,
+      minWidth: 120,
       renderCell: (params: any) => {
         const row = params.row as Masraf;
-        if (!row?.tarih) return <Typography variant="body2">-</Typography>;
-        return <Typography variant="body2">{formatDate(row.tarih)}</Typography>;
+        if (!row?.date) return <Typography variant="body2">-</Typography>;
+        return <Typography variant="body2">{formatDate(row.date)}</Typography>;
       },
-      valueGetter: (params: any) => {
-        if (!params?.row?.tarih) return '';
-        return formatDate(params.row.tarih);
-      },
+      valueGetter: (params: any) => params?.row?.date ? formatDate(params.row.date) : '',
     },
     {
-      field: 'kategori',
+      field: 'referenceNo',
+      headerName: 'Fiş/Fatura No',
+      minWidth: 140,
+      renderCell: (params: any) => (
+        <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--foreground)', fontFamily: 'monospace' }}>
+          {params.row.referenceNo || '-'}
+        </Typography>
+      ),
+    },
+    {
+      field: 'category',
       headerName: 'Kategori',
       flex: 1,
       minWidth: 160,
@@ -577,7 +814,7 @@ export default function MasrafPage() {
         if (!row) return <Typography variant="body2">-</Typography>;
         return (
           <Chip
-            label={row.kategori?.kategoriAdi || '-'}
+            label={row.category?.name || '-'}
             size="small"
             sx={{
               bgcolor: 'color-mix(in srgb, var(--muted-foreground) 10%, transparent)',
@@ -588,10 +825,10 @@ export default function MasrafPage() {
           />
         );
       },
-      valueGetter: (params: any) => params?.row?.kategori?.kategoriAdi || '-',
+      valueGetter: (params: any) => params?.row?.category?.name || '-',
     },
     {
-      field: 'aciklama',
+      field: 'notes',
       headerName: 'Açıklama',
       flex: 1.5,
       minWidth: 220,
@@ -599,42 +836,42 @@ export default function MasrafPage() {
         const row = params.row as Masraf;
         return (
           <Typography variant="body2" noWrap sx={{ maxWidth: '100%' }}>
-            {row?.aciklama || '-'}
+            {row?.notes || '-'}
           </Typography>
         );
       },
     },
     {
-      field: 'tutar',
+      field: 'amount',
       headerName: 'Tutar',
       minWidth: 140,
       renderCell: (params: any) => {
         const row = params.row as Masraf;
-        if (!row?.tutar) return <Typography variant="body2">-</Typography>;
+        if (!row?.amount) return <Typography variant="body2">-</Typography>;
         return (
           <Typography variant="body2" fontWeight={600} sx={{ color: 'var(--destructive)' }}>
-            {formatCurrency(row.tutar)}
+            {formatCurrency(row.amount)}
           </Typography>
         );
       },
-      valueGetter: (params: any) => params?.row?.tutar ? formatCurrency((params.row as Masraf).tutar) : '-',
+      valueGetter: (params: any) => params?.row?.amount ? formatCurrency((params.row as Masraf).amount) : '-',
     },
     {
-      field: 'odemeTipi',
+      field: 'paymentType',
       headerName: 'Ödeme Tipi',
       minWidth: 160,
       renderCell: (params: any) => {
         const row = params.row as Masraf;
-        if (!row?.odemeTipi) return <Typography variant="body2">-</Typography>;
+        if (!row?.paymentType) return <Typography variant="body2">-</Typography>;
         const colorMap: Record<string, string> = {
-          NAKIT: 'var(--chart-2)',
-          KREDI_KARTI: 'var(--chart-1)',
-          BANKA_HAVALESI: 'var(--secondary)',
+          CASH: 'var(--chart-2)',
+          CREDIT_CARD: 'var(--chart-1)',
+          BANK_TRANSFER: 'var(--secondary)',
         };
-        const chipColor = colorMap[row.odemeTipi] || 'var(--muted-foreground)';
+        const chipColor = colorMap[row.paymentType] || 'var(--muted-foreground)';
         return (
           <Chip
-            label={getOdemeTipiLabel(row.odemeTipi)}
+            label={getOdemeTipiLabel(row.paymentType)}
             size="small"
             sx={{
               bgcolor: `color-mix(in srgb, ${chipColor} 15%, transparent)`,
@@ -645,7 +882,7 @@ export default function MasrafPage() {
           />
         );
       },
-      valueGetter: (params: any) => params?.row?.odemeTipi ? getOdemeTipiLabel((params.row as Masraf).odemeTipi) : '-',
+      valueGetter: (params: any) => params?.row?.paymentType ? getOdemeTipiLabel((params.row as Masraf).paymentType) : '-',
     },
     {
       field: 'createdAt',
@@ -730,69 +967,69 @@ export default function MasrafPage() {
   ], [handleOpenDialog, handleViewDetail]);
 
   return (
-    <MainLayout>
-      <Box sx={{ p: 3, bgcolor: 'var(--background)' }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Box>
-            <Typography
-              variant="h4"
-              sx={{
-                fontWeight: 700,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 1,
-                color: 'var(--foreground)',
-                letterSpacing: '-0.02em',
-                mb: 0.5,
-              }}
-            >
-              <CurrencyLira sx={{ fontSize: 40, color: 'var(--destructive)' }} />
-              Masraf Yönetimi
-            </Typography>
+    <StandardPage>
+      <Box sx={{ pb: 4 }}>
+        {/* Header */}
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2, py: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+            <Box sx={{
+              width: 44,
+              height: 44,
+              borderRadius: 3,
+              background: 'linear-gradient(135deg, var(--destructive), #f87171)',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              boxShadow: '0 8px 16px -4px color-mix(in srgb, var(--destructive) 40%, transparent)',
+            }}>
+              <CurrencyLira sx={{ color: 'white', fontSize: 26 }} />
+            </Box>
+            <Box>
+              <Typography variant="h6" sx={{ fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2, letterSpacing: '-0.02em' }}>
+                Masraf Yönetimi
+              </Typography>
+              <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>
+                Harcamalarınızı takip edin ve kategorize edin
+              </Typography>
+            </Box>
           </Box>
-          <Box sx={{ display: 'flex', gap: 2 }}>
+          <Box sx={{ display: 'flex', gap: 1.5 }}>
             <Button
+              size="small"
               variant="outlined"
               startIcon={<Category />}
               onClick={() => handleOpenKategoriDialog()}
               sx={{
+                borderRadius: 2.5,
+                textTransform: 'none',
+                fontWeight: 600,
                 color: 'var(--secondary)',
                 borderColor: 'var(--secondary)',
+                px: 2,
                 '&:hover': {
-                  borderColor: 'var(--secondary-hover)',
-                  bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)',
+                  borderColor: 'var(--secondary)',
+                  bgcolor: 'color-mix(in srgb, var(--secondary) 8%, transparent)',
                 },
               }}
             >
-              Kategori Yönetimi
+              Kategoriler
             </Button>
             <Button
-              variant="outlined"
-              startIcon={<Refresh />}
-              onClick={() => {
-                queryClient.invalidateQueries({ queryKey: ['masraflar'] });
-                queryClient.invalidateQueries({ queryKey: ['masraf-stats'] });
-              }}
-              sx={{
-                borderColor: 'var(--border)',
-                color: 'var(--foreground)',
-                '&:hover': {
-                  borderColor: 'var(--primary)',
-                  bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-                },
-              }}
-            >
-              Yenile
-            </Button>
-            <Button
+              size="small"
               variant="contained"
               startIcon={<Add />}
               onClick={() => handleOpenDialog()}
               sx={{
+                borderRadius: 2.5,
+                textTransform: 'none',
+                fontWeight: 600,
                 bgcolor: 'var(--destructive)',
                 color: 'var(--destructive-foreground)',
+                px: 2,
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--destructive) 30%, transparent)',
                 '&:hover': {
-                  bgcolor: 'color-mix(in srgb, var(--destructive) 90%, #000 10%)',
+                  bgcolor: 'color-mix(in srgb, var(--destructive) 90%, black)',
+                  boxShadow: '0 6px 16px color-mix(in srgb, var(--destructive) 40%, transparent)',
                 },
               }}
             >
@@ -801,175 +1038,333 @@ export default function MasrafPage() {
           </Box>
         </Box>
 
-        {/* İstatistikler */}
-        {stats && (
-          <Grid container spacing={2} sx={{ mb: 3 }}>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--destructive)', boxShadow: 'var(--shadow-sm)' }}>
-                <CardContent>
-                  <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>Toplam Masraf</Typography>
-                  <Typography variant="h4" sx={{ color: 'var(--destructive)', fontWeight: 700 }}>
-                    {formatCurrency(stats.toplamMasraf)}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--chart-3)', boxShadow: 'var(--shadow-sm)' }}>
-                <CardContent>
-                  <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>Toplam Kayıt</Typography>
-                  <Typography variant="h4" sx={{ color: 'var(--chart-3)', fontWeight: 700 }}>
-                    {stats.toplamAdet}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--chart-2)', boxShadow: 'var(--shadow-sm)' }}>
-                <CardContent>
-                  <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>Kategori Sayısı</Typography>
-                  <Typography variant="h4" sx={{ color: 'var(--chart-2)', fontWeight: 700 }}>
-                    {kategoriler.length}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
-            <Grid size={{ xs: 12, md: 3 }}>
-              <Card sx={{ bgcolor: 'var(--card)', border: '1px solid var(--chart-1)', boxShadow: 'var(--shadow-sm)' }}>
-                <CardContent>
-                  <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>Ortalama Masraf</Typography>
-                  <Typography variant="h5" sx={{ color: 'var(--chart-1)', fontWeight: 700 }}>
-                    {stats.toplamAdet > 0 ? formatCurrency(stats.toplamMasraf / stats.toplamAdet) : '₺0'}
-                  </Typography>
-                </CardContent>
-              </Card>
-            </Grid>
+        {/* KPI / Metrics strip */}
+        {/* KPI Stats */}
+        <Grid container spacing={isMobile ? 1.5 : 2} sx={{ mb: 3 }}>
+          <Grid size={{ xs: 6, md: 3 }}>
+            <Paper variant="outlined" sx={{
+              p: 2, borderRadius: 4, height: '100%', bgcolor: 'var(--card)', border: '1px solid var(--border)',
+              position: 'relative', overflow: 'hidden',
+              '&::before': { content: '""', position: 'absolute', top: 0, left: 0, width: '4px', height: '100%', bgcolor: 'var(--destructive)' }
+            }}>
+              <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
+                <TrendingDown sx={{ fontSize: 14, color: 'var(--destructive)' }} /> TOPLAM MASRAF
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--destructive)', mt: 0.5, fontSize: isMobile ? '1.1rem' : '1.5rem' }}>
+                {formatCurrency(stats?.toplamExpense || 0)}
+              </Typography>
+            </Paper>
           </Grid>
-        )}
+          <Grid size={{ xs: 6, md: 3 }}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 4, height: '100%', bgcolor: 'var(--card)', border: '1px solid var(--border)' }}>
+              <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
+                <TableRows sx={{ fontSize: 14, color: 'var(--primary)' }} /> KAYIT SAYISI
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--foreground)', mt: 0.5, fontSize: isMobile ? '1.1rem' : '1.5rem' }}>
+                {stats?.toplamAdet || 0}
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 6, md: 3 }}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 4, height: '100%', bgcolor: 'var(--card)', border: '1px solid var(--border)' }}>
+              <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
+                <Category sx={{ fontSize: 14, color: 'var(--secondary)' }} /> KATEGORİ
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--foreground)', mt: 0.5, fontSize: isMobile ? '1.1rem' : '1.5rem' }}>
+                {kategoriler.length}
+              </Typography>
+            </Paper>
+          </Grid>
+          <Grid size={{ xs: 6, md: 3 }}>
+            <Paper variant="outlined" sx={{ p: 2, borderRadius: 4, height: '100%', bgcolor: 'var(--card)', border: '1px solid var(--border)' }}>
+              <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 600, display: 'flex', alignItems: 'center', gap: 0.5, fontSize: isMobile ? '0.65rem' : '0.75rem' }}>
+                <TrendingUp sx={{ fontSize: 14, color: 'var(--chart-2)' }} /> ORTALAMA
+              </Typography>
+              <Typography variant="h5" sx={{ fontWeight: 800, color: 'var(--foreground)', mt: 0.5, fontSize: isMobile ? '1.1rem' : '1.5rem' }}>
+                {(stats?.toplamAdet ?? 0) > 0 ? formatCurrency((stats?.toplamExpense ?? 0) / (stats?.toplamAdet ?? 1)) : '₺0'}
+              </Typography>
+            </Paper>
+          </Grid>
+        </Grid>
 
-        {/* Filtreler */}
-        <Paper sx={{ p: 2, mb: 3, bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
-          <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: 'var(--foreground)', fontWeight: 700 }}>
-            <FilterList sx={{ color: 'var(--muted-foreground)' }} />
-            Filtreler
-          </Typography>
-          <Grid container spacing={2}>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <FormControl fullWidth size="small" className="form-control-select">
-                <InputLabel>Kategori</InputLabel>
-                <Select
-                  value={filterKategori}
-                  onChange={(e) => setFilterKategori(e.target.value)}
-                  label="Kategori"
-                >
-                  <MenuItem value="">Tümü</MenuItem>
-                  {kategoriler.map((kat) => (
-                    <MenuItem key={kat.id} value={kat.id}>
-                      {kat.kategoriAdi}
-                    </MenuItem>
-                  ))}
-                </Select>
-              </FormControl>
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
-              <TextField
-                fullWidth
+        {/* Toolbar */}
+        <Paper variant="outlined" sx={{
+          mb: 3,
+          borderRadius: 4,
+          bgcolor: 'var(--card)',
+          border: '1px solid var(--border)',
+          overflow: 'hidden'
+        }}>
+          <Stack
+            direction={isTablet ? 'column' : 'row'}
+            spacing={2}
+            sx={{ p: 2, alignItems: isTablet ? 'stretch' : 'center' }}
+          >
+            <TextField
+              size="small"
+              placeholder="Açıklama veya kategori ara..."
+              sx={{ flex: 1 }}
+              InputProps={{
+                startAdornment: (
+                  <InputAdornment position="start">
+                    <Search sx={{ color: 'var(--muted-foreground)', fontSize: 20 }} />
+                  </InputAdornment>
+                ),
+                sx: { borderRadius: 2.5, bgcolor: 'var(--background)' }
+              }}
+            />
+
+            {!isTablet && <Divider orientation="vertical" flexItem />}
+
+            <Stack
+              direction="row"
+              spacing={1}
+              sx={{
+                alignItems: 'center',
+                overflowX: 'auto',
+                pb: isMobile ? 1 : 0,
+                '&::-webkit-scrollbar': { display: 'none' }
+              }}
+            >
+              <Chip
+                label="Bugün"
+                onClick={() => handleQuickFilter('today')}
                 size="small"
-                className="form-control-textfield"
+                variant={filterBaslangic === new Date().toISOString().split('T')[0] ? 'filled' : 'outlined'}
+                sx={{
+                  borderRadius: 2,
+                  fontWeight: 600,
+                  bgcolor: filterBaslangic === new Date().toISOString().split('T')[0] ? 'var(--primary)' : 'transparent',
+                  color: filterBaslangic === new Date().toISOString().split('T')[0] ? 'white' : 'var(--muted-foreground)',
+                }}
+              />
+              <Chip
+                label="Bu Hafta"
+                onClick={() => handleQuickFilter('week')}
+                size="small"
+                variant="outlined"
+                sx={{ borderRadius: 2, fontWeight: 600, color: 'var(--muted-foreground)' }}
+              />
+              <Chip
+                label="Bu Ay"
+                onClick={() => handleQuickFilter('month')}
+                size="small"
+                variant="outlined"
+                sx={{ borderRadius: 2, fontWeight: 600, color: 'var(--muted-foreground)' }}
+              />
+            </Stack>
+
+            {!isTablet && <Divider orientation="vertical" flexItem />}
+
+            <Stack
+              direction={isMobile ? 'column' : 'row'}
+              spacing={isMobile ? 1.5 : 1}
+              sx={{ flex: isTablet ? 'none' : '1 1 300px' }}
+            >
+              <TextField
+                size="small"
                 type="date"
-                label="Başlangıç Tarihi"
+                label="Başlangıç"
+                fullWidth={isMobile}
                 value={filterBaslangic}
                 onChange={(e) => setFilterBaslangic(e.target.value)}
                 InputLabelProps={{ shrink: true }}
+                sx={{ '& .MuiInputBase-root': { borderRadius: 2.5 } }}
               />
-            </Grid>
-            <Grid size={{ xs: 12, md: 4 }}>
               <TextField
-                fullWidth
                 size="small"
-                className="form-control-textfield"
                 type="date"
-                label="Bitiş Tarihi"
+                label="Bitiş"
+                fullWidth={isMobile}
                 value={filterBitis}
                 onChange={(e) => setFilterBitis(e.target.value)}
                 InputLabelProps={{ shrink: true }}
+                sx={{ '& .MuiInputBase-root': { borderRadius: 2.5 } }}
               />
-            </Grid>
-          </Grid>
-        </Paper>
 
-        {/* Tablo */}
-        <Paper sx={{ height: 520, p: 1, bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
-          <DataGrid
-            rows={masraflar}
-            columns={masrafColumns}
-            loading={isMasrafLoading}
-            disableColumnMenu
-            disableColumnSelector
-            disableDensitySelector
-            disableRowSelectionOnClick
-            pageSizeOptions={[25, 50, 100]}
-            initialState={{
-              pagination: {
-                paginationModel: { pageSize: 25, page: 0 },
-              },
-            }}
-            density="comfortable"
-            sx={{
-              border: 'none',
-              '& .MuiDataGrid-cell': {
+              {isMobile && (
+                <Button
+                  fullWidth
+                  variant="outlined"
+                  startIcon={<Refresh />}
+                  onClick={() => {
+                    queryClient.invalidateQueries({ queryKey: ['masraflar'] });
+                    queryClient.invalidateQueries({ queryKey: ['masraf-stats'] });
+                  }}
+                  sx={{ borderRadius: 2.5, height: 40 }}
+                >
+                  Yenile
+                </Button>
+              )}
+            </Stack>
+
+            {!isMobile && (
+              <IconButton
+                onClick={() => {
+                  queryClient.invalidateQueries({ queryKey: ['masraflar'] });
+                  queryClient.invalidateQueries({ queryKey: ['masraf-stats'] });
+                }}
+                sx={{ color: 'var(--primary)', bgcolor: 'color-mix(in srgb, var(--primary) 8%, transparent)', borderRadius: 2 }}
+              >
+                <Refresh />
+              </IconButton>
+            )}
+
+            <Button
+              variant="outlined"
+              startIcon={<FileDownload />}
+              onClick={(e) => setExportAnchorEl(e.currentTarget)}
+              sx={{
+                borderRadius: 2.5,
+                textTransform: 'none',
                 borderColor: 'var(--border)',
                 color: 'var(--foreground)',
-              },
-              '& .MuiDataGrid-columnHeaders': {
-                backgroundColor: 'var(--muted)',
-                fontWeight: 700,
-                color: 'var(--foreground)',
-                borderBottom: '2px solid var(--border)',
-              },
-              '& .MuiDataGrid-row': {
-                backgroundColor: 'var(--background)',
-                '&:hover': {
-                  backgroundColor: 'var(--muted) !important',
-                },
-              },
-              '& .MuiDataGrid-footerContainer': {
-                borderTop: '1px solid var(--border)',
-                backgroundColor: 'var(--card)',
-              },
-            }}
-            slots={{
-              noRowsOverlay: DataGridNoRowsOverlay,
-            }}
-          />
+                height: 40,
+                px: 2,
+                '&:hover': { borderColor: 'var(--primary)', bgcolor: 'color-mix(in srgb, var(--primary) 4%, transparent)' }
+              }}
+            >
+              Dışa Aktar
+            </Button>
+
+            <Menu
+              anchorEl={exportAnchorEl}
+              open={openExportMenu}
+              onClose={() => setExportAnchorEl(null)}
+              PaperProps={{
+                sx: {
+                  borderRadius: 3,
+                  mt: 1,
+                  border: '1px solid var(--border)',
+                  boxShadow: '0 8px 16px -4px rgba(0,0,0,0.1)'
+                }
+              }}
+            >
+              <MenuItem onClick={handleExportExcel} sx={{ gap: 1.5, py: 1.2 }}>
+                <TableChart sx={{ color: '#16a34a' }} />
+                Excel (.xlsx)
+              </MenuItem>
+              <MenuItem onClick={handleExportPdf} sx={{ gap: 1.5, py: 1.2 }}>
+                <PictureAsPdf sx={{ color: '#dc2626' }} />
+                PDF (.pdf)
+              </MenuItem>
+            </Menu>
+          </Stack>
         </Paper>
 
-        {/* Kategori Bazlı Özet */}
-        {stats && stats.kategoriler && stats.kategoriler.length > 0 && (
-          <Paper sx={{ p: 2, mt: 3, bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
-            <Typography variant="h6" sx={{ mb: 2, display: 'flex', alignItems: 'center', gap: 1, color: 'var(--foreground)', fontWeight: 700 }}>
-              <Category sx={{ color: 'var(--muted-foreground)' }} />
-              Kategori Bazlı Masraflar
-            </Typography>
-            <Grid container spacing={2}>
-              {stats.kategoriler.map((kat) => (
-                <Grid size={{ xs: 12, md: 4 }} key={kat.kategoriId}>
-                  <Card variant="outlined" sx={{ bgcolor: 'var(--card)', borderColor: 'var(--border)' }}>
-                    <CardContent>
-                      <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>{kat.kategoriAdi}</Typography>
-                      <Typography variant="h6" sx={{ color: 'var(--destructive)', fontWeight: 700 }}>
-                        {formatCurrency(kat.toplam)}
-                      </Typography>
-                      <Typography variant="caption" sx={{ color: 'var(--muted-foreground)' }}>
-                        {kat.adet} kayıt
-                      </Typography>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </Paper>
+        {/* Kategori Bazlı Özet - Minimalist Bar */}
+        {stats && stats.categoryler && stats.categoryler.length > 0 && (
+          <Box sx={{
+            display: 'flex',
+            gap: 1.5,
+            overflowX: 'auto',
+            pb: 1,
+            mb: 1.5,
+            '&::-webkit-scrollbar': { display: 'none' },
+            msOverflowStyle: 'none',
+            scrollbarWidth: 'none'
+          }}>
+            {stats.categoryler.map((kat) => (
+              <Paper
+                key={kat.categoryId}
+                variant="outlined"
+                sx={{
+                  px: 1.8,
+                  py: 1.2,
+                  borderRadius: 3,
+                  minWidth: 'fit-content',
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 1.5,
+                  bgcolor: 'var(--card)',
+                  borderColor: 'var(--border)',
+                  transition: 'all 0.2s',
+                  '&:hover': {
+                    borderColor: 'var(--primary)',
+                    bgcolor: 'color-mix(in srgb, var(--primary) 2%, var(--card))'
+                  }
+                }}
+              >
+                <Box sx={{
+                  width: 8,
+                  height: 8,
+                  borderRadius: '50%',
+                  bgcolor: 'var(--primary)',
+                  opacity: 0.6
+                }} />
+                <Typography variant="caption" sx={{ fontWeight: 600, color: 'var(--muted-foreground)', whiteSpace: 'nowrap' }}>
+                  {kat.name}
+                </Typography>
+                <Typography variant="subtitle2" sx={{ fontWeight: 800, color: 'var(--foreground)', whiteSpace: 'nowrap' }}>
+                  {formatCurrency(kat.toplam)}
+                </Typography>
+                <Box sx={{
+                  px: 0.8,
+                  py: 0.2,
+                  borderRadius: 1,
+                  bgcolor: 'var(--muted)',
+                  display: 'flex',
+                  alignItems: 'center'
+                }}>
+                  <Typography variant="caption" sx={{ fontWeight: 700, fontSize: '0.65rem', color: 'var(--muted-foreground)' }}>
+                    {kat.adet}
+                  </Typography>
+                </Box>
+              </Paper>
+            ))}
+          </Box>
         )}
+
+        {/* DataGrid Area */}
+        <StandardCard padding={isMobile ? 0 : 1} sx={{ borderRadius: { xs: 2, md: 4 }, overflow: 'hidden', border: isMobile ? 'none' : '1px solid var(--border)' }}>
+          <Box sx={{ height: { xs: 500, md: 650 }, width: '100%' }}>
+            <DataGrid
+              rows={masraflar}
+              columns={masrafColumns}
+              loading={isMasrafLoading}
+              disableColumnMenu
+              disableRowSelectionOnClick
+              density={isMobile ? 'compact' : 'standard'}
+              columnHeaderHeight={48}
+              rowHeight={isMobile ? 52 : 60}
+              pageSizeOptions={[25, 50, 100]}
+              initialState={{
+                pagination: {
+                  paginationModel: { pageSize: 25, page: 0 },
+                },
+              }}
+              slots={{
+                noRowsOverlay: DataGridNoRowsOverlay,
+              }}
+              sx={{
+                border: 'none',
+                '& .MuiDataGrid-columnHeaders': {
+                  bgcolor: 'var(--muted)',
+                  color: 'var(--foreground)',
+                  fontWeight: 800,
+                  fontSize: isMobile ? '0.7rem' : '0.85rem',
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.05em',
+                },
+                '& .MuiDataGrid-cell': {
+                  borderColor: 'var(--border)',
+                  fontSize: isMobile ? '0.8rem' : '0.9rem',
+                },
+                '& .MuiDataGrid-row:hover': {
+                  bgcolor: 'color-mix(in srgb, var(--primary) 4%, transparent) !important',
+                },
+              }}
+            />
+          </Box>
+        </StandardCard>
+
+        {/* Audit Popover */}
+        <AuditPopover
+          anchorEl={auditAnchor.el}
+          data={auditAnchor.data}
+          onClose={() => setAuditAnchor({ el: null, data: null })}
+        />
+
 
         {/* Form Dialog */}
         <MasrafFormDialog
@@ -981,6 +1376,15 @@ export default function MasrafPage() {
           onClose={handleCloseDialog}
           onSubmit={handleSubmit}
           onFormChange={handleFormChange}
+          isMobile={isMobile}
+        />
+
+        {/* Kurumsal Yazdırma Formu */}
+        <ExpensePrintForm
+          open={printOpen}
+          expenses={masraflar}
+          onClose={() => setPrintOpen(false)}
+          dateRange={{ start: filterBaslangic, end: filterBitis }}
         />
 
         {/* Silme Dialog */}
@@ -991,46 +1395,95 @@ export default function MasrafPage() {
             sx: {
               bgcolor: 'var(--card)',
               backgroundImage: 'none',
+              borderRadius: 'var(--radius-xl)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-2xl)',
+              overflow: 'hidden',
+              minWidth: 320,
             },
           }}
         >
-          <DialogTitle component="div" sx={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}>Silme Onayı</DialogTitle>
-          <DialogContent sx={{ bgcolor: 'var(--background)' }}>
-            <Typography sx={{ color: 'var(--foreground)' }}>
-              Bu masraf kaydını silmek istediğinizden emin misiniz?
-              <br />
-              <strong>Kategori: </strong>{selectedMasraf?.kategori.kategoriAdi}
-              <br />
-              <strong>Tutar: </strong>{selectedMasraf && formatCurrency(selectedMasraf.tutar)}
-            </Typography>
+          <DialogTitle sx={{
+            fontWeight: 800,
+            color: 'var(--foreground)',
+            borderBottom: '1px solid var(--border)',
+            textAlign: 'center',
+            py: 2
+          }}>
+            Kayıt Silme Onayı
+          </DialogTitle>
+          <DialogContent sx={{ p: 3, bgcolor: 'var(--card)' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 2, pt: 1 }}>
+              <Box sx={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--destructive)',
+                mb: 1
+              }}>
+                <Delete sx={{ fontSize: 32 }} />
+              </Box>
+              <Typography variant="body1" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>
+                Bu masraf kaydını silmek istediğinizden emin misiniz?
+              </Typography>
+              <Box sx={{
+                width: '100%',
+                p: 2,
+                bgcolor: 'var(--background)',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--border)',
+                textAlign: 'left'
+              }}>
+                <Typography variant="caption" display="block" sx={{ color: 'var(--muted-foreground)', mb: 0.5 }}>MASRAF DETAYI</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>
+                  {selectedMasraf?.category?.name} - {selectedMasraf && formatCurrency(selectedMasraf.amount)}
+                </Typography>
+                <Typography variant="caption" display="block" sx={{ color: 'var(--muted-foreground)', mt: 1 }}>TARİH</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>
+                  {selectedMasraf && formatDate(selectedMasraf.date)}
+                </Typography>
+              </Box>
+            </Box>
           </DialogContent>
-          <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
+          <DialogActions sx={{ p: 2, bgcolor: 'color-mix(in srgb, var(--primary) 2%, var(--card))', borderTop: '1px solid var(--border)', gap: 1.5 }}>
             <Button
+              fullWidth
+              variant="outlined"
               onClick={() => setOpenDelete(false)}
               sx={{
-                borderColor: 'var(--border)',
+                borderRadius: 'var(--radius-lg)',
+                textTransform: 'none',
+                fontWeight: 600,
                 color: 'var(--foreground)',
-                '&:hover': {
-                  borderColor: 'var(--primary)',
-                  bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-                },
+                borderColor: 'var(--border)',
+                '&:hover': { borderColor: 'var(--primary)', bgcolor: 'transparent' }
               }}
             >
-              İptal
+              Vazgeç
             </Button>
             <Button
+              fullWidth
               variant="contained"
               onClick={handleDelete}
               disabled={actionLoading}
               sx={{
+                borderRadius: 'var(--radius-lg)',
+                textTransform: 'none',
+                fontWeight: 700,
                 bgcolor: 'var(--destructive)',
                 color: 'var(--destructive-foreground)',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--destructive) 30%, transparent)',
                 '&:hover': {
-                  bgcolor: 'color-mix(in srgb, var(--destructive) 90%, #000 10%)',
-                },
+                  bgcolor: 'color-mix(in srgb, var(--destructive) 90%, black)',
+                  boxShadow: '0 6px 16px color-mix(in srgb, var(--destructive) 40%, transparent)',
+                }
               }}
             >
-              Sil
+              Evet, Sil
             </Button>
           </DialogActions>
         </Dialog>
@@ -1041,192 +1494,287 @@ export default function MasrafPage() {
           onClose={() => setOpenKategoriDialog(false)}
           maxWidth="md"
           fullWidth
+          fullScreen={isMobile}
           PaperProps={{
             sx: {
               bgcolor: 'var(--card)',
               backgroundImage: 'none',
+              borderRadius: isMobile ? 0 : 'var(--radius-xl)',
+              border: isMobile ? 'none' : '1px solid var(--border)',
+              boxShadow: 'var(--shadow-2xl)',
+              overflow: 'hidden',
             },
           }}
         >
-          <DialogTitle component="div" sx={{
-            bgcolor: 'var(--secondary)',
-            color: 'var(--secondary-foreground)',
+          <Box sx={{
+            p: 2.5,
             display: 'flex',
             alignItems: 'center',
-            gap: 1,
+            justifyContent: 'space-between',
             borderBottom: '1px solid var(--border)',
+            background: 'linear-gradient(to right, var(--card), color-mix(in srgb, var(--primary) 3%, transparent))',
           }}>
-            <Category sx={{ color: 'var(--secondary-foreground)' }} />
-            Masraf Kategorileri
-          </DialogTitle>
-          <DialogContent sx={{ bgcolor: 'var(--background)' }}>
-            <Box sx={{ mt: 2 }}>
-              {/* Yeni/Düzenle Kategori Formu */}
-              <Paper sx={{ p: 2, mb: 3, bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
-                <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2, color: 'var(--foreground)' }}>
-                  {kategoriEditMode ? 'Kategori Düzenle' : 'Yeni Kategori Ekle'}
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+              <Box sx={{
+                width: 36,
+                height: 36,
+                borderRadius: 2,
+                bgcolor: 'color-mix(in srgb, var(--secondary) 10%, transparent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--secondary)',
+              }}>
+                <Category sx={{ fontSize: 20 }} />
+              </Box>
+              <Box>
+                <Typography variant="subtitle1" sx={{ fontWeight: 800, color: 'var(--foreground)', lineHeight: 1.2 }}>
+                  Masraf Kategorileri
                 </Typography>
-                <Grid container spacing={2}>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      label="Kategori Adı *"
-                      className="form-control-textfield"
-                      value={kategoriFormData.kategoriAdi}
-                      onChange={(e) => setKategoriFormData(prev => ({ ...prev, kategoriAdi: e.target.value }))}
-                      placeholder="Örn: Ofis Giderleri"
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12, md: 6 }}>
-                    <TextField
-                      fullWidth
-                      label="Açıklama"
-                      className="form-control-textfield"
-                      value={kategoriFormData.aciklama}
-                      onChange={(e) => setKategoriFormData(prev => ({ ...prev, aciklama: e.target.value }))}
-                      placeholder="Kategori açıklaması (opsiyonel)"
-                    />
-                  </Grid>
-                  <Grid size={{ xs: 12 }}>
-                    <Box sx={{ display: 'flex', gap: 2 }}>
+                <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 500 }}>
+                  Gider kalemlerinizi gruplandırın ve yönetin
+                </Typography>
+              </Box>
+            </Box>
+            <IconButton
+              size="small"
+              onClick={() => setOpenKategoriDialog(false)}
+              sx={{
+                color: 'var(--muted-foreground)',
+                transition: 'all 0.2s',
+                '&:hover': {
+                  color: 'var(--destructive)',
+                  bgcolor: 'color-mix(in srgb, var(--destructive) 8%, transparent)',
+                  transform: 'rotate(90deg)',
+                },
+              }}
+            >
+              <Close fontSize="small" />
+            </IconButton>
+          </Box>
+
+          <DialogContent sx={{ p: 0, bgcolor: 'var(--card)', height: isMobile ? '100%' : '70vh', display: 'flex', flexDirection: { xs: 'column', md: 'row' } }}>
+            {/* Sidebar: Liste ve Arama */}
+            <Box sx={{
+              width: { xs: '100%', md: '360px' },
+              borderRight: { xs: 'none', md: '1px solid var(--border)' },
+              borderBottom: { xs: '1px solid var(--border)', md: 'none' },
+              display: (isMobile && kategoriEditMode) ? 'none' : 'flex',
+              flexDirection: 'column',
+              bgcolor: 'color-mix(in srgb, var(--primary) 1%, var(--card))',
+              height: { xs: '100%', md: 'auto' }
+            }}>
+              <Box sx={{ p: 2, borderBottom: '1px solid var(--border)' }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
+                  <Typography variant="subtitle2" sx={{ fontWeight: 700 }}>Kategori Listesi</Typography>
+                  <Button
+                    size="small"
+                    startIcon={<Add />}
+                    onClick={() => {
+                      setKategoriEditMode(false);
+                      setSelectedKategori(null);
+                      setKategoriFormData({ name: '', notes: '' });
+                    }}
+                    sx={{ textTransform: 'none', fontWeight: 600 }}
+                  >
+                    Yeni Ekle
+                  </Button>
+                </Box>
+                <TextField
+                  fullWidth
+                  size="small"
+                  placeholder="Kategori ara..."
+                  value={categorySearch}
+                  onChange={(e) => setCategorySearch(e.target.value)}
+                  InputProps={{
+                    startAdornment: (
+                      <InputAdornment position="start">
+                        <Search sx={{ fontSize: 18, color: 'var(--muted-foreground)' }} />
+                      </InputAdornment>
+                    ),
+                    sx: { borderRadius: 'var(--radius-md)', bgcolor: 'var(--card)' }
+                  }}
+                />
+              </Box>
+              <Box sx={{ flex: 1, overflowY: 'auto', p: 1.5 }}>
+                <Stack spacing={1}>
+                  {kategoriler
+                    .filter(k => k.name.toLowerCase().includes(categorySearch.toLowerCase()))
+                    .map((kat) => {
+                      const stat = stats?.categoryler?.find(s => s.categoryId === kat.id);
+                      const percentage = stats?.toplamExpense ? ((stat?.toplam || 0) / stats.toplamExpense) * 100 : 0;
+                      const isActive = selectedKategori?.id === kat.id && kategoriEditMode;
+
+                      return (
+                        <Box
+                          key={kat.id}
+                          onClick={() => handleOpenKategoriDialog(kat)}
+                          sx={{
+                            p: 1.5,
+                            borderRadius: 'var(--radius-lg)',
+                            cursor: 'pointer',
+                            transition: 'all 0.2s',
+                            border: '1px solid',
+                            borderColor: isActive ? 'var(--primary)' : 'transparent',
+                            bgcolor: isActive ? 'color-mix(in srgb, var(--primary) 5%, var(--card))' : 'transparent',
+                            '&:hover': {
+                              bgcolor: isActive ? 'color-mix(in srgb, var(--primary) 8%, var(--card))' : 'var(--muted)',
+                              transform: 'translateX(4px)',
+                            }
+                          }}
+                        >
+                          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', mb: 1 }}>
+                            <Typography variant="body2" sx={{ fontWeight: 700, color: 'var(--foreground)' }}>
+                              {kat.name}
+                            </Typography>
+                            <Chip
+                              label={kat._count?.expenses || 0}
+                              size="small"
+                              sx={{ height: 18, fontSize: '0.65rem', fontWeight: 800, bgcolor: 'var(--background)', color: 'var(--muted-foreground)' }}
+                            />
+                          </Box>
+                          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
+                            <Box sx={{ flex: 1, height: 4, bgcolor: 'var(--border)', borderRadius: 2, overflow: 'hidden' }}>
+                              <Box sx={{
+                                width: `${Math.min(100, percentage)}%`,
+                                height: '100%',
+                                bgcolor: 'var(--secondary)',
+                                borderRadius: 2
+                              }} />
+                            </Box>
+                            <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', fontWeight: 600, minWidth: 35 }}>
+                              %{Math.round(percentage)}
+                            </Typography>
+                          </Box>
+                          <Typography variant="caption" sx={{ color: 'var(--muted-foreground)', display: 'block', mt: 0.5 }}>
+                            {formatCurrency(stat?.toplam || 0)} harcama
+                          </Typography>
+                        </Box>
+                      );
+                    })}
+                </Stack>
+              </Box>
+            </Box>
+
+            {/* Main: Form ve Detay */}
+            <Box sx={{
+              flex: 1,
+              p: { xs: 2.5, md: 4 },
+              display: (isMobile && !kategoriEditMode) ? 'none' : 'flex',
+              flexDirection: 'column',
+              bgcolor: 'var(--card)',
+              overflowY: 'auto'
+            }}>
+              <Box sx={{ mb: 4 }}>
+                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 1 }}>
+                  {isMobile && kategoriEditMode && (
+                    <IconButton
+                      size="small"
+                      onClick={() => setKategoriEditMode(false)}
+                      sx={{ mr: 1, color: 'var(--primary)' }}
+                    >
+                      <Visibility sx={{ transform: 'rotate(180deg)' }} />
+                    </IconButton>
+                  )}
+                  <Typography variant="h6" sx={{ fontWeight: 800, color: 'var(--foreground)' }}>
+                    {kategoriEditMode ? 'Kategori Düzenle' : 'Yeni Kategori Tanımla'}
+                  </Typography>
+                </Box>
+                <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
+                  {kategoriEditMode
+                    ? 'Kategori bilgilerini güncelleyerek harcamalarınızı daha iyi organize edin.'
+                    : 'Masraflarınızı gruplandırmak için yeni bir kategori adı ve isteğe bağlı açıklama girin.'}
+                </Typography>
+              </Box>
+
+              <Stack spacing={3}>
+                <TextField
+                  fullWidth
+                  label="Kategori Başlığı *"
+                  className="form-control-textfield"
+                  value={kategoriFormData.name}
+                  onChange={(e) => setKategoriFormData(prev => ({ ...prev, name: e.target.value }))}
+                  placeholder="Harcama grubunu isimlendirin..."
+                />
+                <TextField
+                  fullWidth
+                  label="Açıklama"
+                  className="form-control-textfield"
+                  value={kategoriFormData.notes}
+                  onChange={(e) => setKategoriFormData(prev => ({ ...prev, notes: e.target.value }))}
+                  placeholder="Bu kategori neleri kapsıyor? (Opsiyonel)"
+                  multiline
+                  rows={3}
+                />
+
+                <Box sx={{ display: 'flex', gap: 2, pt: 2 }}>
+                  <Button
+                    variant="contained"
+                    onClick={handleKategoriSubmit}
+                    disabled={actionLoading}
+                    sx={{
+                      px: 4,
+                      height: 44,
+                      borderRadius: 'var(--radius-lg)',
+                      bgcolor: 'var(--secondary)',
+                      color: 'var(--secondary-foreground)',
+                      textTransform: 'none',
+                      fontWeight: 700,
+                      boxShadow: '0 4px 12px color-mix(in srgb, var(--secondary) 25%, transparent)',
+                      '&:hover': {
+                        bgcolor: 'color-mix(in srgb, var(--secondary) 90%, black)',
+                        boxShadow: '0 6px 16px color-mix(in srgb, var(--secondary) 35%, transparent)',
+                      },
+                    }}
+                  >
+                    {kategoriEditMode ? 'Değişiklikleri Kaydet' : 'Kategoriyi Oluştur'}
+                  </Button>
+                  {kategoriEditMode && (
+                    <Box sx={{ display: 'flex', gap: 1 }}>
                       <Button
-                        variant="contained"
-                        startIcon={kategoriEditMode ? <Edit /> : <Add />}
-                        onClick={handleKategoriSubmit}
-                        disabled={actionLoading}
+                        variant="outlined"
+                        onClick={() => {
+                          setKategoriEditMode(false);
+                          setSelectedKategori(null);
+                          setKategoriFormData({ name: '', notes: '' });
+                        }}
                         sx={{
-                          bgcolor: 'var(--secondary)',
-                          color: 'var(--secondary-foreground)',
-                          '&:hover': {
-                            bgcolor: 'var(--secondary-hover)',
-                          },
+                          height: 44,
+                          borderRadius: 'var(--radius-lg)',
+                          textTransform: 'none',
+                          fontWeight: 600,
+                          color: 'var(--muted-foreground)',
+                          borderColor: 'var(--border)',
                         }}
                       >
-                        {kategoriEditMode ? 'Güncelle' : 'Kategori Ekle'}
+                        Vazgeç
                       </Button>
-                      {kategoriEditMode && (
-                        <Button
-                          variant="outlined"
-                          onClick={() => {
-                            setKategoriEditMode(false);
-                            setSelectedKategori(null);
-                            setKategoriFormData({ kategoriAdi: '', aciklama: '' });
-                          }}
-                          sx={{
-                            borderColor: 'var(--border)',
-                            color: 'var(--foreground)',
-                            '&:hover': {
-                              borderColor: 'var(--primary)',
-                              bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-                            },
-                          }}
-                        >
-                          İptal
-                        </Button>
-                      )}
+                      <IconButton
+                        onClick={() => {
+                          setOpenKategoriDelete(true);
+                        }}
+                        sx={{
+                          width: 44,
+                          height: 44,
+                          borderRadius: 'var(--radius-lg)',
+                          color: 'var(--destructive)',
+                          bgcolor: 'color-mix(in srgb, var(--destructive) 8%, transparent)',
+                          '&:hover': { bgcolor: 'color-mix(in srgb, var(--destructive) 15%, transparent)' }
+                        }}
+                        disabled={!!selectedKategori?._count?.expenses}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
                     </Box>
-                  </Grid>
-                </Grid>
-              </Paper>
+                  )}
+                </Box>
+              </Stack>
 
-              {/* Mevcut Kategoriler Listesi */}
-              <Typography variant="subtitle1" fontWeight={700} sx={{ mb: 2, color: 'var(--foreground)' }}>
-                Mevcut Kategoriler ({kategoriler.length})
-              </Typography>
-              <TableContainer component={Paper} sx={{ bgcolor: 'var(--card)', boxShadow: 'var(--shadow-sm)' }}>
-                <Table size="small">
-                  <TableHead>
-                    <TableRow sx={{ bgcolor: 'var(--muted)' }}>
-                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}>Kategori Adı</TableCell>
-                      <TableCell sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}>Açıklama</TableCell>
-                      <TableCell align="center" sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}>Masraf Sayısı</TableCell>
-                      <TableCell align="right" sx={{ fontWeight: 700, color: 'var(--foreground) !important' }}>İşlemler</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {kategoriler.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={4} align="center" sx={{ py: 3 }}>
-                          <Typography sx={{ color: 'var(--muted-foreground)' }}>Kategori bulunamadı</Typography>
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      kategoriler.map((kat) => (
-                        <TableRow
-                          key={kat.id}
-                          hover
-                          sx={{
-                            bgcolor: 'var(--background)',
-                            '&:hover': {
-                              bgcolor: 'var(--muted) !important',
-                            },
-                            borderBottom: '1px solid var(--border)',
-                          }}
-                        >
-                          <TableCell>
-                            <Typography variant="body2" fontWeight={500} sx={{ color: 'var(--foreground)' }}>
-                              {kat.kategoriAdi}
-                            </Typography>
-                          </TableCell>
-                          <TableCell>
-                            <Typography variant="body2" sx={{ color: 'var(--muted-foreground)' }}>
-                              {kat.aciklama || '-'}
-                            </Typography>
-                          </TableCell>
-                          <TableCell align="center">
-                            <Chip
-                              label={kat._count?.masraflar || 0}
-                              size="small"
-                              sx={{
-                                bgcolor: kat._count?.masraflar
-                                  ? 'color-mix(in srgb, var(--chart-2) 15%, transparent)'
-                                  : 'color-mix(in srgb, var(--muted-foreground) 10%, transparent)',
-                                color: kat._count?.masraflar ? 'var(--chart-2)' : 'var(--muted-foreground)',
-                                borderColor: kat._count?.masraflar ? 'var(--chart-2)' : 'var(--border)',
-                              }}
-                              variant="outlined"
-                            />
-                          </TableCell>
-                          <TableCell align="right">
-                            <Tooltip title="Düzenle">
-                              <IconButton
-                                size="small"
-                                onClick={() => handleOpenKategoriDialog(kat)}
-                                sx={{
-                                  color: 'var(--chart-3)',
-                                  '&:hover': {
-                                    bgcolor: 'color-mix(in srgb, var(--chart-3) 10%, transparent)',
-                                  },
-                                }}
-                              >
-                                <Edit fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                            <Tooltip title="Sil">
-                              <IconButton
-                                size="small"
-                                onClick={() => {
-                                  setSelectedKategori(kat);
-                                  setOpenKategoriDelete(true);
-                                }}
-                                sx={{
-                                  color: 'var(--destructive)',
-                                  '&:hover': {
-                                    bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
-                                  },
-                                }}
-                                disabled={!!kat._count?.masraflar}
-                              >
-                                <Delete fontSize="small" />
-                              </IconButton>
-                            </Tooltip>
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
+              {kategoriEditMode && (selectedKategori?._count?.expenses ?? 0) > 0 && (
+                <Alert severity="info" sx={{ mt: 'auto', borderRadius: 'var(--radius-lg)', bgcolor: 'color-mix(in srgb, var(--primary) 5%, var(--card))', border: 'none' }}>
+                  Bu kategoride {selectedKategori?._count?.expenses} adet harcama kaydı bulunmaktadır.
+                </Alert>
+              )}
             </Box>
           </DialogContent>
           <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
@@ -1254,55 +1802,103 @@ export default function MasrafPage() {
             sx: {
               bgcolor: 'var(--card)',
               backgroundImage: 'none',
+              borderRadius: 'var(--radius-xl)',
+              border: '1px solid var(--border)',
+              boxShadow: 'var(--shadow-2xl)',
+              overflow: 'hidden',
+              minWidth: 320,
             },
           }}
         >
-          <DialogTitle component="div" sx={{ color: 'var(--foreground)', borderBottom: '1px solid var(--border)' }}>Kategori Silme Onayı</DialogTitle>
-          <DialogContent sx={{ bgcolor: 'var(--background)' }}>
-            <Typography sx={{ color: 'var(--foreground)' }}>
-              Bu kategoriyi silmek istediğinizden emin misiniz?
-              <br />
-              <strong>Kategori: </strong>{selectedKategori?.kategoriAdi}
-              <br />
-              <br />
-              {selectedKategori?._count?.masraflar ? (
-                <Alert severity="error" sx={{ mt: 2 }}>
-                  Bu kategoride {selectedKategori._count.masraflar} adet masraf kaydı var. Önce bu kayıtları silmeniz veya başka kategoriye taşımanız gerekir.
+          <DialogTitle sx={{
+            fontWeight: 800,
+            color: 'var(--foreground)',
+            borderBottom: '1px solid var(--border)',
+            textAlign: 'center',
+            py: 2
+          }}>
+            Kategori Silme Onayı
+          </DialogTitle>
+          <DialogContent sx={{ p: 3, bgcolor: 'var(--card)' }}>
+            <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 2, pt: 1 }}>
+              <Box sx={{
+                width: 56,
+                height: 56,
+                borderRadius: '50%',
+                bgcolor: 'color-mix(in srgb, var(--destructive) 10%, transparent)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                color: 'var(--destructive)',
+                mb: 1
+              }}>
+                <Delete sx={{ fontSize: 32 }} />
+              </Box>
+              <Typography variant="body1" sx={{ color: 'var(--foreground)', fontWeight: 500 }}>
+                Bu kategoriyi silmek istediğinizden emin misiniz?
+              </Typography>
+
+              <Box sx={{
+                width: '100%',
+                p: 2,
+                bgcolor: 'var(--background)',
+                borderRadius: 'var(--radius-lg)',
+                border: '1px solid var(--border)',
+                textAlign: 'left',
+                mt: 1
+              }}>
+                <Typography variant="caption" display="block" sx={{ color: 'var(--muted-foreground)', mb: 0.5 }}>KATEGORİ ADI</Typography>
+                <Typography variant="body2" sx={{ fontWeight: 600, color: 'var(--foreground)' }}>
+                  {selectedKategori?.name}
+                </Typography>
+              </Box>
+
+              {selectedKategori?._count?.expenses ? (
+                <Alert severity="error" sx={{ mt: 2, width: '100%', borderRadius: 'var(--radius-md)' }}>
+                  Bu kategoride **{selectedKategori._count.expenses}** adet masraf kaydı var. Önce bu kayıtları silmeniz gerekir.
                 </Alert>
               ) : (
-                <Alert severity="warning" sx={{ mt: 2 }}>
+                <Alert severity="warning" sx={{ mt: 2, width: '100%', borderRadius: 'var(--radius-md)' }}>
                   Bu işlem geri alınamaz!
                 </Alert>
               )}
-            </Typography>
+            </Box>
           </DialogContent>
-          <DialogActions sx={{ bgcolor: 'var(--card)', borderTop: '1px solid var(--border)' }}>
+          <DialogActions sx={{ p: 2, bgcolor: 'color-mix(in srgb, var(--primary) 2%, var(--card))', borderTop: '1px solid var(--border)', gap: 1.5 }}>
             <Button
+              fullWidth
+              variant="outlined"
               onClick={() => setOpenKategoriDelete(false)}
               sx={{
-                borderColor: 'var(--border)',
+                borderRadius: 'var(--radius-lg)',
+                textTransform: 'none',
+                fontWeight: 600,
                 color: 'var(--foreground)',
-                '&:hover': {
-                  borderColor: 'var(--primary)',
-                  bgcolor: 'color-mix(in srgb, var(--primary) 10%, transparent)',
-                },
+                borderColor: 'var(--border)',
+                '&:hover': { borderColor: 'var(--primary)', bgcolor: 'transparent' }
               }}
             >
-              İptal
+              Vazgeç
             </Button>
             <Button
+              fullWidth
               variant="contained"
               onClick={handleKategoriDelete}
-              disabled={actionLoading || !!selectedKategori?._count?.masraflar}
+              disabled={actionLoading || !!selectedKategori?._count?.expenses}
               sx={{
+                borderRadius: 'var(--radius-lg)',
+                textTransform: 'none',
+                fontWeight: 700,
                 bgcolor: 'var(--destructive)',
                 color: 'var(--destructive-foreground)',
+                boxShadow: '0 4px 12px color-mix(in srgb, var(--destructive) 30%, transparent)',
                 '&:hover': {
-                  bgcolor: 'color-mix(in srgb, var(--destructive) 90%, #000 10%)',
-                },
+                  bgcolor: 'color-mix(in srgb, var(--destructive) 90%, black)',
+                  boxShadow: '0 6px 16px color-mix(in srgb, var(--destructive) 40%, transparent)',
+                }
               }}
             >
-              Sil
+              Evet, Sil
             </Button>
           </DialogActions>
         </Dialog>
@@ -1319,6 +1915,6 @@ export default function MasrafPage() {
           </Alert>
         </Snackbar>
       </Box>
-    </MainLayout>
+    </StandardPage >
   );
 }

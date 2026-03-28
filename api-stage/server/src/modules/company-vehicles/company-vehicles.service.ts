@@ -13,12 +13,14 @@ export class CompanyVehiclesService {
 
     async create(createDto: CreateCompanyVehicleDto) {
         const tenantId = await this.tenantResolver.resolveForCreate();
-        const { registrationDate, ...rest } = createDto;
+        const { registrationDate, lastInspectionDate, insuranceDate, ...rest } = createDto;
 
         return this.prisma.companyVehicle.create({
             data: {
                 ...rest,
                 registrationDate: registrationDate ? new Date(registrationDate) : undefined,
+                lastInspectionDate: lastInspectionDate ? new Date(lastInspectionDate) : undefined,
+                insuranceDate: insuranceDate ? new Date(insuranceDate) : undefined,
                 tenantId,
             },
         });
@@ -65,13 +67,15 @@ export class CompanyVehiclesService {
     async update(id: string, updateDto: UpdateCompanyVehicleDto) {
         await this.findOne(id); // Ensure it exists and belongs to the tenant
 
-        const { registrationDate, ...rest } = updateDto;
+        const { registrationDate, lastInspectionDate, insuranceDate, ...rest } = updateDto;
 
         return this.prisma.companyVehicle.update({
             where: { id },
             data: {
                 ...rest,
                 registrationDate: registrationDate ? new Date(registrationDate) : undefined,
+                lastInspectionDate: lastInspectionDate ? new Date(lastInspectionDate) : undefined,
+                insuranceDate: insuranceDate ? new Date(insuranceDate) : undefined,
             },
         });
     }

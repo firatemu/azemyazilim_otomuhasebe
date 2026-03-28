@@ -114,6 +114,8 @@ export default function NewCariDialog({ open, onClose, onSuccess, showSnackbar }
             sector: data.sektor || undefined,
             customCode1: data.ozelKod1 || undefined,
             customCode2: data.ozelKod2 || undefined,
+            efaturaPostaKutusu: data.efaturaPostaKutusu || undefined,
+            efaturaGondericiBirim: data.efaturaGondericiBirim || undefined,
         };
 
         // Şahıs şirketi değilse TC ve isim-soyisim temizle
@@ -137,7 +139,7 @@ export default function NewCariDialog({ open, onClose, onSuccess, showSnackbar }
         }
 
         // Boş alanları temizle
-        const nullableFields = ['phone', 'email', 'contactName', 'taxNumber', 'taxOffice', 'nationalId', 'fullName', 'address', 'website', 'fax', 'sector', 'customCode1', 'customCode2', 'bankInfo', 'salesAgentId'];
+        const nullableFields = ['phone', 'email', 'contactName', 'taxNumber', 'taxOffice', 'nationalId', 'fullName', 'address', 'website', 'fax', 'sector', 'customCode1', 'customCode2', 'bankInfo', 'salesAgentId', 'efaturaPostaKutusu', 'efaturaGondericiBirim'];
         nullableFields.forEach(field => {
             if (dataToSend[field] !== undefined && (dataToSend[field] === '' || dataToSend[field] === null)) {
                 dataToSend[field] = undefined;

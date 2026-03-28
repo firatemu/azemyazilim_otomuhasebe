@@ -48,5 +48,17 @@ export class CreateCompanyVehicleDto {
 
     @IsString()
     @IsOptional()
+    registrationSerialNo?: string;
+
+    @IsDateString()
+    @IsOptional()
+    lastInspectionDate?: string;
+
+    @IsDateString()
+    @IsOptional()
+    insuranceDate?: string;
+
+    @IsString()
+    @IsOptional()
     notes?: string;
 }
